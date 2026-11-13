@@ -392,24 +392,6 @@
     }
   </details>
 
-  <section class="group import-exclusions" [class.guest-locked]="guest()" [attr.inert]="guest() ? '' : null" [attr.aria-disabled]="guest() ? 'true' : null">
-    <div class="group-head">
-      <h3>Exclusion lists for imports</h3>
-      <span class="saved-to" [title]="'In import-excluded.json at the top of ' + libraryPlace() + ' - it goes wherever the library goes'">Saved in {{ libraryPlace() }}</span>
-    </div>
-    <p class="hint">
-      When your library is read, files with no date in their name or no index entry are offered
-      in Resolve issues found in your library, except any you said not to ask about again - those
-      are kept on exclusion lists in <code>import-excluded.json</code> at the top of the library.
-    </p>
-    <button type="button" class="button reset-exclusions"
-            [disabled]="!canResetExclusions() || resettingExclusions()"
-            [title]="canResetExclusions() ? '' : 'Open a library you can write to first'"
-            (click)="resetExclusions()">
-      Reset exclusion lists for imports
-    </button>
-  </section>
-
   <section class="group index-cache" [class.guest-locked]="guest()" [attr.inert]="guest() ? '' : null" [attr.aria-disabled]="guest() ? 'true' : null">
     <div class="group-head">
       <h3>Dropbox library cache</h3>
@@ -637,6 +619,23 @@
           }
         </div>
       }
+
+      <div class="advanced-part import-exclusions">
+        <div class="group-head">
+          <h4>Exclusion lists for imports</h4>
+          <span class="saved-to" [title]="'In import-excluded.json at the top of ' + libraryPlace() + ' - it goes wherever the library goes'">Saved in {{ libraryPlace() }}</span>
+        </div>
+        <p class="hint">
+          Keeps track of the files you told FicFairy to ignore in the Resolve Issues pop-up. Clearing
+          this is safe and does not affect any of your files.
+        </p>
+        <button type="button" class="button reset-exclusions"
+                [disabled]="!canResetExclusions() || resettingExclusions()"
+                [title]="canResetExclusions() ? '' : 'Open a library you can write to first'"
+                (click)="resetExclusions()">
+          Reset exclusion lists for imports
+        </button>
+      </div>
 
       @if (debugMode.allowed()) {
         <div class="advanced-part debug-mode">

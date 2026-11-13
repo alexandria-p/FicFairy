@@ -367,8 +367,10 @@ describe('UserSettings', () => {
     await open();
 
     const section = element.querySelector('.import-exclusions')!;
-    expect(section.querySelector('h3')?.textContent).toContain('Exclusion lists for imports');
-    expect(section.querySelector('.hint')?.textContent).toContain('import-excluded.json');
+    // a part of Advanced now
+    expect(section.closest('details.advanced')).not.toBeNull();
+    expect(section.querySelector('h4')?.textContent).toContain('Exclusion lists for imports');
+    expect(section.querySelector('.hint')?.textContent).toContain('files you told FicFairy to ignore');
     const button = section.querySelector<HTMLButtonElement>('button.reset-exclusions')!;
     expect(button.textContent?.trim()).toBe('Reset exclusion lists for imports');
     button.click();
@@ -793,7 +795,7 @@ describe('UserSettings', () => {
     // and within it, each part says where it is kept
     expect(element.querySelector('.advanced-part.naming > .saved-to')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Saved to settings.ini');
     expect(element.querySelector('.advanced-part.debug-mode .saved-to')?.textContent?.trim()).toBe('Saved to this browser');
-    expect(named).toContainEqual(['Exclusion lists for imports', 'Saved in your library folder']);
+    expect(element.querySelector('.advanced-part.import-exclusions .saved-to')?.textContent?.trim()).toBe('Saved in your library folder');
     // a helper on this computer offers its settings.ini
     expect(named).toContainEqual(['settings.ini', 'Saved to settings.ini']);
     expect(element.querySelector('.browser-note')).toBeNull();
