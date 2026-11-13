@@ -4,9 +4,6 @@ Keep your own copy of your AO3 bookmarks and collections on your computer or Dro
 
 **This app works best in Chrome web browser.**
 
-**[Try it in your browser](https://alexandria-p.github.io/ficfairy/app/)** - opens in guest mode, with a
-made-up library and pretend runs, so you can look around before downloading anything.
-
 ![The works list](docs/screenshots/works.png)
 _Font: Lexend, Colour Palette: Light - Strawberry Milk_
 
