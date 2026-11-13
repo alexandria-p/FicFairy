@@ -938,7 +938,7 @@ describe('UserSettings', () => {
 
   it('says nothing in the library is lost, and opens on everything it can clear, ticked', async () => {
     await open();
-    expect(element.querySelector('.clear-browser .nothing-lost')?.textContent).toContain('Nothing in your library is lost');
+    expect(element.querySelector('.clear-browser .nothing-lost')?.textContent).toContain('Your downloaded works will not be lost');
     expect(element.querySelector('.choose-clear')?.textContent).toContain('Choose what to clear');
     await openClear();
     const ids = [...element.querySelectorAll('[data-clear]')].map((x) => x.getAttribute('data-clear'));
