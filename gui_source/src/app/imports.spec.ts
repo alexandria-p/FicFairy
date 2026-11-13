@@ -9,6 +9,8 @@ import {
   modifiedTimes,
   importRequests,
   removeFiles,
+  patiently,
+  SLOW_DOWN_TRIES,
   LibraryImports,
   dateFiles,
   datedName,
@@ -22,6 +24,7 @@ import {
 } from './imports';
 import { Library } from './library';
 import { LibraryStore } from './library-store';
+import { DropboxError } from './dropbox';
 
 /** a library in memory, by path: what is renamed moves */
 class MemoryStore implements LibraryStore {
@@ -292,6 +295,68 @@ describe('duplicates', () => {
     expect(importRequests(base)).toBe(4 + 8 * 2);
     expect(importRequests({ ...base, replaceOutdated: true })).toBe(4 + 8 * 2 + 30);
     expect(importRequests({ ...base, scope: 'skip' })).toBe(4);
+  });
+
+  it('waits and deletes again a file Dropbox asked us to slow down for, as long as it said', async () => {
+    const store = new MemoryStore(['works/1 a.html', 'works/1 b.html']);
+    const refused = new Set(['works/1 b.html']);
+    store.delete = async (path: string) => {
+      if (refused.delete(path)) throw new DropboxError('Dropbox asked us to slow down.', 429, '', 3);
+      store.files.delete(path);
+    };
+    const waited: number[] = [];
+    const result = await removeFiles(store, ['works/1 a.html', 'works/1 b.html'], undefined, undefined, undefined,
+      async (ms) => { waited.push(ms); });
+    expect(result.removed).toEqual(['works/1 a.html', 'works/1 b.html']);
+    expect(result.failed).toEqual([]);
+    expect(waited).toEqual([3000]);
+  });
+
+  it('takes a write refused for too many at once as asking to slow down, waiting longer each time', async () => {
+    let tries = 0;
+    const waited: number[] = [];
+    const answer = await patiently(async () => {
+      if (++tries < 4) throw new DropboxError('busy', 409, 'too_many_write_operations/');
+      return 'done';
+    }, () => false, async (ms) => { waited.push(ms); });
+    expect(answer).toBe('done');
+    expect(waited).toEqual([1000, 2000, 4000]);
+  });
+
+  it('gives a file up after so many slow-downs, and never retries any other failure', async () => {
+    const store = new MemoryStore(['works/1 a.html', 'works/1 b.html']);
+    let asked = 0;
+    store.delete = async (path: string) => {
+      asked++;
+      if (path.endsWith('a.html')) throw new DropboxError('Dropbox asked us to slow down.', 429);
+      throw new Error('locked');
+    };
+    const result = await removeFiles(store, ['works/1 a.html', 'works/1 b.html'], undefined, undefined, undefined,
+      async () => {});
+    expect(result.failed.map((f) => f.path)).toEqual(['works/1 a.html', 'works/1 b.html']);
+    expect(asked).toBe(SLOW_DOWN_TRIES + 1);
+  });
+
+  it('stops waiting on a slow-down once the window is closed', async () => {
+    let stop = false;
+    const store = new MemoryStore(['works/1 a.html']);
+    store.delete = async () => { throw new DropboxError('Dropbox asked us to slow down.', 429, '', 60); };
+    const result = await removeFiles(store, ['works/1 a.html'], undefined, () => stop, undefined,
+      async () => { stop = true; });
+    expect(result.failed.map((f) => f.path)).toEqual(['works/1 a.html']);
+  });
+
+  it('renames again a file Dropbox asked us to slow down for', async () => {
+    const store = new MemoryStore(['works/1 a.html']);
+    let refusedOnce = false;
+    const rename = store.rename.bind(store);
+    store.rename = async (from: string, to: string) => {
+      if (!refusedOnce) { refusedOnce = true; throw new DropboxError('slow down', 429); }
+      await rename(from, to);
+    };
+    const result = await dateFiles(store, [{ path: 'works/1 a.html', to: 'works/1 a 2024-01-01.html' }],
+      undefined, undefined, undefined, async () => {});
+    expect(result.renamed).toEqual([{ from: 'works/1 a.html', to: 'works/1 a 2024-01-01.html' }]);
   });
 
   it('removes each file, carrying on past one that will not go', async () => {

@@ -21,6 +21,7 @@ import { Misnamed, misnamedFiles } from './renames';
 import { WORKS_FOLDER } from './library-setup';
 import { Library, OpenableFormat, OPENABLE_FORMATS } from './library';
 import { DropboxLibraryStore, LibraryStore } from './library-store';
+import { DropboxError } from './dropbox';
 import { VisitLog } from './visit-log';
 
 /** one file in `works/` named for a work */
@@ -203,6 +204,7 @@ export async function dateFiles(
   progress: (done: number, total: number) => void = () => undefined,
   stopped: () => boolean = () => false,
   result: DatingResult = { renamed: [], failed: [] },
+  pause: (ms: number) => Promise<void> = wait,
 ): Promise<DatingResult> {
   for (const [index, { path, to }] of renames.entries()) {
     if (stopped()) break;
@@ -211,7 +213,7 @@ export async function dateFiles(
       continue;
     }
     try {
-      await store.rename(path, to);
+      await patiently(() => store.rename(path, to), stopped, pause);
       result.renamed.push({ from: path, to });
     } catch (error) {
       result.failed.push({ path, error: error instanceof Error ? error.message : String(error) });
@@ -369,11 +371,12 @@ export async function removeFiles(
   progress: (done: number, total: number) => void = () => undefined,
   stopped: () => boolean = () => false,
   result: RemovingResult = { removed: [], failed: [] },
+  pause: (ms: number) => Promise<void> = wait,
 ): Promise<RemovingResult> {
   for (const [index, path] of paths.entries()) {
     if (stopped()) break;
     try {
-      await store.delete(path);
+      await patiently(() => store.delete(path), stopped, pause);
       result.removed.push(path);
     } catch (error) {
       result.failed.push({ path, error: error instanceof Error ? error.message : String(error) });
@@ -381,6 +384,47 @@ export async function removeFiles(
     progress(index + 1, paths.length);
   }
   return result;
+}
+
+/** how many times one file is tried when Dropbox keeps asking us to slow down */
+export const SLOW_DOWN_TRIES = 5;
+
+/**
+ * How long Dropbox asked us to wait before trying again, in seconds, or null when the error is
+ * not Dropbox asking us to slow down. That is a 429 (`Retry-After` when it gave one, else 0), or
+ * a write refused because too many came at once (`too_many_write_operations`, a 409).
+ */
+export function slowDownSeconds(error: unknown): number | null {
+  if (!(error instanceof DropboxError)) return null;
+  if (error.status === 429) return error.retryAfter ?? 0;
+  return /too_many_(write_operations|requests)/.test(error.summary) ? 0 : null;
+}
+
+/**
+ * Do one library write, trying it again when Dropbox asks us to slow down - deleting or renaming
+ * thousands of duplicates one after another runs into Dropbox's limit on writes, and a file it
+ * turned away is not one that failed. Waits as long as Dropbox said, else 1, 2, 4, 8 seconds;
+ * gives up after `SLOW_DOWN_TRIES`, or at once when stopped. Anything else is thrown as it came.
+ */
+export async function patiently<T>(
+  act: () => Promise<T>,
+  stopped: () => boolean = () => false,
+  pause: (ms: number) => Promise<void> = wait,
+): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await act();
+    } catch (error) {
+      const seconds = slowDownSeconds(error);
+      if (seconds === null || attempt >= SLOW_DOWN_TRIES || stopped()) throw error;
+      await pause(Math.max(seconds, 2 ** (attempt - 1)) * 1000);
+      if (stopped()) throw error;
+    }
+  }
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /** a file to be given a date, with the index entry of its work when there is one */
