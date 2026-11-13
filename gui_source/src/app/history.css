@@ -1,0 +1,462 @@
+.history {
+  margin: 20px 0 40px;
+}
+
+.history-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.meta-line {
+  margin: -6px 0 16px;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+}
+
+/* an (i) beside the heading whose text shows on hover or keyboard focus */
+.info-tip {
+  position: relative;
+  display: inline-flex;
+  margin-left: 6px;
+  vertical-align: middle;
+  font-size: 0.8rem;
+  font-weight: 400;
+  cursor: help;
+  outline: none;
+}
+
+.info-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border: 1px solid var(--accent-line);
+  border-radius: 50%;
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-style: italic;
+  font-family: Georgia, serif;
+}
+
+.info-tip:hover .info-mark,
+.info-tip:focus-visible .info-mark {
+  background: var(--accent-bg);
+}
+
+.info-text {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: -8px;
+  z-index: 20;
+  width: max-content;
+  max-width: min(340px, 80vw);
+  padding: 8px 10px;
+  border: 1px solid var(--accent-line);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--text);
+  line-height: 1.45;
+  box-shadow: 0 4px 14px var(--backdrop);
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.info-tip:hover .info-text,
+.info-tip:focus .info-text {
+  visibility: visible;
+  opacity: 1;
+}
+
+.history-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.notice {
+  margin: 0 0 12px;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+.run {
+  /* holds the floated status corner inside the card */
+  display: flow-root;
+  margin: 0 0 12px;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 3px;
+  background: var(--surface);
+  font-size: 0.88rem;
+}
+
+/* the outcome is the first thing worth seeing, so it colours the whole card's edge */
+.run-success { border-left-color: var(--ok-text); }
+.run-partial { border-left-color: var(--warn-text); }
+.run-stopped,
+.run-interrupted { border-left-color: var(--warn-border); }
+/* ended by the helper, not by anything going wrong - the colour of a stop */
+.run-abandoned { border-left-color: var(--warn-border); }
+.run-failed { border-left-color: var(--danger); }
+.run-running,
+.run-active { border-left-color: var(--accent); }
+.run { border-left-width: 5px; }
+
+/* the corner floats, so the date sits straight under the name rather than under the pill and
+   Retry stacked beside it; the card holds the float (display: flow-root on .run) */
+.run-head {
+  display: block;
+}
+
+/* how it ended, with Retry under it, in the card's top right corner */
+.run-corner {
+  float: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 0 0 6px 12px;
+}
+
+/* Retry's straight top edge ends where the pill's straight bottom edge does, each going into
+   its curve at the same point: in by the pill's corner (half its height - 0.75rem of text at
+   line-height 1.5, 2px padding and 1px border each side) less the button's own 3px corner */
+.run-corner .retry {
+  margin-right: calc(0.5625rem + 3px - 3px);
+}
+
+.run-name {
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+/* how a run ended, as a pill in its status colour - the first thing read on a card */
+.run-status {
+  flex: none;
+  /* its height is set by these, so Retry can be lined up with where its round end begins */
+  line-height: 1.5;
+  padding: 2px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-strong);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.run-success .run-status {
+  border-color: var(--ok-border);
+  background: var(--ok-bg);
+  color: var(--ok-text);
+}
+
+.run-partial .run-status,
+.run-stopped .run-status,
+.run-interrupted .run-status,
+.run-abandoned .run-status {
+  border-color: var(--warn-border);
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.run-failed .run-status {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.run-running .run-status,
+.run-active .run-status {
+  border-color: var(--accent-line);
+  background: var(--accent-bg);
+  color: var(--accent-text);
+}
+
+.run-when {
+  margin: 2px 0 8px;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+}
+
+.run-error {
+  margin: 0 0 8px;
+  color: var(--danger-text);
+}
+
+.hint {
+  margin: 0 0 8px;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+}
+
+.run-settings {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  margin: 0 0 8px;
+  font-size: 0.84rem;
+}
+
+.run-settings dt {
+  color: var(--text-dim);
+}
+
+.run-settings dd {
+  margin: 0;
+}
+
+.run-choices {
+  margin: 0 0 8px;
+  font-size: 0.84rem;
+  color: var(--text-dim);
+}
+
+.run-choices p {
+  margin: 0 0 4px;
+}
+
+.run-choice {
+  margin: 0 0 6px;
+}
+
+/* whether you chose, or a default was taken: quieter than the answer itself */
+.run-choice .how {
+  font-style: italic;
+  font-size: 0.8rem;
+}
+
+.ids {
+  margin-top: 4px;
+  font-size: 0.84rem;
+}
+
+.ids summary {
+  padding: 3px 0;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.ids summary:hover {
+  color: var(--text-strong);
+}
+
+.ids-count {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 0.76rem;
+}
+
+.ids.failed summary {
+  color: var(--danger-text);
+}
+
+/* work numbers wrap as a dense block - a long column of them would be unreadable */
+.id-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 4px;
+  padding: 0;
+  list-style: none;
+}
+
+.id-list a {
+  display: inline-block;
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--accent-text);
+  font-size: 0.8rem;
+  text-decoration: none;
+}
+
+.id-list a:hover {
+  border-color: var(--border-strong);
+}
+
+.reason-list {
+  margin: 6px 0 4px;
+  padding: 0;
+  list-style: none;
+}
+
+.reason-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  padding: 2px 0;
+}
+
+.reason-list .reason,
+.reason-list .who {
+  color: var(--text-dim);
+  font-size: 0.82rem;
+}
+
+/* the run going now - pinned, and told apart from the record of runs gone */
+.run-active {
+  border-color: var(--accent-line);
+  background: var(--accent-bg);
+}
+
+.run-issues {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+/* the last resort for a run that will not stop: quiet until asked for, then plain about it */
+.force-stop {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.force-stop-confirm {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--danger-border);
+  border-radius: 3px;
+  background: var(--danger-bg);
+}
+
+.force-stop-confirm p {
+  margin: 0 0 8px;
+}
+
+.force-stop-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* the tab's buttons, styled as on the other tabs - without these they were the browser's own */
+.button {
+  display: inline-block;
+  font-family: inherit;
+  padding: 6px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--surface-2);
+  color: var(--text-strong);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.button.primary {
+  border-color: var(--accent-line);
+  background: var(--accent-fill);
+}
+
+.button.primary:hover:not(:disabled) {
+  background: var(--accent-fill-hover);
+}
+
+.button.danger {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.button.danger:hover:not(:disabled) {
+  background: var(--danger-bg-hover);
+}
+
+/* a run whose indexing broke off: amber, as a copy to check is - something did not happen,
+   but nothing went wrong with what did */
+.index-gaps {
+  margin: 8px 0;
+  padding: 8px 12px;
+  border: 1px solid var(--warn-border);
+  border-radius: 4px;
+  background: var(--warn-bg);
+  font-size: 0.88rem;
+}
+
+.index-gaps p,
+.index-gaps ul {
+  margin: 0 0 6px;
+}
+
+
+
+/* Refresh, as an icon beside 'List refreshed': spins while the list is read again */
+.refresh-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* the gap is all margin, with no space before it in any template, so it is the same on every tab */
+  margin-left: 6px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 3px;
+  /* transparent in every state - hover only colours the arrow */
+  background: transparent;
+  appearance: none;
+  color: var(--text-dim);
+  /* sat on the text's baseline and a pixel below it: the arrow's middle then meets the middle
+     of the capitals and digits beside it, which is where the eye lines it up */
+  vertical-align: -1px;
+  cursor: pointer;
+}
+
+.refresh-icon svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+  transform-origin: 50% 50%;
+}
+
+.refresh-icon:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+.refresh-icon:disabled {
+  background: transparent;
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* spinning is the point while it reads: not faded with the rest of a held button */
+.refresh-icon.spinning:disabled {
+  opacity: 1;
+  color: var(--accent);
+}
+
+.refresh-icon.spinning svg {
+  animation: refresh-spin 1s linear infinite;
+}
+
+@keyframes refresh-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .refresh-icon.spinning svg { animation: none; }
+}

@@ -1,0 +1,62 @@
+<section class="name-pattern">
+    <h4>File name pattern</h4>
+    <p class="hint">
+      Drag the parts into the order you want (or use the arrows). FicFairy will use this rule when
+      reading files from your library, and will save any new downloaded fics in this format.
+      FicFairy always reads and writes dates as <code>YYYY-MM-DD</code>
+    </p>
+    <!-- ready-made patterns, above the parts they fill and apart from Save, so neither reads as saving -->
+    <div class="pattern-presets">
+      <button type="button" class="button" (click)="usePreset(defaultPattern)">Reset to app default</button>
+      <button type="button" class="button" (click)="usePreset(ao3Pattern)">Set to AO3 default (with a date)</button>
+    </div>
+    <ol class="pattern-parts" aria-label="The parts of a file name, in order">
+      @for (token of order(); track token; let at = $index; let last = $last) {
+        <li class="pattern-part" draggable="true" [attr.data-token]="token"
+            (dragstart)="dragStart(at)" (dragover)="$event.preventDefault()" (drop)="dropOn(at)">
+          <span class="grip" aria-hidden="true">&#8942;&#8942;</span>
+          <span class="token">{{ tokenLabels[token] }}</span>
+          <button type="button" class="icon nudge" [disabled]="at === 0" (click)="nudge(at, -1)"
+                  [attr.aria-label]="'Move ' + tokenLabels[token] + ' earlier'">&larr;</button>
+          <button type="button" class="icon nudge" [disabled]="last" (click)="nudge(at, 1)"
+                  [attr.aria-label]="'Move ' + tokenLabels[token] + ' later'">&rarr;</button>
+        </li>
+        @if (!last) {
+          <li class="pattern-separator">
+            <input type="text" [maxLength]="separatorMax" [value]="separators()[at]"
+                   [attr.aria-label]="'Between ' + tokenLabels[token] + ' and ' + tokenLabels[order()[at + 1]]"
+                   (input)="setSeparator(at, $any($event.target).value)" />
+            <!-- a box holding only spaces looks empty: say so -->
+            @if (separators()[at] && !separators()[at].trim()) {
+              <span class="sep-hint">{{ separators()[at].length === 1 ? 'a space' : separators()[at].length + ' spaces' }}</span>
+            }
+          </li>
+        }
+      }
+    </ol>
+    <!-- the preview: what the parts above make, before anything is saved -->
+    <p class="pattern-text">Pattern: <code>{{ patternEdited() }}</code></p>
+    <p class="pattern-example">For example: <code>{{ patternExample() }}</code></p>
+    @if (patternProblem()) {
+      <p class="warning pattern-problem" role="alert">{{ patternProblem() }}</p>
+    }
+    @if (patternEditable() === false) {
+      <p class="hint pattern-readonly">
+        This can only be changed on a helper running on this computer - a hosted copy's settings.ini
+        comes from its deployment.
+      </p>
+    }
+    <div class="pattern-actions">
+      <button type="button" class="button primary" (click)="savePattern()"
+              [disabled]="!!patternProblem() || !patternChanged() || !patternEditable() || patternSaving()">
+        {{ patternSaving() ? 'Saving...' : 'Save and offer renames' }}
+      </button>
+      <!-- an edit not yet written to settings.ini changes nothing: say so beside the button that would -->
+      @if (patternChanged() && !patternSaving()) {
+        <span class="pattern-unsaved" role="status">Unsaved changes - nothing is renamed or saved this way until you save.</span>
+      }
+    </div>
+    @if (patternSaid(); as said) {
+      <p class="pattern-said" [class.warning]="said.problem" role="status">{{ said.text }}</p>
+    }
+</section>

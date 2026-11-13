@@ -1,0 +1,770 @@
+{
+  "_about": "The made-up library FicFairy shows: the README screenshots (docs/screenshots/make-screenshots.js), debug mode dummy data and guest mode all read this file. Change it here. Safe for work, no real AO3 username - Example_* and made-up names only.",
+  "works": [
+    {
+      "indexFile": "90000001 Spooky Scary Skeletons - jack_in_the_box.json",
+      "entry": {
+        "id": "90000001",
+        "link": "https://archiveofourown.org/works/90000001",
+        "source": "https://archiveofourown.org/users/Example_Reader/bookmarks",
+        "bookmarked": true,
+        "last_indexed": "2026-11-05T10:00:00+00:00",
+        "indexes": [
+          {
+            "indexed_on": "2026-11-05T10:00:00+00:00",
+            "id": "90000001",
+            "link": "https://archiveofourown.org/works/90000001",
+            "title": "Spooky Scary Skeletons",
+            "authors": [
+              "jack_in_the_box"
+            ],
+            "date_created": null,
+            "date_updated": "2026-11-03",
+            "fandoms": [
+              "Nightmare Before Christmas"
+            ],
+            "warnings": [
+              "No Archive Warnings Apply"
+            ],
+            "tags": {
+              "rating": "General Audiences",
+              "categories": [
+                "Gen"
+              ],
+              "relationships": [],
+              "characters": [],
+              "additional": [
+                "Alternate Universe",
+                "Coffee Shop AU",
+                "Slice of Life",
+                "Fluffy",
+                "Jack Skellington Is a Softy"
+              ]
+            },
+            "summary": "Turns out this bag of old bones can learn new tricks, with a little pumpkin spice and a lot of holiday magic.",
+            "words": 19000,
+            "chapters_published": 5,
+            "chapters_total": 5,
+            "comments": 60,
+            "kudos": 395,
+            "bookmarks": 55,
+            "hits": 5050,
+            "date_bookmarked": "2026-11-04",
+            "bookmark_notes": "",
+            "bookmark_tags": [],
+            "bookmark_collections": [],
+            "bookmark_private": false,
+            "bookmark_rec": false
+          }
+        ]
+      },
+      "files": [
+        "90000001 Spooky Scary Skeletons - jack_in_the_box 2026-11-03.epub"
+      ]
+    },
+    {
+      "indexFile": "90000002 I'm Just Like You, You're Just Like Me - vamp_lover.json",
+      "entry": {
+        "id": "90000002",
+        "link": "https://archiveofourown.org/works/90000002",
+        "source": "https://archiveofourown.org/users/Example_Reader/bookmarks",
+        "bookmarked": true,
+        "last_indexed": "2026-11-05T10:00:00+00:00",
+        "indexes": [
+          {
+            "indexed_on": "2026-11-05T10:00:00+00:00",
+            "id": "90000002",
+            "link": "https://archiveofourown.org/works/90000002",
+            "title": "I'm Just Like You, You're Just Like Me",
+            "authors": [
+              "vamp_lover"
+            ],
+            "date_created": null,
+            "date_updated": "2026-11-01",
+            "fandoms": [
+              "Sinners (2025)"
+            ],
+            "warnings": [
+              "Creator Chose Not To Use Archive Warnings"
+            ],
+            "tags": {
+              "rating": "Teen And Up Audiences",
+              "categories": [
+                "Gen"
+              ],
+              "relationships": [],
+              "characters": [],
+              "additional": [
+                "Modern AU",
+                "Multiverse Theory",
+                "Angst",
+                "Bring Your Tissueboxes This Is A Sad One"
+              ]
+            },
+            "summary": "In every life, it's always been Smoke and Stack against the world. Back-to-back, back-to-wall.",
+            "words": 34200,
+            "chapters_published": 9,
+            "chapters_total": 12,
+            "comments": 108,
+            "kudos": 519,
+            "bookmarks": 67,
+            "hits": 6690,
+            "date_bookmarked": "2026-11-02",
+            "bookmark_notes": "",
+            "bookmark_tags": [],
+            "bookmark_collections": [],
+            "bookmark_private": false,
+            "bookmark_rec": false
+          }
+        ]
+      },
+      "files": [
+        "90000002 I'm Just Like You, You're Just Like Me - vamp_lover 2026-11-01.pdf",
+        "90000002 I'm Just Like You, You're Just Like Me - vamp_lover 2026-11-01.epub",
+        "90000002 I'm Just Like You, You're Just Like Me - vamp_lover 2026-11-01.azw3"
+      ]
+    },
+    {
+      "indexFile": "80000001 Luna Virtuoso - maple_leaf_mischief.json",
+      "entry": {
+        "id": "80000001",
+        "link": "https://archiveofourown.org/works/80000001",
+        "source": "https://archiveofourown.org/users/Example_Reader/bookmarks",
+        "bookmarked": true,
+        "last_indexed": "2026-11-05T10:00:00+00:00",
+        "indexes": [
+          {
+            "indexed_on": "2026-11-05T10:00:00+00:00",
+            "id": "80000001",
+            "link": "https://archiveofourown.org/works/80000001",
+            "title": "Luna Virtuoso",
+            "authors": [
+              "maple_leaf_mischief"
+            ],
+            "date_created": null,
+            "date_updated": "2026-10-30",
+            "fandoms": [
+              "Heated Rivalry (TV)"
+            ],
+            "warnings": [
+              "No Archive Warnings Apply"
+            ],
+            "tags": {
+              "rating": "Teen And Up Audiences",
+              "categories": [
+                "M/M"
+              ],
+              "relationships": [
+                "Shane Hollander/Ilya Rozanov"
+              ],
+              "characters": [
+                "Shane Hollander",
+                "Ilya Rozanov"
+              ],
+              "additional": [
+                "Post-Canon",
+                "Established Relationship",
+                "Domestic Fluff",
+                "The Cottage",
+                "Lake Days",
+                "Ilya Rozanov Is a Menace",
+                "Soft Shane Hollander",
+                "Vignettes"
+              ]
+            },
+            "summary": "Moments from the cottage.",
+            "words": 45600,
+            "chapters_published": 12,
+            "chapters_total": 12,
+            "comments": 144,
+            "kudos": 612,
+            "bookmarks": 76,
+            "hits": 7920,
+            "date_bookmarked": "2026-10-31",
+            "bookmark_notes": "The one I reread every time the off-season starts. Chapter 4, the thunderstorm, gets me every time.",
+            "bookmark_tags": [
+              "comfort read",
+              "reread",
+              "favourites"
+            ],
+            "bookmark_collections": [],
+            "bookmark_private": false,
+            "bookmark_rec": true
+          }
+        ]
+      },
+      "files": [
+        "80000001 Luna Virtuoso - maple_leaf_mischief 2026-10-30.html",
+        "80000001 Luna Virtuoso - maple_leaf_mischief 2026-10-30.epub"
+      ]
+    },
+    {
+      "indexFile": "80000002 Pizza time! - extra_cheese_please.json",
+      "entry": {
+        "id": "80000002",
+        "link": "https://archiveofourown.org/works/80000002",
+        "source": "https://archiveofourown.org/users/Example_Reader/bookmarks",
+        "bookmarked": true,
+        "last_indexed": "2026-11-05T10:00:00+00:00",
+        "indexes": [
+          {
+            "indexed_on": "2026-11-05T10:00:00+00:00",
+            "id": "80000002",
+            "link": "https://archiveofourown.org/works/80000002",
+            "title": "Pizza time!",
+            "authors": [
+              "extra_cheese_please"
+            ],
+            "date_created": null,
+            "date_updated": "2026-10-28",
+            "fandoms": [
+              "Spider-Man - All Media Types",
+              "Batman - All Media Types",
+              "Justice League - All Media Types"
+            ],
+            "warnings": [
+              "No Archive Warnings Apply"
+            ],
+            "tags": {
+              "rating": "Teen And Up Audiences",
+              "categories": [
+                "Gen"
+              ],
+              "relationships": [],
+              "characters": [
+                "Peter Parker",
+                "Bruce Wayne",
+                "Alfred Pennyworth",
+                "Dick Grayson",
+                "Jason Todd",
+                "Damian Wayne",
+                "Clark Kent",
+                "Diana (Wonder Woman)"
+              ],
+              "additional": [
+                "Crossover",
+                "Humor",
+                "Crack Treated Seriously",
+                "Pizza Delivery",
+                "Peter Parker Needs a Nap",
+                "Batfamily Shenanigans",
+                "Bruce Wayne Is Bad at Feelings",
+                "Everyone Wants To Adopt Peter Parker"
+              ]
+            },
+            "summary": "Not the delivery boy Gotham wants, but the one it deserves",
+            "words": 26600,
+            "chapters_published": 7,
+            "chapters_total": 20,
+            "comments": 84,
+            "kudos": 457,
+            "bookmarks": 61,
+            "hits": 5870,
+            "date_bookmarked": "2026-10-29",
+            "bookmark_notes": "Waiting on the Justice League chapter. Damian vs. pineapple on pizza is canon to me now.",
+            "bookmark_tags": [
+              "crack",
+              "to finish",
+              "laughed out loud"
+            ],
+            "bookmark_collections": [],
+            "bookmark_private": false,
+            "bookmark_rec": false
+          }
+        ]
+      },
+      "files": [
+        "80000002 Pizza time! - extra_cheese_please 2026-10-28.html",
+        "80000002 Pizza time! - extra_cheese_please 2026-10-28.pdf"
+      ]
+    },
+    {
+      "indexFile": "80000003 Sink these bones - clicker_lullaby.json",
+      "entry": {
+        "id": "80000003",
+        "link": "https://archiveofourown.org/works/80000003",
+        "source": "https://archiveofourown.org/users/Example_Reader/bookmarks",
+        "bookmarked": false,
+        "last_indexed": "2026-11-05T10:00:00+00:00",
+        "indexes": [
+          {
+            "indexed_on": "2026-11-05T10:00:00+00:00",
+            "id": "80000003",
+            "link": "https://archiveofourown.org/works/80000003",
+            "title": "Sink these bones",
+            "authors": [
+              "clicker_lullaby"
+            ],
+            "date_created": null,
+            "date_updated": "2026-10-21",
+            "fandoms": [
+              "The Last of Us (TV)"
+            ],
+            "warnings": [
+              "Creator Chose Not To Use Archive Warnings"
+            ],
+            "tags": {
+              "rating": "Teen And Up Audiences",
+              "categories": [
+                "Gen"
+              ],
+              "relationships": [],
+              "characters": [
+                "Joel Miller",
+                "Ellie Williams",
+                "Tommy Miller"
+              ],
+              "additional": [
+                "Alternate Universe - Canon Divergence",
+                "Zombie Apocalypse",
+                "Undead Joel Miller",
+                "Dead Man Walking",
+                "the ticker is both his watch and his literal heart",
+                "both stopped when his metaphorical heart did on on outbreak night (stick with me here, it’s a metaphor)",
+                "Found Family",
+                "Angst",
+                "Dark Humor",
+                "Protective Joel Miller"
+              ]
+            },
+            "summary": "Zombies aren’t the only dead things still walking ‘round here. Life hasn’t beat in Joel’s chest since the old ticker stopped on outbreak night.",
+            "words": 11400,
+            "chapters_published": 3,
+            "chapters_total": 3,
+            "comments": 36,
+            "kudos": 333,
+            "bookmarks": 49,
+            "hits": 4230,
+            "date_bookmarked": "",
+            "bookmark_notes": "",
+            "bookmark_tags": [],
+            "bookmark_collections": [],
+            "bookmark_private": false,
+            "bookmark_rec": false
+          }
+        ],
+        "from_link": true
+      },
+      "files": [
+        "80000003 Sink these bones - clicker_lullaby 2026-10-21.html"
+      ]
+    },
+    {
+      "indexFile": "80000004 Crawling back to you - wrong_vent_buddy.json",
+      "entry": {
+        "id": "80000004",
+        "link": "https://archiveofourown.org/works/80000004",
+        "source": "https://archiveofourown.org/users/Example_Reader/bookmarks",
+        "bookmarked": true,
+        "last_indexed": "2026-11-05T10:00:00+00:00",
+        "indexes": [
+          {
+            "indexed_on": "2026-11-05T10:00:00+00:00",
+            "id": "80000004",
+            "link": "https://archiveofourown.org/works/80000004",
+            "title": "Crawling back to you",
+            "authors": [
+              "wrong_vent_buddy"
+            ],
+            "date_created": null,
+            "date_updated": "2026-10-11",
+            "fandoms": [
+              "The Avengers (Marvel Movies)",
+              "Alien (1979)"
+            ],
+            "warnings": [
+              "Graphic Depictions Of Violence"
+            ],
+            "tags": {
+              "rating": "Mature",
+              "categories": [
+                "Gen"
+              ],
+              "relationships": [],
+              "characters": [
+                "Clint Barton",
+                "Ellen Ripley",
+                "Natasha Romanov",
+                "Jonesy (Alien)",
+                "Lucky the Pizza Dog"
+              ],
+              "additional": [
+                "Crossover",
+                "Alternate Universe - Space",
+                "Horror",
+                "Clint Barton Lives in the Vents",
+                "Clint Barton Needs a Hug",
+                "Cats",
+                "Dogs",
+                "Lucky the Pizza Dog Is a Good Boy",
+                "Suspense"
+              ]
+            },
+            "summary": "There’s something in the air vents of the USCSS Nostromo. Clint just wants to get home to his dog in one piece.",
+            "words": 57000,
+            "chapters_published": 15,
+            "chapters_total": null,
+            "comments": 180,
+            "kudos": 705,
+            "bookmarks": 85,
+            "hits": 9150,
+            "date_bookmarked": "2026-10-12",
+            "bookmark_notes": "",
+            "bookmark_tags": [],
+            "bookmark_collections": [],
+            "bookmark_private": false,
+            "bookmark_rec": false
+          }
+        ]
+      },
+      "files": [
+        "80000004 Crawling back to you - wrong_vent_buddy 2026-10-11.html",
+        "80000004 Crawling back to you - wrong_vent_buddy 2026-10-11.epub",
+        "80000004 Crawling back to you - wrong_vent_buddy 2026-10-11.pdf"
+      ]
+    },
+    {
+      "indexFile": "80000005 I'd wanna be felled by you, held by you, fuel the pyre of your enemies (Blackthorn tree) - bones_and_blue_eyes.json",
+      "entry": {
+        "id": "80000005",
+        "link": "https://archiveofourown.org/works/80000005",
+        "source": "https://archiveofourown.org/users/Example_Reader/bookmarks",
+        "bookmarked": false,
+        "last_indexed": "2026-11-05T10:00:00+00:00",
+        "indexes": [
+          {
+            "indexed_on": "2026-11-05T10:00:00+00:00",
+            "id": "80000005",
+            "link": "https://archiveofourown.org/works/80000005",
+            "title": "I'd wanna be felled by you, held by you, fuel the pyre of your enemies (Blackthorn tree)",
+            "authors": [
+              "bones_and_blue_eyes"
+            ],
+            "date_created": null,
+            "date_updated": "2026-09-02",
+            "fandoms": [
+              "Star Trek: Alternate Original Series (Movies)"
+            ],
+            "warnings": [
+              "Major Character Death"
+            ],
+            "tags": {
+              "rating": "Teen And Up Audiences",
+              "categories": [
+                "M/M"
+              ],
+              "relationships": [
+                "James T. Kirk/Leonard McCoy"
+              ],
+              "characters": [
+                "Leonard McCoy",
+                "James T. Kirk",
+                "Spock (Star Trek)"
+              ],
+              "additional": [
+                "Alternate Universe - Fantasy",
+                "Death Personified",
+                "James T. Kirk Is Death",
+                "Doctor Leonard McCoy",
+                "Pining",
+                "Slow Burn",
+                "Bittersweet",
+                "Folklore"
+              ]
+            },
+            "summary": "Leonard is old friends with death. It’s a hazard of the profession - but no one ever warned him that its eyes would be quite so blue.",
+            "words": 3800,
+            "chapters_published": 1,
+            "chapters_total": 1,
+            "comments": 12,
+            "kudos": 271,
+            "bookmarks": 43,
+            "hits": 3410,
+            "date_bookmarked": "",
+            "bookmark_notes": "",
+            "bookmark_tags": [],
+            "bookmark_collections": [],
+            "bookmark_private": false,
+            "bookmark_rec": false
+          }
+        ],
+        "from_import": true
+      },
+      "files": [
+        "80000005 I'd wanna be felled by you, held by you, fuel the pyre of your enemies (Blackthorn tree) - bones_and_blue_eyes 2026-09-02.html"
+      ]
+    },
+    {
+      "indexFile": "80000006 Turnabout is Fair play - camelot_kettle.json",
+      "entry": {
+        "id": "80000006",
+        "link": "https://archiveofourown.org/works/80000006",
+        "source": "https://archiveofourown.org/users/Example_Reader/bookmarks",
+        "bookmarked": true,
+        "last_indexed": "2026-11-05T10:00:00+00:00",
+        "indexes": [
+          {
+            "indexed_on": "2026-11-05T10:00:00+00:00",
+            "id": "80000006",
+            "link": "https://archiveofourown.org/works/80000006",
+            "title": "Turnabout is Fair play",
+            "authors": [
+              "camelot_kettle"
+            ],
+            "date_created": null,
+            "date_updated": "2026-08-17",
+            "fandoms": [
+              "Merlin (TV)"
+            ],
+            "warnings": [
+              "No Archive Warnings Apply"
+            ],
+            "tags": {
+              "rating": "General Audiences",
+              "categories": [
+                "Gen"
+              ],
+              "relationships": [
+                "Arthur & Merlin (Merlin)"
+              ],
+              "characters": [
+                "Merlin (Merlin)",
+                "Arthur Pendragon (Merlin)",
+                "Gaius (Merlin)",
+                "Gwen (Merlin)"
+              ],
+              "additional": [
+                "5+1 Things",
+                "Protective Arthur",
+                "Merlin Is Bad at Self-Preservation",
+                "Hurt/Comfort",
+                "Friendship",
+                "Destiny",
+                "Canon Era"
+              ]
+            },
+            "summary": "Five times Merlin saved Arthur, and one time Arthur saved him.",
+            "words": 83600,
+            "chapters_published": 22,
+            "chapters_total": 22,
+            "comments": 264,
+            "kudos": 922,
+            "bookmarks": 106,
+            "hits": 12020,
+            "date_bookmarked": "2026-08-18",
+            "bookmark_notes": "",
+            "bookmark_tags": [],
+            "bookmark_collections": [],
+            "bookmark_private": true,
+            "bookmark_rec": false
+          }
+        ]
+      },
+      "files": [
+        "80000006 Turnabout is Fair play - camelot_kettle 2026-08-17.html",
+        "80000006 Turnabout is Fair play - camelot_kettle 2026-08-17.epub"
+      ]
+    }
+  ],
+  "collections": [
+    {
+      "name": "spookyoctoberfest2026",
+      "link": "https://archiveofourown.org/collections/spookyoctoberfest2026",
+      "last_indexed": "2026-11-05T10:00:00+00:00",
+      "indexes": [
+        {
+          "title": "Spooky Octoberfest 2026",
+          "description": "A month of spooky bingo prompts.",
+          "maintainers": [
+            "Example_Moderator"
+          ],
+          "tags": [
+            "scary",
+            "themed"
+          ],
+          "active_since": "2026-10-01",
+          "created": "2026-09-20",
+          "flags": [
+            "Open",
+            "Moderated"
+          ],
+          "challenge_type": "Prompt Meme",
+          "multifandom": true,
+          "closed": false,
+          "moderated": true,
+          "unrevealed": false,
+          "anonymous": false,
+          "fandom_count": 9,
+          "work_count": 4,
+          "bookmark_count": 0,
+          "subcollection_count": 0,
+          "parent_collection": null,
+          "subcollections_link": null,
+          "subcollections": [],
+          "work_ids": [
+            "90000001",
+            "90000002",
+            "80000003",
+            "80000005"
+          ],
+          "bookmark_ids": [],
+          "external_ids": []
+        }
+      ]
+    }
+  ],
+  "customCollections": [
+    {
+      "name": "custom-0123456789",
+      "custom": true,
+      "link": null,
+      "title": "My local collection",
+      "description": "Some of my favorites",
+      "tags": [
+        "comfort",
+        "found-family"
+      ],
+      "maintainers": [],
+      "closed": true,
+      "moderated": true,
+      "unrevealed": false,
+      "anonymous": false,
+      "multifandom": false,
+      "challenge_type": "No Challenge",
+      "work_ids": [
+        "80000001",
+        "80000004",
+        "80000006"
+      ],
+      "bookmark_ids": [],
+      "external_ids": [],
+      "indexes": [
+        {
+          "last_indexed": "2026-11-05"
+        }
+      ]
+    }
+  ],
+  "runs": [
+    {
+      "file": "20261105T090000Z-aaaa1111.json",
+      "run": {
+        "filetypes": [
+          "JSON",
+          "HTML",
+          "EPUB"
+        ],
+        "options": {},
+        "reindexed": [
+          "90000001",
+          "90000002"
+        ],
+        "downloaded": [
+          "90000001",
+          "90000002"
+        ],
+        "updated": [
+          "80000001"
+        ],
+        "choices": [],
+        "skipped": [],
+        "failures": [],
+        "error": "",
+        "username": "Example_Reader",
+        "log": [
+          "[2026-11-05 09:00:00 UTC] logging in"
+        ],
+        "id": "aaaa1111-1",
+        "action": "quick",
+        "actionName": "Quick Scan",
+        "status": "success",
+        "started": "2026-11-05T09:00:00+00:00",
+        "finished": "2026-11-05T09:12:00+00:00"
+      }
+    },
+    {
+      "file": "20261102T090000Z-bbbb2222.json",
+      "run": {
+        "filetypes": [
+          "JSON",
+          "HTML",
+          "EPUB"
+        ],
+        "options": {},
+        "reindexed": [
+          "80000003"
+        ],
+        "downloaded": [
+          "80000003"
+        ],
+        "updated": [],
+        "choices": [],
+        "skipped": [],
+        "failures": [
+          {
+            "id": "80000098",
+            "link": "https://archiveofourown.org/works/80000098",
+            "error": "EPUB: 404"
+          }
+        ],
+        "error": "",
+        "username": "Example_Reader",
+        "log": [
+          "[2026-11-05 09:00:00 UTC] logging in"
+        ],
+        "id": "bbbb2222-2",
+        "action": "works",
+        "actionName": "Download/update several fics",
+        "status": "partial",
+        "started": "2026-11-02T09:00:00+00:00",
+        "finished": "2026-11-02T09:05:00+00:00"
+      }
+    },
+    {
+      "file": "20261028T090000Z-cccc3333.json",
+      "run": {
+        "filetypes": [
+          "JSON",
+          "HTML",
+          "EPUB"
+        ],
+        "options": {},
+        "reindexed": [
+          "90000001",
+          "90000002",
+          "80000001",
+          "80000002",
+          "80000003",
+          "80000004",
+          "80000005",
+          "80000006"
+        ],
+        "downloaded": [
+          "90000001",
+          "90000002",
+          "80000001",
+          "80000002",
+          "80000003",
+          "80000004",
+          "80000005",
+          "80000006"
+        ],
+        "updated": [],
+        "choices": [],
+        "skipped": [],
+        "failures": [],
+        "error": "",
+        "username": "Example_Reader",
+        "log": [
+          "[2026-11-05 09:00:00 UTC] logging in"
+        ],
+        "id": "cccc3333-3",
+        "action": "bookmarks",
+        "actionName": "(Full scan) Reindex & Update All",
+        "status": "success",
+        "started": "2026-10-28T09:00:00+00:00",
+        "finished": "2026-10-28T11:40:00+00:00"
+      }
+    }
+  ]
+}

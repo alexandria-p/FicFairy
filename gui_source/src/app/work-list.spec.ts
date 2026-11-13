@@ -1,0 +1,724 @@
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { WorkList } from './work-list';
+import { Library } from './library';
+import { Bookmark } from './bookmarks';
+
+/**
+ * Narrowing a listing that is already on disk.
+ *
+ * Every filter here reads what the folder holds, so it costs no requests and works with the
+ * helper stopped. What it must never do is quietly show less than it says it is showing.
+ */
+
+interface Partial {
+  id: string;
+  title?: string;
+  authors?: string[];
+  updated?: string;
+  bookmarked?: string;
+  created?: string;
+}
+
+function work(given: Partial): Bookmark {
+  return {
+    id: given.id,
+    link: `https://archiveofourown.org/works/${given.id}`,
+    title: given.title ?? `Work ${given.id}`,
+    authors: given.authors ?? ['Writer'],
+    date_created: given.created ?? null,
+    date_updated: given.updated ?? '01 Jan 2020',
+    fandoms: ['A Fandom'],
+    warnings: ['No Archive Warnings Apply'],
+    tags: {
+      rating: 'General Audiences',
+      categories: [],
+      relationships: [],
+      characters: [],
+      additional: [],
+    },
+    summary: '',
+    words: 100,
+    chapters_published: 1,
+    chapters_total: 1,
+    comments: null,
+    kudos: null,
+    bookmarks: null,
+    hits: null,
+    date_bookmarked: given.bookmarked ?? '02 Feb 2021',
+    bookmark_notes: '',
+    bookmark_tags: [],
+    bookmark_collections: [],
+    bookmark_private: false,
+    bookmark_rec: false,
+  } as Bookmark;
+}
+
+let fixture: ComponentFixture<WorkList>;
+let element: HTMLElement;
+
+async function listing(works: Bookmark[]) {
+  fixture = TestBed.createComponent(WorkList);
+  fixture.componentRef.setInput('works', works);
+  await fixture.whenStable();
+  element = fixture.nativeElement as HTMLElement;
+}
+
+function shownTitles(): string[] {
+  // `a.title` only: the heading also links every author, and those are not titles
+  return Array.from(element.querySelectorAll('.blurb .heading a.title')).map(
+    (a) => a.textContent?.trim() ?? '',
+  );
+}
+
+function shownCount(): number {
+  return element.querySelectorAll('.blurb').length;
+}
+
+async function type(name: string, value: string) {
+  const input = element.querySelector<HTMLInputElement>(`input[name="${name}"]`)!;
+  input.value = value;
+  input.dispatchEvent(new Event('input'));
+  await fixture.whenStable();
+}
+
+const LIBRARY = [
+  work({ id: '1', title: 'No Paths Are Bound', authors: ['Cataclysmic_Cal'],
+         updated: '14 Dec 2024', bookmarked: '01 Mar 2025' }),
+  work({ id: '2', title: 'Catch and Release', authors: ['Like_a_Hurricane'],
+         updated: '02 Aug 2026', bookmarked: '10 Sep 2026' }),
+  work({ id: '3', title: 'The Dating Game', authors: ['inukagome15', 'Cataclysmic_Cal'],
+         updated: '2026-01-15', bookmarked: '05 Jan 2026' }),
+];
+
+describe('WorkList filtering', () => {
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({ imports: [WorkList] }).compileComponents();
+  });
+
+  it('shows everything when nothing has been filled in', async () => {
+    await listing(LIBRARY);
+
+    expect(shownCount()).toBe(3);
+    expect(element.querySelector('.filtered-note')).toBeNull();
+  });
+
+  it('matches part of a title, whatever the case', async () => {
+    await listing(LIBRARY);
+
+    await type('titleQuery', 'dating');
+
+    expect(shownTitles()).toEqual(['The Dating Game']);
+  });
+
+  it('matches part of an author name, including a second author', async () => {
+    await listing(LIBRARY);
+
+    await type('authorQuery', 'cataclysmic');
+
+    // work 3 lists two authors, and the second one is the match
+    expect(shownTitles().sort()).toEqual(['No Paths Are Bound', 'The Dating Game']);
+  });
+
+  it('narrows by when AO3 last updated the work, counting both ends', async () => {
+    await listing(LIBRARY);
+
+    await type('updatedFrom', '2024-12-14');
+    await type('updatedTo', '2026-01-15');
+
+    // the two on the boundaries are kept; the 2026-08 one is outside
+    expect(shownTitles().sort()).toEqual(['No Paths Are Bound', 'The Dating Game']);
+  });
+
+  it('narrows by when the work was bookmarked', async () => {
+    await listing(LIBRARY);
+
+    await type('bookmarkedFrom', '2026-01-01');
+
+    expect(shownTitles().sort()).toEqual(['Catch and Release', 'The Dating Game']);
+  });
+
+  it('reads both of the date forms AO3 writes', async () => {
+    // work 3's updated date is stored as 2026-01-15, the others as '14 Dec 2024' style
+    await listing(LIBRARY);
+
+    await type('updatedFrom', '2026-01-01');
+    await type('updatedTo', '2026-01-31');
+
+    expect(shownTitles()).toEqual(['The Dating Game']);
+  });
+
+  it('makes every filter that was filled in have to match', async () => {
+    await listing(LIBRARY);
+
+    await type('authorQuery', 'cataclysmic');
+    await type('updatedFrom', '2026-01-01');
+
+    // both authored by Cal, but only one updated this year
+    expect(shownTitles()).toEqual(['The Dating Game']);
+  });
+
+  // it cannot be placed in the range, and including it would make the range a lie
+  it('leaves a work with no readable date out of a date range', async () => {
+    const undated = work({ id: '4', title: 'Undated', updated: '', bookmarked: '' });
+    await listing([...LIBRARY, undated]);
+
+    expect(shownCount()).toBe(4);
+
+    await type('updatedFrom', '2000-01-01');
+
+    expect(shownTitles()).not.toContain('Undated');
+  });
+
+  it('says the listing is filtered, so a short one is not read as a small library', async () => {
+    await listing(LIBRARY);
+
+    await type('titleQuery', 'dating');
+
+    expect(element.querySelector('.filtered-note')?.textContent).toContain('3');
+    expect(element.querySelector('.listing-heading')?.textContent).toContain('of 1');
+  });
+
+  it('clears back to the whole listing', async () => {
+    await listing(LIBRARY);
+    await type('titleQuery', 'dating');
+    expect(shownCount()).toBe(1);
+
+    const clear = Array.from(element.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Clear filters'),
+    )!;
+    clear.click();
+    await fixture.whenStable();
+
+    expect(shownCount()).toBe(3);
+    expect(element.querySelector('.filtered-note')).toBeNull();
+  });
+
+  // staying on page 9 of a result that now has one page would show an empty listing and
+  // look like the filter had found nothing
+  it('goes back to the first page when the filter changes', async () => {
+    const many = Array.from({ length: 45 }, (_, i) =>
+      work({ id: String(i + 1), title: i === 44 ? 'Findable' : `Filler ${i + 1}` }),
+    );
+    await listing(many);
+
+    const second = Array.from(element.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === '2',
+    )!;
+    second.click();
+    await fixture.whenStable();
+    expect(element.querySelector('.listing-heading')?.textContent).toContain('21 - 40');
+
+    await type('titleQuery', 'findable');
+
+    expect(shownTitles()).toEqual(['Findable']);
+    expect(element.querySelector('.listing-heading')?.textContent).toContain('1 - 1');
+  });
+
+  // region sorting
+
+  async function sortBy(value: string) {
+    const select = element.querySelector<HTMLSelectElement>('select[name="sortBy"]')!;
+    select.value = value;
+    select.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+  }
+
+  it('sorts by date bookmarked, newest first', async () => {
+    await listing(LIBRARY);
+
+    await sortBy('bookmarked-desc');
+
+    // 10 Sep 2026, 05 Jan 2026, 01 Mar 2025
+    expect(shownTitles()).toEqual(['Catch and Release', 'The Dating Game', 'No Paths Are Bound']);
+  });
+
+  it('sorts by date bookmarked, oldest first', async () => {
+    await listing(LIBRARY);
+
+    await sortBy('bookmarked-asc');
+
+    expect(shownTitles()).toEqual(['No Paths Are Bound', 'The Dating Game', 'Catch and Release']);
+  });
+
+  it('sorts by date created when works have one', async () => {
+    await listing([
+      work({ id: '1', title: 'Middle', created: '10 Jun 2020' }),
+      work({ id: '2', title: 'Newest', created: '2024-01-01' }),
+      work({ id: '3', title: 'Oldest', created: '01 Jan 2010' }),
+    ]);
+
+    await sortBy('created-desc');
+    expect(shownTitles()).toEqual(['Newest', 'Middle', 'Oldest']);
+
+    await sortBy('created-asc');
+    expect(shownTitles()).toEqual(['Oldest', 'Middle', 'Newest']);
+  });
+
+  it('sorts by the date AO3 last updated a work, in either of the forms AO3 writes it', async () => {
+    await listing([
+      work({ id: '1', title: 'Middle', updated: '10 Jun 2020' }),
+      work({ id: '2', title: 'Newest', updated: '2024-01-01' }),
+      work({ id: '3', title: 'Oldest', updated: '01 Jan 2010' }),
+    ]);
+
+    await sortBy('updated-desc');
+    expect(shownTitles()).toEqual(['Newest', 'Middle', 'Oldest']);
+
+    await sortBy('updated-asc');
+    expect(shownTitles()).toEqual(['Oldest', 'Middle', 'Newest']);
+  });
+
+  // putting blanks first on an ascending sort would bury every dated work under them
+  it('puts works without the date last, whichever way it sorts', async () => {
+    await listing([
+      work({ id: '1', title: 'Blank', bookmarked: '' }),
+      work({ id: '2', title: 'Old', bookmarked: '01 Jan 2020' }),
+      work({ id: '3', title: 'New', bookmarked: '01 Jan 2025' }),
+    ]);
+
+    await sortBy('bookmarked-asc');
+    expect(shownTitles()).toEqual(['Old', 'New', 'Blank']);
+
+    await sortBy('bookmarked-desc');
+    expect(shownTitles()).toEqual(['New', 'Old', 'Blank']);
+  });
+
+  // publication dates are only recorded by a lookup this app does not run, so on most
+  // libraries this sort has nothing to work with - and should say so
+  it('says when there is nothing to sort by, instead of doing nothing silently', async () => {
+    await listing(LIBRARY);
+
+    await sortBy('created-desc');
+
+    expect(element.querySelector('.sort-empty')?.textContent).toContain('leaves the order unchanged');
+    expect(shownTitles()).toEqual(['No Paths Are Bound', 'Catch and Release', 'The Dating Game']);
+
+    await sortBy('bookmarked-desc');
+    expect(element.querySelector('.sort-empty')).toBeNull();
+  });
+
+  it('does not call a sorted listing a filtered one', async () => {
+    await listing(LIBRARY);
+
+    await sortBy('bookmarked-desc');
+
+    expect(element.querySelector('.filtered-note')).toBeNull();
+    expect(shownCount()).toBe(3);
+  });
+
+  it('clears the sort along with the filters', async () => {
+    await listing(LIBRARY);
+    await sortBy('bookmarked-asc');
+
+    Array.from(element.querySelectorAll('button'))
+      .find((b) => b.textContent?.includes('Clear filters'))!
+      .click();
+    await fixture.whenStable();
+
+    // back to the default: most recently bookmarked first
+    expect(shownTitles()).toEqual(['Catch and Release', 'The Dating Game', 'No Paths Are Bound']);
+    expect(element.querySelector<HTMLSelectElement>('select[name="sortBy"]')!.value).toBe(
+      'bookmarked-desc',
+    );
+  });
+
+  it('lists the most recently bookmarked first, before anything is chosen', async () => {
+    // the index keeps no listing order of its own any more
+    await listing(LIBRARY);
+
+    expect(shownTitles()).toEqual(['Catch and Release', 'The Dating Game', 'No Paths Are Bound']);
+    expect(element.querySelector('.sort-empty')).toBeNull();
+    // a default is not something to clear
+    const clear = Array.from(element.querySelectorAll<HTMLButtonElement>('button')).find((b) =>
+      b.textContent?.includes('Clear filters'),
+    )!;
+    expect(clear.disabled).toBe(true);
+  });
+
+  // endregion
+});
+
+describe('WorkList, bookmarks of every kind', () => {
+  const series = {
+    ...work({ id: '15213', title: "Watches 'Verse", bookmarked: '18 May 2026' }),
+    link: 'https://archiveofourown.org/series/15213',
+    bookmark_type: 'series bookmark',
+    works: 3,
+    complete: false,
+    work_ids: ['111', '222', '999'],
+  } as Bookmark;
+  const external = {
+    ...work({ id: '1', title: 'drift', bookmarked: '01 Jan 2026' }),
+    link: 'https://example.com/drift',
+    bookmark_type: 'external work',
+  } as Bookmark;
+  const single = {
+    ...work({ id: '555', title: 'On Its Own', bookmarked: '10 Sep 2026' }),
+    bookmark_type: 'individual work',
+  } as Bookmark;
+  // in the index because of the series; one of them bookmarked in its own right as well
+  const partOne = { ...work({ id: '111', title: 'Part One' }), bookmarked: false } as Bookmark;
+  const partTwo = { ...work({ id: '222', title: 'Part Two' }), bookmarked: true } as Bookmark;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({ imports: [WorkList] }).compileComponents();
+    const library = TestBed.inject(Library);
+    library.worksById.set(new Map([['111', partOne], ['222', partTwo], ['555', single]]));
+    // a downloaded copy of part one - and a file whose number happens to be the external
+    // work's id, which must not be taken for its copy
+    library.copies.update((c) => ({ ...c, html: new Map([
+      ['111', new File(['<p>one</p>'], '111 Part One.html')],
+      ['1', new File(['<p>work 1</p>'], '1 Some Other Work.html')],
+    ]) }));
+  });
+
+  async function showTypes(value: string) {
+    const select = element.querySelector<HTMLSelectElement>('select[name="typeFilter"]')!;
+    select.value = value;
+    select.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+  }
+
+  it('lists works, series and external works together, newest bookmark first', async () => {
+    await listing([series, external, single]);
+    expect(shownTitles()).toEqual(['On Its Own', "Watches 'Verse", 'drift']);
+    expect(Array.from(element.querySelectorAll('.kind')).map((x) => x.textContent?.trim()))
+      .toEqual(['Series', 'External work']);
+  });
+
+  it('narrows to the works downloaded in a format, or to those with no copy at all', async () => {
+    const two = { ...work({ id: '222', title: 'Part Two', bookmarked: '11 Sep 2026' }), bookmark_type: 'individual work' } as Bookmark;
+    TestBed.inject(Library).copies.update((c) => ({ ...c, html: new Map([
+      ['555', new File(['<p>x</p>'], '555 On Its Own.html')],
+    ]), epub: new Map([['222', new File(['x'], '222 Part Two.epub')]]) }));
+    await listing([series, external, single, two]);
+    const choose = async (value: string) => {
+      const select = element.querySelector<HTMLSelectElement>('select[name="formatFilter"]')!;
+      select.value = value;
+      select.dispatchEvent(new Event('change'));
+      await fixture.whenStable();
+    };
+
+    await choose('html');
+    expect(shownTitles()).toEqual(['On Its Own']);
+    await choose('epub');
+    expect(shownTitles()).toEqual(['Part Two']);
+    await choose('pdf');
+    expect(shownTitles()).toEqual([]);
+    // a series or an external work is never 'downloaded', nor counted as not
+    await choose('none');
+    expect(shownTitles()).toEqual([]);
+    await choose('');
+    expect(shownTitles()).toHaveLength(4);
+  });
+
+  it('narrows to one kind of bookmark', async () => {
+    await listing([series, external, single]);
+
+    await showTypes('series bookmark');
+    expect(shownTitles()).toEqual(["Watches 'Verse"]);
+    await showTypes('external work');
+    expect(shownTitles()).toEqual(['drift']);
+    await showTypes('individual work');
+    expect(shownTitles()).toEqual(['On Its Own']);
+    expect(element.querySelector('.filtered-note')?.textContent).toContain('3');
+  });
+
+  it('opens a series on ao3 and an external work where it is hosted', async () => {
+    await listing([series, external]);
+    const links = Array.from(element.querySelectorAll<HTMLAnchorElement>('.blurb .heading a.title'));
+    expect(links.map((a) => [a.getAttribute('href'), a.target])).toEqual([
+      ['https://archiveofourown.org/series/15213', '_blank'],
+      ['https://example.com/drift', '_blank'],
+    ]);
+    // an external work's id is not a work number, whatever file shares it
+    expect(links[1].classList.contains('local')).toBe(false);
+  });
+
+  it('keeps a series card closed until asked, then lists its works in order', async () => {
+    await listing([series]);
+    expect(element.querySelector('.series-list')).toBeNull();
+
+    const toggle = element.querySelector<HTMLButtonElement>('.series-toggle')!;
+    expect(toggle.textContent).toContain('Show the 3 works in this series');
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    toggle.click();
+    await fixture.whenStable();
+
+    const parts = Array.from(element.querySelectorAll('.series-list li'));
+    expect(parts.map((li) => li.querySelector('a.title')?.textContent?.trim())).toEqual([
+      'Part One',
+      'Part Two',
+      // grown since the series was last read: known only by its number
+      'Work 999',
+    ]);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    // a part with a downloaded copy opens it, as any work does
+    expect(parts[0].querySelector('a.title')!.classList.contains('local')).toBe(true);
+    // and one bookmarked in its own right says so
+    expect(parts[1].querySelector('.badge')?.textContent).toContain('Also bookmarked');
+    expect(parts[0].querySelector('.badge')).toBeNull();
+
+    toggle.click();
+    await fixture.whenStable();
+    expect(element.querySelector('.series-list')).toBeNull();
+  });
+
+  it('says so when a series has not been read for its works yet', async () => {
+    await listing([{ ...series, work_ids: [] } as Bookmark]);
+    element.querySelector<HTMLButtonElement>('.series-toggle')!.click();
+    await fixture.whenStable();
+    expect(element.querySelector('.series-works')?.textContent).toContain('works have not been indexed yet');
+  });
+
+  it('shows a series its own stats rather than chapters', async () => {
+    await listing([series]);
+    const stats = element.querySelector('.stats')?.textContent ?? '';
+    expect(stats).toContain('Works:');
+    expect(stats).toContain('Complete:');
+    expect(stats).not.toContain('Chapters:');
+  });
+
+  // region the series a work is part of
+
+  const walked = {
+    ...series,
+    id: '777',
+    title: 'Not Bookmarked',
+    bookmarked: false,
+    work_ids: ['111', '555', '222'],
+  } as Bookmark;
+  const member = {
+    ...single,
+    series: [{ id: '777', title: 'Not Bookmarked', part: 2 }],
+  } as Bookmark;
+
+  function withSeries(...entries: Bookmark[]) {
+    TestBed.inject(Library).seriesById.set(new Map(entries.map((e) => [e.id!, e])));
+  }
+
+  it('says which series a work is part of, and where in it', async () => {
+    withSeries(walked);
+    await listing([member]);
+    const line = element.querySelector('.membership')!;
+    expect(line.querySelector('.series-toggle')?.textContent).toContain('Part 2 of');
+    expect(line.querySelector('.series-name')?.textContent).toBe('Not Bookmarked');
+    expect(line.querySelector<HTMLAnchorElement>('a.series-link')!.getAttribute('href')).toBe(
+      'https://archiveofourown.org/series/777',
+    );
+    // closed until asked
+    expect(line.querySelector('.series-list')).toBeNull();
+  });
+
+  it('opens the rest of a series you never bookmarked from a work of yours in it', async () => {
+    // the only place its other works appear at all
+    withSeries(walked);
+    await listing([member]);
+
+    element.querySelector<HTMLButtonElement>('.membership .series-toggle')!.click();
+    await fixture.whenStable();
+
+    const parts = Array.from(element.querySelectorAll('.membership .series-list li'));
+    expect(parts.map((li) => li.querySelector('a.title')?.textContent?.trim())).toEqual([
+      'Part One',
+      'On Its Own',
+      'Part Two',
+    ]);
+    // the work whose card this is, marked as such rather than as a separate bookmark
+    expect(parts[1].querySelector('.badge')?.textContent).toContain('This work');
+    expect(parts[1].classList.contains('current')).toBe(true);
+    expect(parts[2].querySelector('.badge')?.textContent).toContain('Also bookmarked');
+    // a part with a downloaded copy opens it
+    expect(parts[0].querySelector('a.title')!.classList.contains('local')).toBe(true);
+  });
+
+  it('opens a series on one work without opening it on every other work in it', async () => {
+    withSeries(walked);
+    const other = {
+      ...work({ id: '888', title: 'Another', bookmarked: '01 Jan 2020' }),
+      series: [{ id: '777', title: 'Not Bookmarked', part: 3 }],
+    } as Bookmark;
+    await listing([member, other]);
+
+    element.querySelector<HTMLButtonElement>('.membership .series-toggle')!.click();
+    await fixture.whenStable();
+
+    expect(element.querySelectorAll('.membership .series-list')).toHaveLength(1);
+  });
+
+  it('says what to run when a series a work is part of has not had its works indexed', async () => {
+    withSeries();
+    await listing([member]);
+    element.querySelector<HTMLButtonElement>('.membership .series-toggle')!.click();
+    await fixture.whenStable();
+
+    const said = element.querySelector('.membership')?.textContent ?? '';
+    expect(said).toContain("works have not been indexed yet");
+    expect(said).toContain('only bookmarked some');
+    expect(said).toContain('Get all works from encountered series');
+  });
+
+  it('shows no series line on a work in no series', async () => {
+    await listing([single]);
+    expect(element.querySelector('.membership')).toBeNull();
+  });
+
+  // endregion
+
+  // region downloaded PDFs, and every other format
+
+  it('offers a button for each format downloaded, in AO3s order, and none for html', async () => {
+    TestBed.inject(Library).copies.update((c) => ({
+      ...c,
+      html: new Map([['555', new File(['<html>'], '555 On Its Own.html')]]),
+      azw3: new Map([['555', new File(['x'], '555 On Its Own.azw3')]]),
+      epub: new Map([['555', new File(['x'], '555 On Its Own.epub')]]),
+      pdf: new Map([['555', new File(['%PDF'], '555 On Its Own.pdf')]]),
+    }));
+    await listing([single]);
+
+    const labels = Array.from(element.querySelectorAll('button.format')).map((b) => b.textContent?.trim());
+    expect(labels).toEqual(['PDF', 'EPUB', 'AZW3']);
+    expect(element.querySelector('button.epub')?.getAttribute('aria-label'))
+      .toBe('Save the downloaded EPUB of On Its Own');
+  });
+
+  it('saves an e-book under its own name rather than opening a tab no browser can show', async () => {
+    const epub = new File(['PK'], '555 On Its Own - Writer 2025-06-01.epub');
+    TestBed.inject(Library).copies.update((c) => ({ ...c, epub: new Map([['555', epub]]) }));
+    const realOpen = window.open;
+    const realCreate = URL.createObjectURL;
+    const realClick = HTMLAnchorElement.prototype.click;
+    const opened: string[] = [];
+    const saved: { name: string; type: string }[] = [];
+    let blob: Blob | null = null;
+    window.open = ((url?: string) => { opened.push(url ?? ''); return null; }) as typeof window.open;
+    URL.createObjectURL = ((b: Blob) => { blob = b; return 'blob:the-epub'; }) as typeof URL.createObjectURL;
+    HTMLAnchorElement.prototype.click = function (this: HTMLAnchorElement) {
+      saved.push({ name: this.download, type: blob?.type ?? '' });
+    };
+    try {
+      await listing([single]);
+      element.querySelector<HTMLButtonElement>('button.epub')!.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(opened).toEqual([]);
+      expect(saved).toEqual([{ name: '555 On Its Own - Writer 2025-06-01.epub', type: 'application/epub+zip' }]);
+    } finally {
+      window.open = realOpen;
+      URL.createObjectURL = realCreate;
+      HTMLAnchorElement.prototype.click = realClick;
+    }
+  });
+
+  it('offers a PDF button on a work that has a downloaded PDF, and only then', async () => {
+    TestBed.inject(Library).copies.update((c) => ({ ...c, pdf: new Map([['555', new File(['%PDF'], '555 On Its Own.pdf')]]) }));
+    await listing([single, { ...work({ id: '666', title: 'No PDF' }) } as Bookmark]);
+
+    const buttons = Array.from(element.querySelectorAll<HTMLButtonElement>('button.pdf'));
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0].getAttribute('aria-label')).toBe('Open the downloaded PDF of On Its Own');
+  });
+
+  it('never offers a series or an external work a PDF, whatever file shares its id', async () => {
+    TestBed.inject(Library).copies.update((c) => ({ ...c, pdf: new Map([
+      ['15213', new File(['%PDF'], '15213 x.pdf')],
+      ['1', new File(['%PDF'], '1 x.pdf')],
+    ]) }));
+    await listing([series, external]);
+    expect(element.querySelector('button.pdf')).toBeNull();
+  });
+
+  it('opens the PDF in a new tab, as a PDF', async () => {
+    const pdf = new File(['%PDF-1.7'], '555 On Its Own 2025-06-01.pdf');
+    TestBed.inject(Library).copies.update((c) => ({ ...c, pdf: new Map([['555', pdf]]) }));
+    const tab = { location: { href: '' }, close: () => {} };
+    const opened: string[] = [];
+    const realOpen = window.open;
+    const realCreate = URL.createObjectURL;
+    let shown: Blob | null = null;
+    window.open = ((url?: string) => { opened.push(url ?? ''); return tab; }) as typeof window.open;
+    URL.createObjectURL = ((blob: Blob) => { shown = blob; return 'blob:the-pdf'; }) as typeof URL.createObjectURL;
+    try {
+      await listing([single]);
+      element.querySelector<HTMLButtonElement>('button.pdf')!.click();
+      await new Promise((r) => setTimeout(r, 0));
+    } finally {
+      window.open = realOpen;
+      URL.createObjectURL = realCreate;
+    }
+
+    // a tab is opened on the click itself, so it is not blocked as a popup
+    expect(opened).toEqual(['']);
+    expect(tab.location.href).toBe('blob:the-pdf');
+    expect(shown!.type).toBe('application/pdf');
+  });
+
+  it('offers the PDF on each part of a series that has one', async () => {
+    TestBed.inject(Library).copies.update((c) => ({ ...c, pdf: new Map([['111', new File(['%PDF'], '111 Part One.pdf')]]) }));
+    await listing([series]);
+    element.querySelector<HTMLButtonElement>('.series-toggle')!.click();
+    await fixture.whenStable();
+
+    const parts = Array.from(element.querySelectorAll('.series-list li'));
+    expect(parts[0].querySelector('button.pdf')).toBeTruthy();
+    expect(parts[1].querySelector('button.pdf')).toBeNull();
+  });
+
+  // endregion
+});
+
+describe('WorkList provenance', () => {
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({ imports: [WorkList] }).compileComponents();
+  });
+
+  it('gives every entry an icon naming where it came from, as the Came from filter does', async () => {
+    await listing([
+      { ...LIBRARY[0], bookmarked: true },
+      { ...LIBRARY[1], bookmarked: false, from_collections: ['some_collection'] },
+      { ...LIBRARY[0], id: '901', bookmarked: false, from_link: true },
+      { ...LIBRARY[1], id: '902', bookmarked: false },
+    ]);
+
+    const icons = [...element.querySelectorAll('.origin-icon')];
+    // in whatever order the listing sorts them
+    expect(icons.map((x) => x.getAttribute('aria-label')).sort()).toEqual([
+      'Came from: An AO3 collection',
+      'Came from: Downloaded by ID or URL',
+      'Came from: Imported from an external source',
+      'Came from: Your AO3 bookmarks',
+    ]);
+    expect(icons.every((x) => x.querySelector('svg'))).toBe(true);
+  });
+
+  it('puts a lock just left of the bookmark icon on a private bookmark, and on nothing else', async () => {
+    await listing([
+      { ...LIBRARY[0], bookmarked: true, bookmark_private: true },
+      { ...LIBRARY[1], bookmarked: true, bookmark_private: false },
+      // a private flag on an entry that is not your bookmark says nothing
+      { ...LIBRARY[0], id: '903', bookmarked: false, bookmark_private: true },
+    ]);
+
+    const locks = [...element.querySelectorAll('.private-icon')];
+    expect(locks.length).toBe(1);
+    expect(locks[0].getAttribute('aria-label')).toBe('Private bookmark');
+    // to the left of the bookmark icon, in the same corner
+    const next = locks[0].nextElementSibling;
+    expect(next?.classList.contains('origin-icon')).toBe(true);
+    expect(next?.classList.contains('bookmarks')).toBe(true);
+  });
+
+  it('marks a work whose entry came from FicHub, saying which formats did', async () => {
+    await listing([
+      { ...LIBRARY[0], retrieved_from: { site: 'fichub', downloaded: ['EPUB', 'PDF'] } },
+      LIBRARY[1],
+    ]);
+
+    const badges = element.querySelectorAll('.badge.mirror');
+    expect(badges).toHaveLength(1);
+    expect(badges[0].textContent).toContain('From FicHub');
+    expect(badges[0].getAttribute('title')).toContain('EPUB, PDF');
+  });
+});

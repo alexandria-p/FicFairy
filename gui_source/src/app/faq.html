@@ -1,0 +1,222 @@
+<section class="faq">
+  <!-- pinned first: the one thing on this page that is not about AO3 itself -->
+  @if (!hosted) {
+  <div class="download-app" role="note">
+    <p>
+      <strong>Run it on your own computer.</strong>
+      The app is everything this page needs, in one download - nothing else to install.
+      <a [href]="latestUrl" target="_blank" rel="noopener">Download the latest version from GitHub</a>:
+    </p>
+    <ul>
+      <li>
+        <strong>Windows:</strong> <code>ficfairy-ao3downloader-windows.zip</code> - unzip it and
+        double-click <code>ficfairy.exe</code>.
+      </li>
+      <li>
+        <strong>Mac:</strong> <code>ficfairy-ao3downloader-macos-apple-silicon.zip</code> for an M1 or
+        later, or <code>ficfairy-ao3downloader-macos-intel.zip</code> for an Intel Mac - open it and
+        double-click <code>Start FicFairy.command</code>. Use it in Chrome, Edge, Brave or
+        Arc: Safari and Firefox cannot open a folder to save your fics in.
+      </li>
+      <li>
+        <strong>Linux:</strong> <code>ficfairy-ao3downloader-linux-x86_64.zip</code> - unzip it and run
+        <code>Start FicFairy.sh</code>. Use it in Chrome or Chromium: Firefox cannot open a
+        folder to save your fics in.
+      </li>
+    </ul>
+    <p>The README in the zip says what to do the first time, when the app is not yet trusted.</p>
+    @if (version) {
+      <p>This page is version {{ version }}.</p>
+    }
+  </div>
+  }
+
+  <h2>About downloading from AO3</h2>
+  <!-- reading the library: under the title, as on every tab -->
+  <ng-content select="[listingProgress]" />
+
+  <p class="lead">
+    This page downloads fanworks using AO3's own download links.
+    <a href="https://archiveofourown.org/faq/downloading-fanworks" target="_blank" rel="noopener">Click here to read AO3's page on how they handle this.</a>
+  </p>
+
+  <h3 class="which-run">Which run to use</h3>
+
+  <ul>
+    <li>
+      <strong>Quick Scan</strong> - your go-to for routine checks. It looks back only as far as
+      your last scan, picking up any new bookmarks and fics updated since then. Far quicker than a
+      Full Scan, and far lighter on AO3 as it does not need to request any fics it already has.
+    </li>
+    <li>
+      <strong>(Full scan) Reindex &amp; Update All</strong> - reads your whole bookmarks list, so
+      it takes much longer. Useful for repairing your library.
+    </li>
+    <li><strong>Custom run</strong> - a Full Scan, with some extra options.</li>
+    <li>
+      <strong>Download/update a specific fic</strong> or <strong>several fics</strong> - download
+      any fics from AO3 by their URL or ID. This always fetches a fresh copy.
+    </li>
+  </ul>
+
+  <p class="hint one-run">Only one run can be performed at a time.</p>
+
+  <h3>Why do I need to log in?</h3>
+
+  <p>You don't need to 😊 Logging in is optional.</p>
+
+  <p>
+    If you choose to download or update fics by URL or id, you can bypass logging in entirely.
+  </p>
+
+  <p>
+    To scan your bookmarks, FicFairy needs your username so it can find your bookmarks page.
+    Your password is still optional here.
+  </p>
+
+  <p>However, you will need to log in to access:</p>
+
+  <ul>
+    <li>Your private bookmarks</li>
+    <li>Works restricted to registered users</li>
+  </ul>
+
+  <p class="hint">
+    Your password is sent straight to AO3 to log in and is never stored by this page.
+  </p>
+
+  @if (offersBackground()) {
+    <h3 class="background-runs">Backgrounded Runs (Dropbox-only)</h3>
+
+    <p>
+      Available if <code>Run as background task</code> on a run's login step is selected. As
+      long as the companion helper is still running on your machine, the web page can be safely closed and the
+      run will carry on.
+    </p>
+  }
+
+  <h3>Run history</h3>
+
+  <p>
+    Check the History tab to see the last 100 runs - including their status, and any issues
+    they encountered. Some unsuccessful runs can be retried, and attempt to pick up where the
+    last one left off.
+  </p>
+
+  <h3>What does not survive a download</h3>
+
+  <ul>
+    <li>No work skins</li>
+    <li>Custom styling (text styled as chat logs, handwriting etc)</li>
+    <li>Embedded audio and video</li>
+  </ul>
+
+  <p>
+    This app only downloads what AO3 provides. This means that any custom styling an author
+    applied to their work is not carried into a downloaded copy - so text laid out as chat
+    logs, handwriting, redactions or newspaper clippings will read as ordinary paragraphs.
+    Sorry!
+  </p>
+
+  <p>
+    Images are normally embedded inside the downloaded work as a link, and will still display
+    when you read it (so long as the original image is still accessible).
+  </p>
+
+  <p class="hint">
+    <strong>Custom run</strong> can also save embedded images as separate files, in an
+    <code>images</code> subfolder. That is for when you want the pictures themselves - it does
+    not repair a work whose images are already inaccessible, and it makes the run considerably
+    longer, because every fic needs its own page fetched on top of its files. Very large images
+    sometimes fail.
+  </p>
+
+  <h3>How indexing works</h3>
+
+  <p>
+    Downloading a fic results in the work being saved to your library in whichever format(s) you
+    requested. <em>Indexing</em> it is something FicFairy does to record each work's metadata, so
+    it can show you your library almost instantly in the Works and Collections tabs. An index is a
+    small <code>.json</code> file describing a work - title, author, tags, summary, word and
+    chapter counts, when AO3 last updated it.
+  </p>
+
+  <h3 class="one-account">One AO3 account per library</h3>
+
+  <p>
+    FicFairy is built to keep track of the bookmarks of a single AO3 account. Scanning a second
+    account's bookmarks into the same library mixes the two together - it <em>can</em> be done,
+    but expect certain features like Quick Scan to misbehave. If you decide to switch users, try
+    running a Full Scan instead before doing anything else.
+  </p>
+
+  <h3>When something cannot be downloaded</h3>
+
+  <p>
+    FicFairy attempts to retrieve works from FicHub, when they cannot be reached on AO3. As
+    FicHub serves cached versions of works, they may be out-of-date - the run will warn you if
+    it detects this.
+  </p>
+
+  <h3>Deleted and hidden bookmarks</h3>
+
+  <p>Any bookmarks that were un-bookmarked on AO3 will still remain in your FicFairy library.</p>
+
+  <p>
+    If you wish to "remove" a work from FicFairy, you can either delete the files themselves
+    or you can use the "hide/unhide" functionality.
+  </p>
+
+  <h3>How downloaded files are named</h3>
+
+  <p>
+    <code class="pattern-words">{{ patternWords() }}</code>, for example:
+  </p>
+
+  <p class="example-name"><code>{{ example() }}</code></p>
+
+  @if (patternEditable) {
+    <p class="hint pattern-where">
+      This pattern can be changed in <strong>User settings</strong>, under
+      <strong>Advanced</strong>.
+    </p>
+  }
+
+  <p>
+    This pattern is how FicFairy pulls important information such as the work ID and the date
+    that it was last updated on AO3.
+  </p>
+
+  <p>You may notice its title and author shortened, if they were too long.</p>
+
+  <p class="hint">
+    If any of your files are missing dates, refresh your library and say 'yes' when FicFairy
+    offers to resolve any issues for you.
+  </p>
+
+  <p class="hint">
+    Index files in your <code>indexing</code> folder are always named
+    <code>{{ indexWords }}</code>. Do not rename these files.
+  </p>
+
+  <h3>Bringing in files you already have</h3>
+
+  <p class="bringing-in">
+    Downloads from anywhere else can sit in your library's <code>works</code> folder and be
+    picked up. If they match the current pattern used by FicFairy to name files, then they can
+    be brought in right away.
+  </p>
+
+  <p>
+    Otherwise, the app will flag an issue with an import, and offer to rename the files for you
+    to bring them in line with the rest.
+  </p>
+
+  <h3>Privacy and licence</h3>
+
+  <p class="legal">
+    <a class="privacy-link" [href]="privacyPolicyUrl()" target="_blank" rel="noopener">Privacy policy</a>
+    &middot;
+    <a class="licence-link" [href]="licenceUrl()" target="_blank" rel="noopener">Licence (GNU GPL v3.0)</a>
+  </p>
+</section>

@@ -1,0 +1,530 @@
+.user-settings {
+  max-width: 760px;
+  margin: 20px 0 24px;
+}
+
+h2 {
+  margin: 0 0 10px;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+h4 {
+  margin: 14px 0 6px;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.heading h2 {
+  margin: 0;
+}
+
+/* where these live is the thing most likely to surprise someone, so it is said first */
+.browser-note {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--accent-line);
+  border-radius: 5px;
+  background: var(--accent-bg);
+  font-size: 0.88rem;
+}
+
+/* the Reset window: the same modal shell as the others, under the feedback tab (1000) */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--backdrop);
+}
+
+.dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(680px, 100%);
+  max-height: min(80vh, 720px);
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  background: var(--surface);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.dialog header,
+.dialog footer {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 12px 16px;
+}
+
+.dialog header {
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+
+.dialog header h2 {
+  margin: 0;
+}
+
+.dialog footer {
+  justify-content: flex-end;
+  border-top: 1px solid var(--border);
+}
+
+.dialog .body {
+  overflow: auto;
+  padding: 12px 16px;
+}
+
+.icon {
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  font-size: 1.3rem;
+  cursor: pointer;
+}
+
+.changes {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.changes th,
+.changes td {
+  padding: 6px 8px;
+  border-top: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.changes thead th {
+  border-top: none;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.changes tbody th {
+  font-weight: 400;
+}
+
+.change-group {
+  display: block;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+}
+
+.changes .current {
+  color: var(--text-dim);
+}
+
+.default {
+  margin-left: 8px;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+
+.hint {
+  margin: 0 0 10px;
+  color: var(--text-dim);
+  font-size: 0.88rem;
+}
+
+.group {
+  margin: 18px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface);
+}
+
+/* a section's title, and at its top right where what it holds is saved */
+.group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  margin: 0 0 6px;
+}
+
+.group-head h3 {
+  margin: 0;
+}
+
+.saved-to {
+  flex: none;
+  margin-left: auto;
+  padding: 1px 9px;
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  color: var(--accent-text);
+  font-size: 0.72rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.saved-to code {
+  font-size: 0.95em;
+}
+
+/* Appearance folds away: its title row is the toggle, with a marker that turns */
+details.group > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+details.group > summary::-webkit-details-marker {
+  display: none;
+}
+
+details.group > summary h3::before {
+  content: '\25B8';
+  display: inline-block;
+  margin-right: 6px;
+  color: var(--text-dim);
+  transition: transform 0.15s;
+}
+
+details.group[open] > summary h3::before {
+  transform: rotate(90deg);
+}
+
+details.group:not([open]) > summary {
+  margin-bottom: 0;
+}
+
+details.group[open] > summary {
+  margin-bottom: 10px;
+}
+
+/* held - nothing to reset, or no library open - and looking it */
+.button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.row:first-child {
+  border-top: none;
+}
+
+.about {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.name {
+  font-weight: 600;
+}
+
+.description {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  white-space: pre-line;
+}
+
+select,
+input[type='number'],
+input[type='text'] {
+  flex: none;
+  width: 170px;
+  padding: 5px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--surface-2);
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.format-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-bottom: 12px;
+}
+
+.check {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.note {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
+.button {
+  display: inline-block;
+  font-family: inherit;
+  padding: 6px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--surface-2);
+  color: var(--text-strong);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: var(--surface-hover);
+}
+
+.button.primary {
+  border-color: var(--accent-line);
+  background: var(--accent-fill);
+}
+
+.button.primary:hover {
+  background: var(--accent-fill-hover);
+}
+
+/* says every change was saved, or why it was not - above the page, below the feedback tab */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 56px;
+  z-index: 900;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 10px 16px;
+  border: 1px solid var(--ok-border);
+  border-radius: 5px;
+  background: var(--ok-bg);
+  color: var(--text-strong);
+  font-size: 0.88rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  transform: translateX(-50%);
+}
+
+.toast.problem {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+}
+
+@media (max-width: 560px) {
+  .row {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  select,
+  input[type='number'],
+  input[type='text'] {
+    width: 100%;
+  }
+}
+
+/* each palette is drawn in its own colours, whichever one the page is in now */
+.palettes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 0;
+  border: none;
+}
+
+.palette-group {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.palettes legend {
+  margin-bottom: 6px;
+  padding: 0;
+  font-weight: 600;
+}
+
+.palette {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 130px;
+  padding: 10px;
+  border: 2px solid;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.palette input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.palette:has(input:focus-visible) {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 2px;
+}
+
+.swatches {
+  display: flex;
+  gap: 4px;
+}
+
+.swatches span {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+}
+
+.palette-name {
+  font-size: 0.88rem;
+}
+
+.palette.chosen .palette-name::before {
+  content: '\2713  ';
+}
+
+.font-choice .field {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.font-choice .field > span {
+  min-width: 80px;
+  font-weight: 600;
+}
+
+.font-choice input[type='text'] {
+  width: 240px;
+}
+
+.font-preview {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 4px;
+  color: var(--text-strong);
+}
+
+.font-choice select {
+  width: 240px;
+}
+
+/* the zone's names run long, '(this browser)' longer still: as wide as the longest needs,
+   never narrower than the other boxes and never wider than the section */
+select.zone-select {
+  width: auto;
+  min-width: 170px;
+  max-width: 100%;
+}
+
+/* a guest's: shown, faded and out of reach - only the time zone and appearance are theirs */
+.guest-locked {
+  opacity: 0.45;
+  filter: grayscale(0.4);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* the owner's way in, as a link in its sentence rather than a button of its own */
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  /* the sentence's own colour: underlined, and nothing louder */
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Advanced, a guest's way to the passcode: looks like the sections they cannot change, but
+   works - quiet among the rest, for the owner to find */
+.guest-faded {
+  opacity: 0.45;
+  filter: grayscale(0.4);
+}
+
+/* Advanced holds more than one thing: each its own part, under a line */
+.advanced-part {
+  position: relative;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.advanced-part.naming > .saved-to {
+  position: absolute;
+  top: 12px;
+  right: 0;
+}
+.advanced-part h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+/* the Clear data window: one tick box per thing this browser keeps */
+.clear-options {
+  list-style: none;
+  margin: 8px 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.clear-options .hint {
+  display: block;
+  margin-top: 2px;
+}
+
+.clear-options li.held {
+  opacity: 0.6;
+}
+
+.nothing-lost strong {
+  color: var(--text-strong);
+}

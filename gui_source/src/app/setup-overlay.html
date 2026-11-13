@@ -1,0 +1,31 @@
+@if (setup.state() === 'asking') {
+  <div
+    class="cover"
+    role="alertdialog"
+    aria-modal="true"
+    aria-live="polite"
+  >
+    <div class="panel">
+      <!-- only a question covers the page: the working steps are in the loading bar -->
+        <h2>Move your works into {{ works }}/?</h2>
+        <p>
+          This folder has <strong>{{ setup.looseWorks() | number }}</strong>
+          downloaded {{ setup.looseWorks() === 1 ? 'work' : 'works' }} in its top level. Works
+          now live in the <code>{{ works }}</code> folder, and ones left in the top level are not
+          seen - the next run would download them all again.
+        </p>
+        <p class="hint">
+          Moving only changes which folder they are in. Nothing is downloaded, renamed or
+          deleted, and a file is never written over.
+        </p>
+        <div class="choices">
+          <button type="button" class="button subtle" (click)="setup.choose(false)">
+            Leave them where they are
+          </button>
+          <button type="button" class="button primary" (click)="setup.choose(true)">
+            Move them into {{ works }}/
+          </button>
+        </div>
+    </div>
+  </div>
+}

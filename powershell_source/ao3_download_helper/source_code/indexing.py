@@ -1,0 +1,147 @@
+"""Version history inside each bookmark's json file.
+
+Indexing the same fic twice should not lose what it looked like the first time, and should
+not fill the file with identical copies either. So each file keeps a list of readings, a
+new one is added only when something actually changed, and the file always records when it
+was last checked - whether or not anything came of it.
+
+    {
+      "id": "123", "link": "...", "source": "...", "bookmark_type": "individual work",
+      "last_indexed": "2026-09-10T12:34:56+00:00",
+      "indexes": [
+        {"indexed_on": "2026-09-01T10:00:00+00:00", "title": ..., "kudos": 12, ...},
+        {"indexed_on": "2026-09-10T12:34:56+00:00", "title": ..., "kudos": 15, ...}
+      ]
+    }
+"""
+
+import datetime
+
+INDEXES = 'indexes'
+INDEXED_ON = 'indexed_on'
+LAST_INDEXED = 'last_indexed'
+# the run that last wrote the file - beside `last_indexed`, never versioned. A retry reads it
+# to say whether an entry is still the one its earlier attempt found
+LAST_INDEXED_BY = 'last_indexed_by'
+# the file's own bookkeeping. a flattened record carries them, and saving one back must not
+# make them part of a reading
+BOOKKEEPING_FIELDS = (INDEXES, LAST_INDEXED, LAST_INDEXED_BY)
+
+# these identify the file rather than describing the work, so they live at the root and
+# are not versioned.
+IDENTITY_FIELDS = ('id', 'link', 'source', 'bookmark_type', 'from_series', 'from_collections',
+                   'from_link', 'from_import')
+
+# the bookmarked series a work was found through. added to, never replaced: a work in two
+# bookmarked series was found through both, whichever was read last
+FROM_SERIES = 'from_series'
+# the collections a work was found through, by short name, when a collections run was asked
+# to index their works. added to the same way, for the same reason
+FROM_COLLECTIONS = 'from_collections'
+# the fields that only ever grow
+ACCUMULATED_FIELDS = (FROM_SERIES, FROM_COLLECTIONS)
+
+# written by earlier versions: a fic's place in the listing, which the page now sorts and
+# filters for itself. dropped from any file as it is next saved
+RETIRED_FIELDS = ('position',)
+
+# a collection is identified by its short name rather than a work id, and has no place
+# in a listing order worth keeping
+COLLECTION_IDENTITY_FIELDS = ('name', 'link', 'source')
+
+
+def now() -> str:
+    """The moment an indexing run started, as UTC."""
+
+    return datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+
+def split(document: dict, identity_fields: tuple[str, ...] = IDENTITY_FIELDS) -> tuple[dict, dict]:
+    """Separate what identifies a record from what is worth keeping history of."""
+
+    identity = {key: document[key] for key in identity_fields if key in document}
+    snapshot = {key: value for key, value in document.items()
+                if key not in identity_fields}
+    return identity, snapshot
+
+
+def changed(previous: dict, snapshot: dict) -> bool:
+    """Whether a reading differs from the one before it, ignoring when it was taken."""
+
+    return {k: v for k, v in previous.items() if k != INDEXED_ON} != snapshot
+
+
+def flatten(document: dict | None) -> dict | None:
+    """One file's contents as the record it currently describes.
+
+    The newest reading with the identity at the root laid over it - identity wins, because
+    it is not versioned. Files written before the history existed are flat already and are
+    returned as they are. Keep this in step with flattenRecord in the gui's bookmarks.ts.
+    """
+
+    if not isinstance(document, dict): return None
+
+    entries = document.get(INDEXES)
+    if isinstance(entries, list):
+        if not entries: return None
+        latest = entries[-1]
+        if not isinstance(latest, dict): return None
+        return {**latest, **document}
+
+    return document if document.get('id') or document.get('title') else None
+
+
+def is_incomplete(record: dict) -> bool:
+    """Whether the index says a fic was still being written when it was last read.
+
+    Ao3 shows a work in progress as '12/?', which is recorded as a chapter total of None.
+    A work with a total it has not reached yet counts too.
+
+    This is what it looked like when it was last indexed, which is the whole limitation of
+    an update pass: a fic that had finished by then is not in this list, however much has
+    been added to it since.
+    """
+
+    total = record.get('chapters_total')
+    if total is None: return True
+    published = record.get('chapters_published')
+    return published is None or published < total
+
+
+def merge(existing: dict | None, document: dict, indexed_on: str,
+          identity_fields: tuple[str, ...] = IDENTITY_FIELDS, run_id: str = '') -> dict:
+    """Fold a fresh reading into whatever is already on disk.
+
+    A reading identical to the most recent one is not added again - the file just records
+    that it was checked. A second save within the same run replaces that run's entry
+    rather than adding another, which is what happens when publication dates are looked up
+    after the listing has already been read.
+    """
+
+    identity, snapshot = split({k: v for k, v in document.items()
+                                if k not in BOOKKEEPING_FIELDS}, identity_fields)
+
+    result = dict(existing or {})
+    entries = list(result.get(INDEXES) or [])
+    entry = {INDEXED_ON: indexed_on, **snapshot}
+
+    if entries and entries[-1].get(INDEXED_ON) == indexed_on:
+        entries[-1] = entry
+    elif not entries or changed(entries[-1], snapshot):
+        entries.append(entry)
+
+    for field in RETIRED_FIELDS:
+        result.pop(field, None)
+        for reading in entries: reading.pop(field, None)
+    known = {field: [str(x) for x in (result.get(field) or [])] for field in ACCUMULATED_FIELDS}
+    result.update(identity)
+    for field in ACCUMULATED_FIELDS:
+        if field in identity or known[field]:
+            added = [str(x) for x in (identity.get(field) or [])]
+            # series ids are numbers, so shorter first keeps them in numeric order
+            result[field] = sorted(set(known[field]) | set(added),
+                                   key=(lambda x: (len(x), x)) if field == FROM_SERIES else None)
+    result[LAST_INDEXED] = indexed_on
+    if run_id: result[LAST_INDEXED_BY] = run_id
+    result[INDEXES] = entries
+    return result

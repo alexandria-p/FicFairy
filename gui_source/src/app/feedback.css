@@ -1,0 +1,426 @@
+/*
+ * The tab sits on the right edge of every page, most of it tucked out of sight, and slides out
+ * on hover. The form wears the same modal shell as passcode-gate.css and the run window, and
+ * sits above all of them: feedback is worth being able to give in the middle of a run, or while
+ * a passcode window waits. The tab (1000) and its window (1001) are far above anything else on
+ * the page (a run window is 50, the passcode gate and the setup overlay 100), so a layer added
+ * later cannot slip over them unnoticed.
+ */
+
+.feedback-tab {
+  position: fixed;
+  top: 50%;
+  right: 0;
+  z-index: 1000;
+  padding: 14px 8px 14px 9px;
+  border: 1px solid var(--accent-line);
+  border-right: none;
+  border-radius: 5px 0 0 5px;
+  background: var(--accent-fill);
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  writing-mode: vertical-rl;
+  transform: translate(6px, -50%);
+  box-shadow: -2px 2px 8px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: transform 0.18s ease-out, background 0.18s ease-out;
+}
+
+.feedback-tab:hover,
+.feedback-tab:focus-visible {
+  background: var(--accent-fill-hover);
+  transform: translate(0, -50%);
+  padding-right: 14px;
+}
+
+.feedback-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feedback-tab {
+    transition: none;
+  }
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--backdrop);
+}
+
+.dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 100%);
+  max-height: min(88vh, 820px);
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  background: var(--surface);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.close {
+  padding: 0 6px;
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.close:hover {
+  color: var(--text-strong);
+}
+
+.body {
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.body p {
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+}
+
+footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.hint {
+  color: var(--text-dim);
+  font-size: 0.82rem !important;
+}
+
+em {
+  color: var(--text-dim);
+  font-style: normal;
+  font-size: 0.82rem;
+}
+
+.kind {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 0;
+  border: none;
+}
+
+.kind legend {
+  margin-bottom: 6px;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+}
+
+.kind label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--surface-2);
+  cursor: pointer;
+}
+
+.kind label.chosen {
+  border-color: var(--accent-line);
+  background: var(--accent-bg);
+}
+
+.field {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.field > span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+}
+
+.field input,
+.field textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--text-strong);
+  font: inherit;
+}
+
+.field textarea {
+  resize: vertical;
+}
+
+.field input:focus,
+.field textarea:focus {
+  outline: 2px solid var(--accent-line);
+  outline-offset: -1px;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.check.unavailable {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* which run's log: the most recent, or one chosen from the history */
+.log-choice {
+  margin: 0 0 8px 26px;
+}
+
+.log-choice .radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.run-pick {
+  width: 100%;
+  margin: 2px 0 8px;
+  padding: 5px 7px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.reading-runs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 8px;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.reading-runs .spinner {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: feedback-spin 0.8s linear infinite;
+}
+
+@keyframes feedback-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reading-runs .spinner { animation-duration: 2.4s; }
+}
+
+.log {
+  margin-bottom: 8px;
+}
+
+.log summary {
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.log pre {
+  max-height: 200px;
+  margin: 6px 0 0;
+  padding: 8px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg);
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.check-widget {
+  min-height: 65px;
+  margin: 12px 0;
+}
+
+.problem {
+  padding: 10px 12px;
+  border: 1px solid var(--danger-border);
+  border-radius: 3px;
+  background: var(--danger-bg);
+}
+
+.failed p {
+  margin: 0 0 8px;
+}
+
+.failed .reason {
+  color: var(--text-dim);
+  font-size: 0.82rem;
+}
+
+.failed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+a.button {
+  display: inline-block;
+  color: var(--text-strong);
+  text-decoration: none;
+}
+
+.button {
+  padding: 7px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--surface-2);
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: var(--surface-hover);
+}
+
+.button.primary {
+  border-color: var(--accent-line);
+  background: var(--accent-fill);
+}
+
+.button.primary:hover {
+  background: var(--accent-fill-hover);
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* the box stops taking more at the limit, so reaching it is said, not left silent */
+.message-count.at-limit,
+.name-count.at-limit {
+  color: var(--warn-text);
+}
+
+.trim-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.kind {
+  flex-wrap: wrap;
+}
+
+.kind legend .required {
+  font-size: 0.78rem;
+}
+
+/* the optional quick questions: folded away to begin with */
+.quick-questions {
+  margin: 0 0 14px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+
+.quick-questions summary {
+  cursor: pointer;
+}
+
+.rating {
+  margin: 12px 0;
+}
+
+.rating > label {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.rating input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+/* unanswered, the slider sits in the middle, faded, so it reads as untouched */
+.rating:not(.answered) input[type='range'] {
+  opacity: 0.55;
+}
+
+.rating-ends {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+
+.rating-said {
+  margin: 2px 0 0;
+  font-size: 0.82rem;
+}
+
+.clear-rating {
+  margin-left: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent-text);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}

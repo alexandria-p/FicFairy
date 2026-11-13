@@ -1,0 +1,272 @@
+@if (offered()) {
+  <!-- pinned to the right edge of every page; it slides out on hover, and back on leaving -->
+  <button type="button" class="feedback-tab" (click)="show()" aria-haspopup="dialog">Feedback</button>
+
+  @if (open()) {
+    <div class="modal">
+      <div class="backdrop" (click)="escape()"></div>
+
+      <form class="dialog" role="dialog" aria-modal="true" aria-labelledby="feedback-title" (submit)="send($event)">
+        <header>
+          <h2 id="feedback-title">{{ stage() === 'sent' ? 'Thank you!' : 'Send feedback' }}</h2>
+          <button type="button" class="close" aria-label="Close" [disabled]="stage() === 'sending'" (click)="close()">
+            &times;
+          </button>
+        </header>
+
+        @if (stage() === 'sent' && sent(); as issue) {
+          <section class="body sent" role="status">
+            <p>
+              Your feedback is on GitHub now, as
+              <a [href]="issue.url" target="_blank" rel="noopener">issue #{{ issue.number }}</a>.
+            </p>
+            <p>
+              It may take up to a minute to
+              <a [href]="feedbackList()" target="_blank" rel="noopener">show in the list</a>. You do
+              not need an account to read it, and any replies to the topic will be posted there.
+            </p>
+          </section>
+          <footer>
+            <button type="button" class="button primary" (click)="close()">Close</button>
+          </footer>
+        } @else {
+          <section class="body">
+            <fieldset class="kind" aria-required="true">
+              <legend>What kind of feedback is this? <span class="required">(required)</span></legend>
+              @for (choice of kinds; track choice.value) {
+                <label [class.chosen]="kind() === choice.value">
+                  <input type="radio" name="kind" [value]="choice.value" [checked]="kind() === choice.value"
+                    (change)="kind.set(choice.value)" />
+                  {{ choice.label }}
+                </label>
+              }
+            </fieldset>
+
+            <label class="field">
+              <span>Your feedback</span>
+              <textarea name="message" rows="6" [maxLength]="messageLimit" [value]="message()"
+                (input)="message.set($any($event.target).value)"></textarea>
+            </label>
+            @if (messageAtLimit()) {
+              <p class="hint message-count at-limit" role="alert">
+                Your feedback has reached the limit of {{ messageLimit.toLocaleString() }} characters -
+                anything more was not added. Shorten it, or send the rest as a second piece of feedback.
+              </p>
+            } @else if (messageNearLimit()) {
+              <p class="hint message-count" role="status">
+                {{ message().length.toLocaleString() }} of {{ messageLimit.toLocaleString() }} characters used.
+              </p>
+            }
+
+            <label class="field">
+              <span>Your name <em>(optional)</em></span>
+              <input name="name" type="text" autocomplete="nickname" [maxLength]="nameLimit" [value]="name()"
+                (input)="name.set($any($event.target).value)" />
+            </label>
+            @if (nameAtLimit()) {
+              <p class="hint name-count at-limit" role="alert">
+                Your name has reached the limit of {{ nameLimit.toLocaleString() }} characters -
+                anything more was not added.
+              </p>
+            } @else if (nameNearLimit()) {
+              <p class="hint name-count" role="status">
+                {{ name().length.toLocaleString() }} of {{ nameLimit.toLocaleString() }} characters used.
+              </p>
+            }
+
+            <!-- optional, folded away; a slider left in the middle is not answered, and not sent -->
+            <details class="quick-questions">
+              <summary>
+                <em>(Optional)</em> Quick questions about your experience
+                @if (ratedCount()) { <span class="dim">- {{ ratedCount() }} answered</span> }
+              </summary>
+              <p class="hint">Move a slider to answer it. One you leave in the middle is not sent.</p>
+              @for (q of ratingQuestions; track q.key) {
+                <div class="rating" [attr.data-rating]="q.key" [class.answered]="ratingOf(q.key) !== undefined">
+                  <label [attr.for]="'rating-' + q.key">{{ q.question }}</label>
+                  <input type="range" [id]="'rating-' + q.key" min="1" max="5" step="1"
+                    [value]="ratingOf(q.key) ?? ratingMiddle"
+                    [attr.aria-valuetext]="ratingOf(q.key) === undefined ? 'Not answered' : ratingOf(q.key) + ' of 5'"
+                    (input)="setRating(q.key, +$any($event.target).value)" />
+                  <div class="rating-ends"><span>{{ q.low }}</span><span>{{ q.high }}</span></div>
+                  <p class="rating-said">
+                    @if (ratingOf(q.key) === undefined) {
+                      <span class="dim">Not answered</span>
+                    } @else {
+                      {{ ratingOf(q.key) }} of 5
+                      <button type="button" class="clear-rating" (click)="clearRating(q.key)">Clear</button>
+                    }
+                  </p>
+                </div>
+              }
+            </details>
+
+            <label class="check" [class.unavailable]="!canAttach()">
+              <input type="checkbox" name="attachLog" [checked]="attachLog()" [disabled]="!canAttach()"
+                (change)="toggleLog($any($event.target).checked)" />
+              Attach a run's log <em>(optional)</em>
+            </label>
+            @if (!canAttach()) {
+              <p class="hint">Open your library to attach a run's log - the logs are kept in it.</p>
+            }
+            @if (attachLog()) {
+              <div class="log-choice" role="radiogroup" aria-label="Which run's log">
+                <label class="radio">
+                  <input type="radio" name="logChoice" value="latest" [checked]="logChoice() === 'latest'"
+                    (change)="setLogChoice('latest')" />
+                  The most recent run
+                </label>
+                <label class="radio">
+                  <input type="radio" name="logChoice" value="choose" [checked]="logChoice() === 'choose'"
+                    (change)="setLogChoice('choose')" />
+                  Choose a run
+                </label>
+                @if (logChoice() === 'choose') {
+                  @if (runListFailed()) {
+                    <p class="hint">Your runs could not be read - attach the most recent one instead.</p>
+                  } @else if (runList(); as runs) {
+                    @if (runs.length) {
+                      <select class="run-pick" aria-label="Run" [value]="chosenRun()"
+                        (change)="chooseRun($any($event.target).value)">
+                        <option value="" disabled [selected]="!chosenRun()">Choose a run...</option>
+                        @for (run of runs; track run.file) {
+                          <option [value]="run.file">{{ runLabel(run) }}</option>
+                        }
+                      </select>
+                    } @else {
+                      <p class="hint">There are no runs in this library yet.</p>
+                    }
+                  } @else {
+                    <p class="reading-runs" role="status"><span class="spinner" aria-hidden="true"></span> Reading your runs...</p>
+                  }
+                }
+              </div>
+              @if (logPreview()) {
+                <label class="field log-amount">
+                  <span>How much of it to attach</span>
+                  <select name="logAmount" (change)="setLogAmount($any($event.target).value)">
+                    @for (amount of logAmounts; track amount) {
+                      <option [value]="amount" [selected]="logAmount() === amount">{{ amountWords(amount, logAttachLimit) }}</option>
+                    }
+                  </select>
+                </label>
+                @if (logCut()) {
+                  <p class="hint log-cut" role="status">
+                    Only the most recent part of this run's log is attached{{ logTrimmedTo() !== null ? ', trimmed to fit' : '' }},
+                    under the run's details. You can download the whole of it any time from the
+                    <strong>History</strong> tab: find the run and choose <strong>Download log</strong>.
+                  </p>
+                }
+                <details class="log">
+                  <summary>See exactly what will be sent</summary>
+                  <pre>{{ logPreview() }}</pre>
+                </details>
+                <p class="hint">Your AO3 username is taken out of it. It never holds your password.</p>
+              } @else if (logNote()) {
+                <p class="hint">{{ logNote() }}</p>
+              } @else if (logChoice() === 'latest' || chosenRun()) {
+                <p class="hint">Reading the log...</p>
+              }
+            }
+
+            <label class="check">
+              <input type="checkbox" name="attachVisit" [checked]="attachVisit()"
+                (change)="toggleVisit($any($event.target).checked)" />
+              Attach what I did on this visit <em>(optional)</em>
+            </label>
+            <p class="hint">
+              For a problem outside a run: the tabs you opened, library reads, windows, runs
+              started and the settings you changed (with what you chose) since this page was
+              opened. It is kept by this page alone and gone when you close or reload it.
+            </p>
+            @if (attachVisit()) {
+              <label class="field log-amount">
+                <span>How much of it to attach</span>
+                <select name="visitAmount" (change)="setVisitAmount($any($event.target).value)">
+                  @for (amount of logAmounts; track amount) {
+                    <option [value]="amount" [selected]="visitAmount() === amount">{{ amountWords(amount, visitAttachLimit) }}</option>
+                  }
+                </select>
+              </label>
+              @if (visitCut()) {
+                <p class="hint visit-cut" role="status">
+                  Only the most recent part of your visit log is attached{{ visitTrimmedTo() !== null ? ', trimmed to fit' : '' }}.
+                  You can download the whole of it from <strong>User settings</strong>, under
+                  <strong>Advanced</strong>.
+                </p>
+              }
+              <details class="log visit">
+                <summary>See exactly what will be sent</summary>
+                <pre>{{ visitPreview() }}</pre>
+              </details>
+            }
+
+            <div class="check-widget" #check></div>
+            @if (failed()) {
+              <div class="problem failed" role="alert">
+                <p><strong>Uh oh - we couldn't submit your feedback.</strong></p>
+                <p class="reason">{{ problem() ? 'Why: ' + problem() + '.' : checkProblem() }}</p>
+                <p>
+                  So you don't lose what you wrote, download it as a text file. You can send it
+                  yourself as a GitHub issue instead (needs a GitHub account), or try again here.
+                </p>
+                <div class="failed-actions">
+                  <button type="button" class="button" (click)="downloadAttempt()">Download what I wrote</button>
+                  <a class="button" [href]="newIssueFilled()" target="_blank" rel="noopener">Submit it on GitHub instead</a>
+                </div>
+              </div>
+            }
+
+            <p class="hint public">
+              Your feedback will be posted publicly to
+              <a href="https://github.com/alexandria-p/ficfairy/issues/" target="_blank" rel="noopener">https://github.com/alexandria-p/ficfairy/issues/</a>,
+              labelled feedback - anyone can read it, so leave out anything private. No account is
+              needed to send it.
+            </p>
+            <p class="hint privacy">
+              An attached log never includes your AO3 username or password, your IP address, email
+              addresses, your AO3 time zone, file paths on your computer, or where your library is
+              kept (its folder's name or location) - anything like these is stripped out before it is sent. The issue also
+              says which browser you used, this app's version, and whether your library is in
+              Dropbox or on this computer. Your IP address is only seen by the bot check, and is
+              never posted. What you type above is sent as written.
+            </p>
+          </section>
+
+          @if (tooLong()) {
+            <p class="problem too-long" role="alert">
+              Sorry - this is {{ overBy().toLocaleString() }} characters too long to send (GitHub takes
+              {{ issueLimit.toLocaleString() }} in all). Untick a log, or shorten what you wrote. A
+              run's whole log can always be downloaded from the <strong>History</strong> tab, and
+              this visit's from <strong>User settings</strong>, under <strong>Advanced</strong>.
+            </p>
+            @if (canTrim()) {
+              <p class="trim-actions">
+                <button type="button" class="button trim-to-fit" (click)="trimToFit()">Trim to fit</button>
+                <span class="hint">Keeps the newest lines - your visit log is cut first, then the run's log. The run's details stay on top.</span>
+              </p>
+            }
+          }
+          @if (trimmed()) {
+            <p class="trim-actions">
+              <button type="button" class="button undo-trim" (click)="undoTrim()">Undo trim</button>
+              <span class="hint">Puts back the lines Trim to fit took out.</span>
+            </p>
+          }
+          @if (!tooLong() && (attachLog() || attachVisit())) {
+            <p class="hint issue-size">
+              {{ issueChars().toLocaleString() }} of {{ issueLimit.toLocaleString() }} characters,
+              {{ issueReserve.toLocaleString() }} of them kept for your name, the version and your browser.
+            </p>
+          }
+          <footer>
+            <button type="button" class="button" [disabled]="stage() === 'sending'" (click)="close()">Cancel</button>
+            <button type="submit" class="button primary" [disabled]="!canSend()">
+              {{ stage() === 'sending' ? 'Sending...' : 'Send feedback' }}
+            </button>
+          </footer>
+        }
+      </form>
+    </div>
+  }
+}

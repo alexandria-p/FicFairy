@@ -1,0 +1,237 @@
+import { Component, computed, inject, input, signal } from '@angular/core';
+import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
+import { Library } from './library';
+import { Jobs } from './jobs';
+import { shownTime } from './preferences';
+import { WorkList } from './work-list';
+import { CollectionEditor } from './collection-editor';
+import { CustomCollections } from './custom-collections';
+import { Bookmark, pageItems, paragraphs, placeholderExternal, placeholderWork } from './bookmarks';
+import {
+  Collection,
+  collectionBadges,
+  collectionLink,
+  collectionNameFromLink,
+  historyLength,
+  isCustomCollection,
+} from './collections';
+
+const PER_PAGE = 20;
+
+/** which set of a collection's works is being shown */
+type Tab = 'works' | 'bookmarks';
+
+/**
+ * The collections page: a paginated listing of the collections that have been indexed,
+ * and everything known about one when it is opened.
+ *
+ * A collection file records the works it holds by work number only, so the works shown
+ * inside one are the matching entries from the bookmarks index - the same works, in the
+ * same listing, which is why the works table here is the bookmarks table.
+ */
+@Component({
+  selector: 'app-collections-view',
+  imports: [DecimalPipe, NgTemplateOutlet, WorkList, CollectionEditor],
+  styleUrl: './collections-view.css',
+  templateUrl: './collections-view.html',
+})
+export class CollectionsView {
+  private readonly library = inject(Library);
+  /** the library is still being read or checked: making a collection waits, as the run buttons do */
+  readonly preparing = input(false);
+  /** the library's first read is still going: no 'no collections yet' until it is known */
+  readonly loading = input(false);
+  /** this library has been read successfully at least once, so 'none yet' is known to be true */
+  protected readonly wasRead = computed(() => {
+    const store = this.library.store();
+    return !!store && this.library.lastRead()?.store === store;
+  });
+  /** 'List refreshed', as the Works tab says it: when the library was last read into the page */
+  protected readonly listedAt = this.library.listedAt;
+  protected readonly shownTime = shownTime;
+
+  protected readonly collections = this.library.collections;
+  /** whether collections of your own can be made or changed: a library the page can write to */
+  protected readonly writable = inject(CustomCollections).writable;
+  private readonly jobs = inject(Jobs);
+  protected readonly runGoing = computed(() => this.jobs.activeRuns().length > 0);
+  /**
+   * The collection window, when it is open: 'new' to make one, or the custom collection
+   * being edited. Closing it without saving changes nothing.
+   */
+  protected readonly editing = signal<'new' | Collection | null>(null);
+
+  /** the open collection, by ao3 name; null while the listing is showing */
+  protected readonly openName = signal<string | null>(null);
+  protected readonly tab = signal<Tab>('works');
+  protected readonly page = signal(1);
+
+  protected readonly total = computed(() => this.collections().length);
+  protected readonly totalPages = computed(() => Math.max(1, Math.ceil(this.total() / PER_PAGE)));
+  protected readonly pages = computed(() => pageItems(this.page(), this.totalPages()));
+
+  protected readonly visible = computed(() => {
+    const start = (this.page() - 1) * PER_PAGE;
+    return this.collections().slice(start, start + PER_PAGE);
+  });
+
+  protected readonly rangeStart = computed(() =>
+    this.total() === 0 ? 0 : (this.page() - 1) * PER_PAGE + 1,
+  );
+  protected readonly rangeEnd = computed(() => Math.min(this.page() * PER_PAGE, this.total()));
+
+  protected readonly open = computed<Collection | null>(() => {
+    const name = this.openName();
+    return name === null ? null : (this.collections().find((c) => c.name === name) ?? null);
+  });
+
+  /** every indexed work, by work number, which is what a collection records */
+  private readonly worksById = this.library.worksById;
+
+  /** the work numbers the open tab is showing */
+  private readonly openIds = computed<string[]>(() => {
+    const collection = this.open();
+    if (!collection) return [];
+    return this.tab() === 'works' ? collection.work_ids : collection.bookmark_ids;
+  });
+
+  /**
+   * Every work the collection lists, in its listed order.
+   *
+   * A collection records what it holds by work number alone, and can hold works you have
+   * never bookmarked. Those have no index entry to show, so they appear as a placeholder
+   * carrying the one thing that is known - the number - and a link to the work on ao3.
+   */
+  protected readonly openWorks = computed<Bookmark[]>(() => {
+    const byId = this.worksById();
+    const works = this.openIds().map((id) => byId.get(id) ?? placeholderWork(id));
+    const collection = this.open();
+    // a collection of your own is one list - it has no works-versus-bookmarks split to show
+    const withExternals = !!collection && (isCustomCollection(collection) || this.tab() === 'bookmarks');
+    if (!collection || !withExternals) return works;
+    // external works after the works: looked up among external works only, since the two
+    // are numbered separately and external work 1 is not work 1
+    const externals = this.library.externalsById();
+    return [
+      ...works,
+      ...collection.external_ids.map((id) => externals.get(id) ?? placeholderExternal(id)),
+    ];
+  });
+
+  /**
+   * Every work the open list holds, by number, to download or update - those not in your index
+   * too, since a number is all a fic run needs. External works are left out: they are hosted
+   * outside AO3. The collection's own lists keep works and external works apart (its listing
+   * says which each is), so nothing here has to guess.
+   */
+  protected readonly openToFetch = computed(() => [
+    ...new Set(
+      this.openWorks()
+        .filter((work) => (work.bookmark_type ?? 'individual work') === 'individual work' && work.id)
+        .map((work) => work.id!),
+    ),
+  ]);
+  protected readonly fetchAllLabel = computed(() => {
+    const n = this.openToFetch().length;
+    return `Download/update ${n === 1 ? 'its 1 work' : `all ${n.toLocaleString()} works`} now`;
+  });
+  protected readonly fetchAllNote = computed(() => {
+    const externals = this.openWorks().filter((w) => w.bookmark_type === 'external work').length;
+    return externals
+      ? `${externals === 1 ? 'The external work is' : `${externals.toLocaleString()} external works are`} left out - they are hosted outside AO3`
+      : '';
+  });
+
+  protected fetchAllNow(): void {
+    const works = this.openToFetch();
+    if (works.length && !this.runGoing()) this.jobs.fetchWorksAsked.set(works);
+  }
+
+  /** everything a custom collection holds: works, and external works */
+  protected itemCount(collection: Collection): number {
+    return collection.work_ids.length + collection.external_ids.length;
+  }
+
+  /** everything among a collection's bookmarked items: works, and external works */
+  protected bookmarkedCount(collection: Collection): number {
+    return collection.bookmark_ids.length + collection.external_ids.length;
+  }
+
+  protected readonly missingCount = computed(
+    () => this.openWorks().filter((work) => work.placeholder).length,
+  );
+
+  protected readonly note = computed(() => {
+    const missing = this.missingCount();
+    if (missing === 0) return '';
+    return (
+      `${missing.toLocaleString()} of ${this.openWorks().length.toLocaleString()} works in this ` +
+      'collection are not in your bookmarks index. They are listed by work number, and open ' +
+      'on AO3 rather than as a local copy.'
+    );
+  });
+
+  protected readonly emptyMessage = computed(() => {
+    const collection = this.open();
+    if (collection && isCustomCollection(collection)) {
+      return 'Nothing in this collection yet. Tick works on the Bookmarks tab, then Add to a collection.';
+    }
+    return this.tab() === 'works'
+      ? 'No works were recorded for this collection.'
+      : 'No bookmarked items were recorded for this collection.';
+  });
+
+  // template helpers
+  protected readonly paragraphs = paragraphs;
+  protected readonly badges = collectionBadges;
+  protected readonly link = collectionLink;
+  protected readonly nameFromLink = collectionNameFromLink;
+  protected readonly historyLength = historyLength;
+  protected readonly isCustom = isCustomCollection;
+
+  protected show(collection: Collection): void {
+    this.openName.set(collection.name);
+    this.tab.set('works');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  protected editorCollection(): Collection | null {
+    const editing = this.editing();
+    return editing === 'new' ? null : editing;
+  }
+
+  /** a new one is opened at once, to put works in; an edit stays where it was */
+  protected editorSaved(collection: Collection): void {
+    const wasNew = this.editing() === 'new';
+    this.editing.set(null);
+    if (wasNew) this.show(collection);
+  }
+
+  protected back(): void {
+    this.openName.set(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  /** open a subcollection or parent from its link, if it has been indexed too */
+  protected follow(url: string, event: Event): void {
+    const name = collectionNameFromLink(url);
+    const known = this.collections().find((c) => c.name === name);
+    if (!known) return; // not indexed: let the link go to ao3
+    event.preventDefault();
+    this.show(known);
+  }
+
+  protected isIndexed(url: string): boolean {
+    const name = collectionNameFromLink(url);
+    return this.collections().some((c) => c.name === name);
+  }
+
+  protected goTo(page: number): void {
+    this.page.set(Math.min(Math.max(page, 1), this.totalPages()));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  protected count(value: number | null | undefined): string {
+    return value === null || value === undefined ? 'not recorded' : value.toLocaleString();
+  }
+}

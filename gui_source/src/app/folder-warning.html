@@ -1,0 +1,65 @@
+<div class="backdrop" (click)="cancel()"></div>
+
+<div class="dialog" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+  <header>
+    <h2>Before you choose a folder</h2>
+    <button type="button" class="icon" (click)="cancel()" aria-label="Close">&times;</button>
+  </header>
+
+  <section class="body">
+    <p>
+      A downloaded file is paired with its AO3 work by the <strong>work ID at the start of
+      its file name</strong>, followed by a space, <code>_</code>, <code>.</code> or
+      <code>-</code>. Anything after that is free.
+    </p>
+
+    <p>
+      The ideal name ends with <strong>the date AO3 last updated the work</strong>, as
+      <code class="whole">YYYY-MM-DD</code>, after a space and just before the extension - it is how a later
+      run tells your copy is behind AO3's:
+    </p>
+
+    <p class="ideal">
+      <code><span class="part">34816549</span>&ngsp;<span class="part">No Paths Are Bound - Cal</span>&ngsp;<span class="part date">2024-12-14</span>.html</code>
+      <span class="parts-key">work ID &middot; title - author &middot; date updated</span>
+    </p>
+
+    <p class="example">
+      <span class="yes">&#10003;</span> <code>34816549 No Paths Are Bound - Cal 2024-12-14.html</code><br />
+      <span class="yes">&#10003;</span> <code>34816549 No Paths Are Bound - Cal.html</code>
+      &mdash; matched, but with no date: you are asked what to do about it<br />
+      <span class="no">&times;</span> <code>No Paths Are Bound 34816549.html</code>
+      &mdash; the number is not first<br />
+      <span class="no">&times;</span> <code>34816549No Paths Are Bound.html</code>
+      &mdash; nothing separates the number from the title
+    </p>
+
+    <p class="hint">
+      Files named any other way still load, and nothing will look broken - but they cannot be
+      matched to your index, so every title opens on AO3 instead of your own copy. Every file
+      a run downloads is named the ideal way already.
+    </p>
+
+    <p class="hint">
+      The folder you choose becomes your library. If it does not already have them, it gets
+      five folders of its own - <code>indexing</code>, <code>collections</code>,
+      <code>images</code>, <code>runs</code> and <code>works</code> - and downloaded works live
+      in <code>works</code>.
+    </p>
+
+    <label class="check">
+      <input
+        type="checkbox"
+        name="dontAskAgain"
+        [checked]="dontAskAgain()"
+        (change)="dontAskAgain.set($any($event.target).checked)"
+      />
+      <span>Don't show this again</span>
+    </label>
+  </section>
+
+  <footer>
+    <button type="button" class="button subtle" (click)="cancel()">Cancel</button>
+    <button type="button" class="button primary" (click)="proceed()">Choose folder</button>
+  </footer>
+</div>

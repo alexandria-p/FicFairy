@@ -1,0 +1,806 @@
+:host {
+  display: block;
+  /* the fairy is placed against the page itself, so she can fly down past the header */
+  position: relative;
+  /* how far everything near her starts from the left, to leave her room */
+  --fairy-room: 150px;
+  max-width: 1000px;
+  margin: 0 auto;
+  /* nothing under the footer: it sits on the window's bottom edge */
+  padding: 16px 20px 0;
+}
+
+/* at least the window's height less the footer, so a short tab still has the footer at the
+   bottom - its height is measured (--app-footer-height), since it wraps on a narrow window */
+.page-body {
+  min-height: calc(100vh - 16px - 24px - var(--app-footer-height, 34px));
+  /* the library's loading panel measures itself against this, not the tab's own column */
+  container-type: inline-size;
+}
+
+/* the library's loading panel is the page's full width on every tab - the FAQ, Report a bug
+   and User settings keep their text to a narrower column, and it sat inside that */
+app-progress-bar {
+  width: 100cqw;
+  max-width: 100cqw;
+}
+
+/* region top bar */
+
+.topbar {
+  display: flex;
+  /* the name and the buttons always share the row: with a wide font chosen the buttons wrap
+     among themselves on the right rather than dropping under the name */
+  flex-wrap: nowrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 64px;
+  padding-bottom: 12px;
+  padding-left: var(--fairy-room);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar h1 {
+  margin: 0;
+  /* the title's own font, never the one chosen in User settings (styles.css) */
+  font-family: 'Doomsdays Dragons', var(--font-body);
+  font-size: 64px;
+  font-weight: normal;
+  /* no taller than the bar's 51px of content (64px less its padding and line), so the bar -
+     and the buttons, centred in it - stay exactly where they were however large the name is */
+  line-height: 51px;
+  height: 51px;
+  /* the name never wraps or shrinks; the buttons beside it give way instead */
+  flex: none;
+  white-space: nowrap;
+  color: var(--text-strong);
+}
+
+/* the name's capitals start 12px below the top of the bar and end just above its line: moved
+   down within the bar rather than making it taller. The span moves, not the h1, which would
+   otherwise become what the fairy is placed against */
+.topbar h1 .name {
+  position: relative;
+  top: 9.5px;
+}
+
+/* the fairy flying in over the tabs: large, tilted, and hanging below the header line, beside
+   the tabs and any banner under it, which start --fairy-room in to make space for her. She is
+   a transparent picture, tinted to the palette (appearance.logoFilter), never in the way of a
+   click, and her alt text is empty because the name beside her is what is read out */
+.topbar h1 .logo {
+  position: absolute;
+  top: 2px;
+  left: 14px;
+  z-index: 1;
+  width: 150px;
+  height: 150px;
+  transform: rotate(-6deg);
+  pointer-events: none;
+  filter: var(--logo-filter, none);
+}
+
+/* the notices under the tabs start below where the fairy's book reaches */
+.notices {
+  margin-top: 16px;
+}
+
+.notices:empty {
+  display: none;
+}
+
+/* :host first, so this outranks the tabs' own margin shorthand further down */
+:host .views {
+  margin-left: var(--fairy-room);
+}
+
+/* too narrow to give her room beside the tabs: she sits in the bar beside the name instead */
+@media (max-width: 760px) {
+  :host {
+    --fairy-room: 0px;
+  }
+
+  /* clear of the tabs, which have no fairy beside them to keep the notices down */
+  .notices {
+    margin-top: 12px;
+  }
+
+  .topbar {
+    flex-wrap: wrap;
+  }
+
+  .picker {
+    justify-content: flex-start;
+  }
+
+  .topbar h1 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 2.6rem;
+    line-height: 1;
+    height: auto;
+  }
+
+  .topbar h1 .name {
+    top: 0;
+  }
+
+  .topbar h1 .logo {
+    position: static;
+    width: 64px;
+    height: 64px;
+    transform: none;
+  }
+}
+
+/* a phone: the fairy and the name centred together, as large as the width allows, and the
+   library's switch on a row of its own under them - beside each other, both were squeezed */
+@media (max-width: 560px) {
+  .topbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .topbar h1 {
+    justify-content: center;
+    gap: 0;
+    /* fills a phone's width without wrapping: the name is ten letters and a space */
+    font-size: clamp(2.4rem, 12vw, 3.6rem);
+  }
+
+  /* she leans in towards the name, as she flies in over the tabs on a wide window */
+  .topbar h1 .logo {
+    width: clamp(72px, 23vw, 104px);
+    height: clamp(72px, 23vw, 104px);
+    margin: -8px 2px -2px -10px;
+    transform: rotate(-6deg);
+  }
+
+  /* .topbar first, to outrank the picker's own right-alignment further down */
+  .topbar .picker {
+    justify-content: center;
+  }
+}
+
+.picker {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+/* where the library lives: two halves of one control, so it reads as a choice of one */
+.storage {
+  display: inline-flex;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+}
+
+.storage button {
+  padding: 6px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.storage button + button {
+  border-left: 1px solid var(--border-strong);
+}
+
+.storage button:hover {
+  color: var(--text-strong);
+}
+
+.storage button.current {
+  position: relative;
+  color: var(--text-strong);
+}
+
+/* the one chosen has a chunky highlighter swipe behind its name, in the palette's accent. It
+   is drawn in each time it appears - on load, and on switching - left to right like a pen */
+.storage button.current {
+  isolation: isolate;
+}
+
+.storage .highlight {
+  position: absolute;
+  inset: 0 -4px;
+  z-index: -1;
+  width: calc(100% + 8px);
+  height: 100%;
+  overflow: visible;
+  opacity: 0.45;
+  pointer-events: none;
+  animation: swipe-in 0.45s cubic-bezier(0.3, 0.7, 0.4, 1) both;
+}
+
+.storage .highlight path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+@keyframes swipe-in {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .storage .highlight { animation: none; }
+}
+
+.source {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 12px;
+}
+
+/* run buttons handed into another component's row take part in that row directly */
+.joined-actions,
+.joined-actions .actions {
+  display: contents;
+}
+
+/* the runs that are each right for one job, kept out of the way of the two that are not */
+.advanced {
+  flex-basis: 100%;
+}
+
+.advanced summary {
+  display: inline-block;
+  padding: 4px 0;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.advanced summary:hover {
+  color: var(--text-strong);
+}
+
+.advanced-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.button.primary {
+  border-color: var(--accent-line);
+  background: var(--accent-fill);
+  color: var(--text-strong);
+}
+
+.button.primary:hover {
+  background: var(--accent-fill-hover);
+}
+
+/*
+  a run that only exists when settings.ini turns the debug tools on. red because it is not
+  part of the ordinary set, and reads that way at a glance beside the buttons that are
+*/
+.button.debug {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--text-strong);
+}
+
+.button.debug:hover {
+  background: var(--danger-bg-hover);
+}
+
+.remembered {
+  color: var(--ok-text);
+  font-size: 0.7em;
+  vertical-align: middle;
+}
+
+.reconnect {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 16px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--warn-border);
+  border-radius: 3px;
+  background: var(--warn-bg);
+  font-size: 0.88rem;
+}
+
+.button {
+  display: inline-block;
+  font-family: inherit;
+  padding: 6px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--surface-2);
+  color: var(--text-strong);
+  font-size: 0.85rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* held - a run going, or the library still loading - and looking it */
+.button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.button:hover {
+  background: var(--surface-hover);
+}
+
+.button.subtle {
+  background: transparent;
+  color: var(--text-dim);
+}
+
+/* endregion */
+
+/* region page-level messages */
+
+.error {
+  margin: 16px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--danger-border);
+  border-radius: 3px;
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.notice {
+  margin: 16px 0;
+  color: var(--text-dim);
+}
+
+/* the library's reading bar, where a tab has no title to put it under */
+.progress-top {
+  margin: 20px 0 0;
+}
+
+.empty {
+  margin-top: 48px;
+  padding: 28px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 4px;
+  text-align: center;
+}
+
+.empty h2 {
+  margin-top: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.empty .hint {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+/* endregion */
+
+/* region view toggle */
+
+.views {
+  display: flex;
+  /* on a narrow window the tabs go onto a second row rather than off the edge of the page */
+  flex-wrap: wrap;
+  gap: 2px 4px;
+  margin: 18px 0 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.views button {
+  /* a tab's name stays on one line - 'Report a bug' broke in two inside its tab */
+  white-space: nowrap;
+  padding: 8px 18px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.views button:hover {
+  color: var(--text-strong);
+}
+
+.views button.current {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text-strong);
+}
+
+@media (max-width: 560px) {
+  .views button {
+    padding: 6px 10px;
+  }
+}
+
+.views .count {
+  margin-left: 6px;
+  color: var(--text-dim);
+  font-weight: 400;
+  font-size: 0.85rem;
+}
+
+/* endregion */
+
+/* the moment between pressing a run's button and its window opening */
+.checking-runs {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--bg, #000) 55%, transparent);
+  color: var(--text-strong, inherit);
+  font-weight: 600;
+}
+
+.checking-runs .spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: checking-spin 0.8s linear infinite;
+}
+
+@keyframes checking-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .checking-runs .spinner { animation-duration: 2.4s; }
+}
+
+
+/* a run already going - the one thing that stops another starting, so it sits at the top */
+.run-in-progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--accent-line);
+  border-radius: 3px;
+  background: var(--accent-bg);
+  font-size: 0.9rem;
+}
+
+/* news, not a problem - the calm blue the run banner wears */
+.update-available {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--accent-line);
+  border-radius: 3px;
+  background: var(--accent-bg);
+  font-size: 0.9rem;
+}
+
+.update-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* the one thing an update banner says that is a problem - amber, as a copy to check is */
+.update-available.update-failed {
+  border-color: var(--warn-border);
+  background: var(--warn-bg);
+}
+
+/* what this page is and where it comes from - on every tab, and kept in view at the bottom
+   of the window, because nobody should have to scroll to the end of a library to find it */
+.app-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin-top: 24px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
+.app-footer a {
+  color: var(--text-dim);
+}
+
+/* the hosted copy's pointer to the app, a panel under the version line */
+.app-footer .run-locally {
+  flex: 1 0 100%;
+  margin: 4px 0 0;
+  padding: 7px 11px;
+  border: 1px solid var(--accent-line);
+  border-radius: 3px;
+  background: var(--accent-bg);
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
+.app-footer .run-locally a {
+  color: var(--link);
+}
+
+/* whether this is the latest version: underlined text, never a button - the banner is the
+   loud way to say it, this is the one that is always there */
+.footer-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.footer-link:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.footer-link:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.footer-note {
+  font-style: italic;
+}
+
+/* a short page, not a document: a link and what to put in the issue */
+.report-bug {
+  max-width: 640px;
+  margin: 20px 0 24px;
+}
+
+.report-bug h2 {
+  margin: 0 0 10px;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.report-bug p {
+  margin: 0 0 10px;
+}
+
+.report-bug .hint {
+  color: var(--text-dim);
+  font-size: 0.88rem;
+}
+
+/* the Works tab's first line while the library has works or files to sort out */
+.import-issues {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--warn-border);
+  border-radius: 5px;
+  background: var(--warn-bg);
+}
+
+.import-issues-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.import-issues-said {
+  color: var(--text-dim);
+  font-size: 0.88rem;
+}
+
+/* the top right of the reminder, however its text wraps */
+.import-issues-close {
+  flex: none;
+  margin-left: auto;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.import-issues-close:hover {
+  color: var(--text-strong);
+}
+
+/* debug mode, above everything else */
+.debug-banner {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--danger-border);
+  border-radius: 5px;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  font-size: 0.9rem;
+}
+
+.views .debug-tab-button {
+  color: var(--danger-text);
+}
+
+/* Refresh, as an icon beside 'List refreshed': spins while the list is read again */
+.refresh-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* the gap is all margin, with no space before it in any template, so it is the same on every tab */
+  margin-left: 6px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 3px;
+  /* transparent in every state - hover only colours the arrow */
+  background: transparent;
+  appearance: none;
+  color: var(--text-dim);
+  /* sat on the text's baseline and a pixel below it: the arrow's middle then meets the middle
+     of the capitals and digits beside it, which is where the eye lines it up */
+  vertical-align: -1px;
+  cursor: pointer;
+}
+
+.refresh-icon svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+  transform-origin: 50% 50%;
+}
+
+.refresh-icon:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+.refresh-icon:disabled {
+  background: transparent;
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* spinning is the point while it reads: not faded with the rest of a held button */
+.refresh-icon.spinning:disabled {
+  opacity: 1;
+  color: var(--accent);
+}
+
+.refresh-icon.spinning svg {
+  animation: refresh-spin 1s linear infinite;
+}
+
+@keyframes refresh-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .refresh-icon.spinning svg { animation: none; }
+}
+
+/* a failed library read: what went wrong, and a way to ask again that waits a moment first */
+.read-error p {
+  margin: 0;
+}
+
+.read-error .slow-down {
+  margin-top: 6px;
+  color: var(--text);
+}
+
+.read-error .try-again {
+  margin-top: 10px;
+  min-width: 7em;
+}
+
+.debug-banner .dummy-note { display: block; margin-top: 4px; }
+
+/* guest mode, first of the notices: a tour, in the accent rather than a warning's colours */
+.guest-banner {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--accent-line);
+  border-radius: 5px;
+  background: var(--accent-bg);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.guest-banner a {
+  color: var(--link);
+}
+
+.guest-banner .guest-note {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-dim);
+}
+
+/* a preview of guest mode, from the DEBUG tab: the way back, on its own line under the text */
+.guest-banner .guest-preview {
+  display: block;
+  margin-top: 8px;
+}
+
+/* why a held run button is held: one line and OK */
+.device-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.device-modal .backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--backdrop);
+}
+
+.device-modal .dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  max-width: 360px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.device-modal .dialog p {
+  margin: 0;
+  align-self: stretch;
+  color: var(--text-strong);
+}
+

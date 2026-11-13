@@ -1,0 +1,363 @@
+@if (open(); as collection) {
+  <!-- one collection, opened -->
+  <p class="crumb">
+    <button type="button" class="linklike" (click)="back()">&larr; All collections</button>
+  </p>
+
+  @if (isCustom(collection)) {
+  <!-- one of your own: made here, so there is no ao3 page, reading history or challenge -->
+  <header class="collection-head">
+    <!-- the name, its pencil, and Update collection details at the right of the same line -->
+    <div class="title-row">
+      <h2>{{ collection.title }}</h2>
+      @if (writable()) {
+        <ng-container [ngTemplateOutlet]="pencil" [ngTemplateOutletContext]="{ $implicit: collection }" />
+        <button type="button" class="button edit-collection" (click)="editing.set(collection)">Update collection details</button>
+      }
+    </div>
+    <p class="flags">
+      <span class="badge custom">Collection made in Fic Fairy</span>
+      @for (badge of badges(collection); track badge) {
+        <span class="badge">{{ badge }}</span>
+      }
+    </p>
+  </header>
+
+  @if (collection.description) {
+    <blockquote class="summary">
+      @for (line of paragraphs(collection.description); track $index) {
+        <p>{{ line }}</p>
+      }
+    </blockquote>
+  }
+
+  @if (collection.tags.length) {
+    <ul class="tags">
+      @for (tag of collection.tags; track tag) {
+        <li><span class="tag">{{ tag }}</span></li>
+      }
+    </ul>
+  }
+
+  <dl class="facts">
+    <dt>Made in</dt>
+    <dd>this app - it is not on AO3</dd>
+    @if (collection.maintainers.length) {
+      <dt>Maintainers</dt>
+      <dd>{{ collection.maintainers.join(', ') }}</dd>
+    }
+    @if (collection.challenge_type && collection.challenge_type !== 'No Challenge') {
+      <dt>Challenge</dt>
+      <dd>{{ collection.challenge_type }}</dd>
+    }
+    @if (badges(collection).length) {
+      <dt>Shown as</dt>
+      <dd>{{ badges(collection).join(', ') }}</dd>
+    }
+    @if (collection.active_since) {
+      <dt>Active since</dt>
+      <dd>{{ collection.active_since }}</dd>
+    }
+    @if (collection.created) {
+      <dt>Created</dt>
+      <dd>{{ collection.created }}</dd>
+    }
+    <dt>Holds</dt>
+    <dd>{{ itemCount(collection) | number }}</dd>
+  </dl>
+
+  <p class="hint">
+    Tick works here to take them out, or on the Bookmarks tab to add more. It is saved in your
+    library, in <code>collections/custom</code>.
+  </p>
+
+  <ng-container [ngTemplateOutlet]="fetchAll" />
+  <app-work-list
+    [works]="openWorks()"
+    label="works in this collection"
+    [note]="note()"
+    [emptyMessage]="emptyMessage()"
+    [selectable]="true"
+    [collection]="collection"
+  />
+  } @else {
+  <header class="collection-head">
+    <h2>
+      <a [href]="link(collection)" target="_blank" rel="noopener">{{ collection.title }}</a>
+    </h2>
+    <p class="slug"><code>{{ collection.name }}</code></p>
+
+    @if (badges(collection).length) {
+      <p class="flags">
+        @for (badge of badges(collection); track badge) {
+          <span class="badge">{{ badge }}</span>
+        }
+        <span class="badge challenge">{{ collection.challenge_type }}</span>
+      </p>
+    } @else {
+      <p class="flags"><span class="badge challenge">{{ collection.challenge_type }}</span></p>
+    }
+  </header>
+
+  @if (collection.description) {
+    <blockquote class="summary">
+      @for (line of paragraphs(collection.description); track $index) {
+        <p>{{ line }}</p>
+      }
+    </blockquote>
+  }
+
+  @if (collection.tags.length) {
+    <ul class="tags">
+      @for (tag of collection.tags; track tag) {
+        <li><span class="tag">{{ tag }}</span></li>
+      }
+    </ul>
+  }
+
+  <dl class="facts">
+    @if (collection.maintainers.length) {
+      <dt>Maintainers</dt>
+      <dd>
+        @for (person of collection.maintainers; track person; let last = $last) {
+          <a [href]="'https://archiveofourown.org/users/' + person" target="_blank" rel="noopener">{{ person }}</a>@if (!last) {, }
+        }
+      </dd>
+    }
+    @if (collection.active_since) {
+      <dt>Active since</dt>
+      <dd>{{ collection.active_since }}</dd>
+    }
+    @if (collection.created) {
+      <dt>Created</dt>
+      <dd>{{ collection.created }}</dd>
+    }
+    <dt>Fandoms</dt>
+    <dd>{{ count(collection.fandom_count) }}</dd>
+    <dt>Works</dt>
+    <dd>{{ count(collection.work_count) }}</dd>
+    <dt>Bookmarked items</dt>
+    <dd>{{ count(collection.bookmark_count) }}</dd>
+    @if (collection.last_indexed) {
+      <dt>Last indexed</dt>
+      <dd>
+        {{ collection.last_indexed }}
+        @if (historyLength(collection) > 1) {
+          <span class="dim">({{ historyLength(collection) }} readings kept)</span>
+        }
+      </dd>
+    }
+  </dl>
+
+  @if (collection.parent_collection || collection.subcollections.length) {
+    <div class="related">
+      @if (collection.parent_collection; as parent) {
+        <p>
+          <span class="label">Part of</span>
+          <a
+            [href]="parent"
+            [class.known]="isIndexed(parent)"
+            target="_blank"
+            rel="noopener"
+            (click)="follow(parent, $event)"
+            >{{ nameFromLink(parent) }}</a
+          >
+        </p>
+      }
+      @if (collection.subcollections.length) {
+        <p>
+          <span class="label">Subcollections ({{ collection.subcollections.length }})</span>
+          @for (child of collection.subcollections; track child; let last = $last) {
+            <a
+              [href]="child"
+              [class.known]="isIndexed(child)"
+              target="_blank"
+              rel="noopener"
+              (click)="follow(child, $event)"
+              >{{ nameFromLink(child) }}</a
+            >@if (!last) {, }
+          }
+        </p>
+        <p class="hint">Underlined in white means that one has been indexed too - click to open it here.</p>
+      }
+    </div>
+  }
+
+  @if (collection.error) {
+    <p class="error">Part of this collection could not be read when it was indexed.</p>
+  }
+
+  <!-- the works in it, in the same listing as the bookmarks page -->
+  <nav class="tabs" aria-label="What to list">
+    <button type="button" [class.current]="tab() === 'works'" (click)="tab.set('works')">
+      Works <span class="count">{{ collection.work_ids.length | number }}</span>
+    </button>
+    <button type="button" [class.current]="tab() === 'bookmarks'" (click)="tab.set('bookmarks')">
+      Bookmarked items <span class="count">{{ bookmarkedCount(collection) | number }}</span>
+    </button>
+  </nav>
+
+  <ng-container [ngTemplateOutlet]="fetchAll" />
+  <app-work-list
+    [works]="openWorks()"
+    [label]="tab() === 'works' ? 'works in this collection' : 'bookmarked items in this collection'"
+    [note]="note()"
+    [emptyMessage]="emptyMessage()"
+    [selectable]="true"
+    [collection]="collection"
+  />
+  }
+} @else {
+  <!-- the listing of collections -->
+  <p class="listing-heading">
+    <!-- nothing counted yet (still loading, or none at all): just what is listed -->
+    @if (total()) {
+      {{ rangeStart() | number }} - {{ rangeEnd() | number }} of {{ total() | number }} Collections
+    } @else {
+      Collections
+    }
+  </p>
+  <p class="meta-line note">
+    @if (listedAt(); as at) {<span>List refreshed {{ shownTime(at) }}</span>} @else {<span>List not yet loaded</span>}<ng-content select="[noteAction]" />
+  </p>
+  <!-- under the heading, one row: the page's run buttons (projected), then making your own -->
+  <div class="listing-actions">
+    <ng-content select="[listingActions]" />
+    @if (writable()) {
+      <button type="button" class="button primary" [disabled]="preparing()"
+              [attr.title]="preparing() ? 'Wait until your library has finished loading' : null"
+              (click)="editing.set('new')">+ New collection</button>
+    }
+  </div>
+  <!-- reading the library: under the title and its buttons, as on the Works tab -->
+  <ng-content select="[listingProgress]" />
+
+  <ol class="collections">
+    @for (collection of visible(); track collection.name) {
+      <li class="collection" [class.custom]="isCustom(collection)">
+        <h4 class="heading">
+          <button type="button" class="title linklike" (click)="show(collection)">
+            {{ collection.title }}
+          </button>
+          @if (isCustom(collection) && writable()) {
+            <ng-container [ngTemplateOutlet]="pencil" [ngTemplateOutletContext]="{ $implicit: collection }" />
+          }
+          @if (collection.maintainers.length) {
+            <span class="by">by</span>
+            @for (person of collection.maintainers; track person; let last = $last) {
+              <a [href]="'https://archiveofourown.org/users/' + person" target="_blank" rel="noopener">{{ person }}</a>@if (!last) {, }
+            }
+          }
+        </h4>
+
+        <p class="flags">
+          @if (isCustom(collection)) {
+            <!-- always the first pill, ahead of any others the collection has -->
+            <span class="badge custom">Collection made in Fic Fairy</span>
+            @for (badge of badges(collection); track badge) {
+              <span class="badge">{{ badge }}</span>
+            }
+          } @else {
+            <span class="badge challenge">{{ collection.challenge_type }}</span>
+            @for (badge of badges(collection); track badge) {
+              <span class="badge">{{ badge }}</span>
+            }
+          }
+        </p>
+
+        @if (collection.description) {
+          <blockquote class="summary">
+            <p>{{ collection.description }}</p>
+          </blockquote>
+        }
+
+        @if (collection.tags.length) {
+          <ul class="tags">
+            @for (tag of collection.tags; track tag) {
+              <li><span class="tag">{{ tag }}</span></li>
+            }
+          </ul>
+        }
+
+        <dl class="stats">
+          @if (isCustom(collection)) {
+            <dt>Works:</dt>
+            <dd>{{ itemCount(collection) | number }}</dd>
+          } @else {
+          <dt>Works:</dt>
+          <dd>{{ collection.work_ids.length | number }}</dd>
+          <dt>Bookmarked items:</dt>
+          <dd>{{ bookmarkedCount(collection) | number }}</dd>
+          }
+          @if (collection.subcollections.length) {
+            <dt>Subcollections:</dt>
+            <dd>{{ collection.subcollections.length | number }}</dd>
+          }
+        </dl>
+      </li>
+    } @empty {
+      <!-- only once this folder has been read: until then nobody knows it has none -->
+      @if (!loading() && wasRead()) {
+      <li class="notice">
+        No collections in this folder yet. Use <strong>Index my collections</strong> above to
+        fetch your own, or <strong>Index collection by URL</strong> for any other. To make one
+        of your own, tick works on the Bookmarks tab and choose <strong>Add to a collection</strong>.
+      </li>
+      }
+    }
+  </ol>
+
+  @if (totalPages() > 1) {
+    <nav class="pagination" aria-label="Pages">
+      <button type="button" class="step" [disabled]="page() === 1" (click)="goTo(page() - 1)">
+        &larr; Previous
+      </button>
+      @for (item of pages(); track $index) {
+        @if (item === 'gap') {
+          <span class="gap">&hellip;</span>
+        } @else {
+          <button
+            type="button"
+            class="page"
+            [class.current]="item === page()"
+            [attr.aria-current]="item === page() ? 'page' : null"
+            (click)="goTo($any(item))"
+          >
+            {{ item }}
+          </button>
+        }
+      }
+      <button type="button" class="step" [disabled]="page() === totalPages()" (click)="goTo(page() + 1)">
+        Next &rarr;
+      </button>
+    </nav>
+  }
+}
+
+<!-- the pencil beside a collection made in Fic Fairy: opens the same window as Update collection details -->
+<!-- every work the open list holds, to the several-fics run: external works are left out -->
+<ng-template #fetchAll>
+  @if (openToFetch().length) {
+    <p class="collection-fetch">
+      <button type="button" class="button fetch-collection" [disabled]="runGoing()"
+        [title]="runGoing() ? 'Unavailable while a run is already in progress' : fetchAllNote()"
+        (click)="fetchAllNow()">{{ fetchAllLabel() }}</button>
+    </p>
+  }
+</ng-template>
+
+<ng-template #pencil let-collection>
+  <button type="button" class="pencil" title="Update collection details" aria-label="Update collection details"
+          (click)="editing.set(collection)">
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+      <path d="M11.3 1.7a1.5 1.5 0 0 1 2.1 0l.9.9a1.5 1.5 0 0 1 0 2.1L5.6 13.4 2 14l.6-3.6 8.7-8.7z"
+            fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" />
+      <path d="M9.8 3.2l3 3" stroke="currentColor" stroke-width="1.4" />
+    </svg>
+  </button>
+</ng-template>
+
+@if (editing()) {
+  <app-collection-editor [collection]="editorCollection()" (saved)="editorSaved($event)"
+                         (cancelled)="editing.set(null)" />
+}

@@ -1,0 +1,2375 @@
+<div class="backdrop" (click)="close()"></div>
+
+<!--
+  data-step names the step the dialog is on. the order of the steps is not the same for
+  every run - a custom run asks its options before the file types, and several runs put an
+  acknowledgement in between - so anything walking this wizard has to go by where it is
+  rather than by counting clicks
+-->
+<div
+  class="dialog"
+  role="dialog"
+  aria-modal="true"
+  [attr.data-step]="step()"
+  (click)="$event.stopPropagation()"
+>
+  <header>
+    <h2>{{ title() }}@if (guest()) {<span class="guest-title"> (guest mode)</span>}</h2>
+    <!-- a background run can be left to carry on, so its window can be closed while it runs -->
+    @if (step() !== 'running' || runningInBackground()) {
+      <button type="button" class="icon" (click)="close()" aria-label="Close">&times;</button>
+    }
+  </header>
+
+  @if (available() === false) {
+    <section class="body">
+      <p class="error">The local helper isn't running, so downloads can't be started from here.</p>
+      @if (local()) {
+        <!-- what to do, for someone who just wants it to work - the developer's way is folded away below -->
+        <div class="restart-advice">
+          <p>
+            Close this page, then start FicFairy again
+            @if (startProgram(); as program) {
+              - {{ program.how }} <code>{{ program.file }}</code> in the <code>ficfairy</code> folder you unzipped.
+            } @else {
+              - double-click <code>ficfairy.exe</code> on Windows, <code>Start FicFairy.command</code> on a Mac,
+              or run <code>Start FicFairy.sh</code> on Linux, in the <code>ficfairy</code> folder you unzipped.
+            }
+            That should:
+          </p>
+          <ol>
+            <li>open the helper in a terminal window - it sends your requests to AO3, so leave it open while you use FicFairy</li>
+            <li>open this site in your web browser - Chrome is recommended</li>
+          </ol>
+        </div>
+      } @else {
+        <p>
+          The helper this page uses isn't answering. It may be waking up after a quiet spell - close
+          this and try again in a minute.
+        </p>
+      }
+      <details class="developer-info">
+        <summary>Advanced information for developers</summary>
+        <p>
+          A web page can't reach AO3 or write to your disk on its own. Start the helper in a
+          terminal, then reopen this:
+        </p>
+        <pre>uv run python -m ao3downloader.server</pre>
+        <p class="hint">
+          Run it from the folder holding <code>settings.ini</code>, so it uses the same settings
+          and downloads folder as the console app.
+        </p>
+      </details>
+    </section>
+    <footer>
+      <button type="button" class="button" (click)="close()">Close</button>
+    </footer>
+  } @else {
+    <!-- until init has worked out which step this run opens on - see Step's 'preparing' -->
+    @if (step() === 'preparing') {
+      <section class="body preparing" role="status">
+        <span class="spinner" aria-hidden="true"></span>
+        <span>Getting this run ready...</span>
+      </section>
+    }
+
+    <!-- step 1a: which collection, when it is not one of yours -->
+    @if (step() === 'link') {
+      <form class="body" (submit)="$event.preventDefault(); fromLink()">
+        <p>{{ blurb() }}</p>
+
+        @if (wantsWorks()) {
+          <label class="field">
+            <span>Work links or work numbers</span>
+            <textarea
+              name="works"
+              rows="6"
+              placeholder="https://archiveofourown.org/works/34816549&#10;75354806, 123456; 7890"
+              [value]="collectionUrl()"
+              [class.ghost-typing]="ghostTyping()"
+              (input)="setCollectionUrl($any($event.target).value)"
+            ></textarea>
+          </label>
+
+          @if (ghostTyping()) {
+          } @else if (workList().unknown.length) {
+            <p class="error">
+              {{ workList().unknown.length === 1 ? 'This is not an AO3 work' : 'These are not AO3 works' }}:
+              <code>{{ workList().unknown.slice(0, 10).join(', ') }}</code>@if (workList().unknown.length > 10) { and {{ workList().unknown.length - 10 }} more}.
+              Each should be a work link like <code>https://archiveofourown.org/works/34816549</code>,
+              or just the number.
+            </p>
+          } @else if (workList().ids.length > maxWorks) {
+            <p class="error too-many-works" role="alert">
+              That is {{ workList().ids.length | number }} fics - one run takes at most
+              {{ maxWorks }}. Remove {{ workList().ids.length - maxWorks | number }}, or split them
+              into smaller runs, to continue.
+            </p>
+          } @else if (workList().ids.length) {
+            <p class="hint work-count">
+              <strong>{{ workList().ids.length | number }}</strong>
+              {{ workList().ids.length === 1 ? 'fic' : 'fics' }} to fetch.
+            </p>
+          }
+
+          <p class="hint">
+            Put them on separate lines, or separate them with commas, spaces or semicolons -
+            any mix. A link to any chapter works, and the same fic twice is fetched once.
+          </p>
+          <p class="hint">Saved to <code>{{ folder() }}</code>, like any other download.</p>
+          <p class="hint">
+            <strong>This always replaces the copies you have</strong> of these fics, in every
+            format you pick. Every fic is looked up first; any AO3 will not give is offered to
+            FicHub once, at the end.
+          </p>
+        } @else if (wantsWork()) {
+          <label class="field">
+            <span>Work link or work number</span>
+            <input
+              type="text"
+              name="work"
+              placeholder="https://archiveofourown.org/works/34816549 or 34816549"
+              [value]="collectionUrl()"
+              [class.ghost-typing]="ghostTyping()"
+              (input)="setCollectionUrl($any($event.target).value)"
+            />
+          </label>
+
+          @if (collectionUrl().trim() && !linkIsValid() && !ghostTyping()) {
+            <p class="error">
+              That is not an AO3 work. It should look like
+              <code>https://archiveofourown.org/works/34816549</code>, or just the number.
+            </p>
+          }
+
+          <p class="hint">
+            A link to any chapter works, so one copied straight out of the address bar is
+            fine. The work number on its own says the same thing.
+          </p>
+          <p class="hint">Saved to <code>{{ folder() }}</code>, like any other download.</p>
+          <p class="hint">
+            <strong>This always replaces the copy you have</strong>, in every format you
+            pick, whether or not AO3 has a newer version. You asked for this one fic by
+            hand, so it is fetched rather than skipped for looking current.
+          </p>
+        } @else {
+          <label class="field">
+            <span>Collection link</span>
+            <input
+              type="url"
+              name="collection"
+              placeholder="https://archiveofourown.org/collections/yuletide2024"
+              [value]="collectionUrl()"
+              (input)="setCollectionUrl($any($event.target).value)"
+            />
+          </label>
+
+          @if (collectionUrl().trim() && !linkIsValid()) {
+            <p class="error">
+              That is not a link to a collection. It should look like
+              <code>https://archiveofourown.org/collections/somename</code>.
+            </p>
+          }
+
+          <p class="hint">
+            Any page of the collection will do - the dashboard, the profile, its works - so a
+            link copied straight out of the address bar works.
+          </p>
+          <p class="hint">Saved to <code>{{ folder() }}</code>, alongside your own collections.</p>
+        }
+
+      </form>
+      <footer>
+        <button type="button" class="button subtle" (click)="close()">Cancel</button>
+        <button type="button" class="button primary" [disabled]="!linkIsValid()" (click)="fromLink()">
+          Continue
+        </button>
+      </footer>
+    }
+
+    <!-- step 1: what to download -->
+    @if (step() === 'filetypes') {
+      <section class="body">
+        @if (blurb()) {
+          <p>{{ blurb() }}</p>
+        }
+        <p class="hint">Files are saved to <code>{{ folder() }}</code>.</p>
+
+        <fieldset>
+          <legend>File types</legend>
+          @for (filetype of shownFiletypes(); track filetype) {
+            <label class="check" [class.locked]="isLocked(filetype)">
+              <input
+                type="checkbox"
+                [checked]="isSelected(filetype)"
+                [disabled]="isLocked(filetype)"
+                (change)="toggle(filetype)"
+              />
+              <span>{{ filetype }}</span>
+              @if (isLocked(filetype)) {
+                <span class="badge">{{ lockedBecause(filetype) }}</span>
+              }
+            </label>
+          }
+        </fieldset>
+
+        <!-- JSON is only listed in debug mode, so only then is there anything to say about it -->
+        @if (!debugMode.on()) {
+        } @else if (picksReindex()) {
+          <p class="hint">
+            @if (reindex()) {
+              JSON is the index itself, so it is written whenever a run indexes - which this
+              one does. Every other type is fetched per work.
+            } @else {
+              You chose to skip indexing, so no JSON is written: JSON <em>is</em> the index,
+              and this run is working from the one you already have. Go back a step to change
+              that.
+            }
+          </p>
+        } @else if (metadataNotApplicable()) {
+          <p class="hint">
+            JSON metadata comes from the bookmarks listing, so this run won't rewrite it - it
+            updates the works themselves.
+          </p>
+        }
+      </section>
+      <footer>
+        <button type="button" class="button subtle" (click)="backFrom('filetypes')">
+          {{ hasStepBefore('filetypes') ? 'Back' : 'Cancel' }}
+        </button>
+        <button type="button" class="button primary" (click)="afterFiletypes()">Continue</button>
+      </footer>
+    }
+
+    <!-- step 2: the questions the console menu asks -->
+    @if (step() === 'options') {
+      <section class="body">
+        <!-- what a scan is for, before what it covers - said here, not on the file types page -->
+        @if (action() === 'quick') {
+          <p class="what-it-does">
+            Scans your AO3 Bookmarks and updates anything that has changed since the last
+            successful run.
+          </p>
+        } @else if (action() === 'bookmarks') {
+          <p class="what-it-does">
+            Walks every page of your AO3 bookmarks, reindexes all of them, and downloads
+            anything missing or out of date. Thorough, and slow.
+          </p>
+        }
+
+        <!-- a quick scan's first page, only while no earlier scan is on record to measure back to -->
+        @if (firstScan()) {
+          <p class="warning first-scan">
+            If you've never completed a successful scan using this website, this will
+            perform a full index. Please be aware that for a large library, the first
+            run may take several hours.
+          </p>
+        }
+
+        <!--
+          the two are alternatives, not settings that combine: one picks works by where
+          they sit in the listing, the other by when AO3 last touched them
+        -->
+        @if (picksDates() || action() === 'quick') {
+          <fieldset>
+            <legend>What this run covers</legend>
+
+            <!-- a quick scan's 'everything' is its own floor, so it words this its way -->
+            <label class="check">
+              <input type="radio" name="coverage" [checked]="coverage() === 'all'"
+                     (change)="coverage.set('all')" />
+              <span>
+                @if (action() === 'quick') {
+                  (Recommended) Anything that has changed since my last run
+                } @else {
+                  All bookmarks
+                }
+              </span>
+            </label>
+
+            @if (action() !== 'quick') {
+              <label class="check">
+                <input type="radio" name="coverage" [checked]="coverage() === 'pages'"
+                       (change)="coverage.set('pages')" />
+                <span>A slice of your bookmarks listing - in the order you bookmarked them, newest first</span>
+              </label>
+            } @else {
+              <!-- the next page lists the scans that can be measured back to -->
+              <label class="check">
+                <input type="radio" name="coverage" [checked]="coverage() === 'run'"
+                       (change)="coverage.set('run')" />
+                <span>Choose which earlier scan to measure back to</span>
+              </label>
+            }
+
+            @if (picksDates()) {
+              <label class="check">
+                <input type="radio" name="coverage" [checked]="coverage() === 'dates'"
+                       (change)="coverage.set('dates')" />
+                <span>
+                  @if (action() === 'quick') {
+                    <!-- only reachable with the debug tools on; see picksDates -->
+                    [DEBUG] Choose my own date range
+                  } @else {
+                    Choose my own date range
+                  }
+                </span>
+              </label>
+            }
+
+            <!-- last: it takes every other choice from the run it retries. not for a guest: the
+                 dummy library's runs never happened, so there is nothing to carry on from -->
+            @if (action() === 'custom' && !guest()) {
+              <label class="check">
+                <input type="radio" name="coverage" [checked]="coverage() === 'resume'"
+                       (change)="coverage.set('resume')" />
+                <span>Retry an earlier run</span>
+              </label>
+            }
+          </fieldset>
+
+          @if (resuming()) {
+            <p class="hint">
+              Retry a run that was stopped, failed, or interrupted. Some previous runs can be
+              continued from a check-point.
+            </p>
+          }
+
+          @if (picksFloorRun()) {
+            <p class="hint">
+              Measures back to the day a completed full scan or quick scan started, instead of
+              the most recent one - useful when a recent scan may have missed something. The
+              further back you go, the longer indexing takes. You pick the scan on the next page.
+            </p>
+          }
+        }
+
+        @if (picksDates() && useDates()) {
+          <fieldset>
+            <legend>Which date range</legend>
+            <label class="check">
+              <input type="radio" name="window" [checked]="!betweenDates()"
+                     (change)="betweenDates.set(false)" />
+              <span>Everything updated since a date</span>
+            </label>
+            <label class="check">
+              <input type="radio" name="window" [checked]="betweenDates()"
+                     (change)="betweenDates.set(true)" />
+              <span>Between two dates</span>
+            </label>
+          </fieldset>
+
+          <!--
+            the newer end comes first because the run works in that direction: it walks
+            down from the most recently updated fic and stops at the older end
+          -->
+          @if (betweenDates()) {
+            <label class="field">
+              <span>Updated on or before</span>
+              <input type="date" name="dateTo" [value]="dateTo()"
+                     (input)="dateTo.set($any($event.target).value)" />
+            </label>
+          }
+
+          <label class="field">
+            <span>Updated on or after</span>
+            <input type="date" name="dateFrom" [value]="dateFrom()"
+                   (input)="dateFrom.set($any($event.target).value)" />
+          </label>
+
+          <p class="hint">
+            Both ends count. This run will fetch <strong>{{ dateRange() }}</strong>.
+          </p>
+          <!-- the dates are the person's own, in the zone AO3 dates fics in for them, so the
+               two are compared as typed - see User settings -->
+          <p class="hint range-zone">
+            Dates are in your AO3 time zone, <strong>{{ ao3Zone }}</strong> - change it in User settings.
+          </p>
+
+          @if (action() === 'quick') {
+            <!--
+              the quick scan's own method, given two dates instead of an earlier scan: both
+              walks run from the newest bookmark down to the older end of the range
+            -->
+            <p class="hint">
+              Indexing reads your bookmarks twice, newest first, each time down to
+              @if (dateFrom()) {
+                <strong>{{ dateFrom() }}</strong>:
+              } @else {
+                the very end - there is no <em>on or after</em> date to stop at, so it
+                <strong>reads the whole listing</strong>, once:
+              }
+            </p>
+            <ol class="hint walks">
+              <li>
+                <strong>by date bookmarked</strong> - picking up works you bookmarked in the
+                range, however long ago AO3 last updated them
+              </li>
+              <li>
+                <strong>by date updated</strong> - picking up works AO3 updated in the range,
+                however long ago you bookmarked them
+              </li>
+            </ol>
+            <p class="hint">
+              Both walks start at your newest bookmark, so anything newer than the range is
+              indexed on the way down but not downloaded. Whatever either walk picked is then
+              checked against your files, and anything missing or behind is downloaded - each
+              fic once.
+            </p>
+          } @else if (reindex()) {
+            <p class="hint">
+              Indexing reads your bookmarks sorted by when AO3 last updated each work, and
+              @if (dateFrom()) {
+                stops at the first fic older than <strong>{{ dateFrom() }}</strong> -
+                everything past that point is outside the range by definition.
+              } @else {
+                with no <em>on or after</em> date to stop at, <strong>reads the whole
+                listing</strong>. Give it an earliest date to keep the run short.
+              }
+            </p>
+          } @else {
+            <p class="hint">
+              With indexing skipped, this picks works out of your existing index without
+              reading AO3's listing at all - so a fic whose entry is out of date can be
+              picked, or missed, on the strength of that entry.
+            </p>
+          }
+
+          @if (action() !== 'quick') {
+            <p class="hint">
+              Whichever fics it picks are then re-read one at a time, newest first, and
+              anything missing or behind is downloaded.
+            </p>
+          }
+        }
+
+        <!-- a resumed run's settings are the earlier run's, so none of these is a choice - and
+             a box that cannot be ticked is not shown at all -->
+        <fieldset class="bare" [disabled]="resuming()" [hidden]="resuming()">
+
+        @if (picksPages()) {
+          <label class="field">
+            <span>Start on page number</span>
+            <input
+              type="number"
+              name="start"
+              min="1"
+              step="1"
+              [value]="start()"
+              (input)="setStart($any($event.target).value)"
+            />
+          </label>
+
+          <label class="field">
+            <span>Stop after page number (0 for all pages)</span>
+            <input
+              type="number"
+              name="pages"
+              min="0"
+              step="1"
+              [value]="pages()"
+              (input)="setPages($any($event.target).value)"
+            />
+          </label>
+
+          <p class="hint">
+            Both are positions in the whole listing, so you can cover a slice in the middle
+            of it - useful for picking up where a stopped run left off. This run will fetch
+            <strong>{{ pageRange() }}</strong>.
+          </p>
+        }
+
+        <!--
+          a series is found on a work's own page, and following one pulls in works that were
+          never in the listing. only a full scan goes the long way round, so it is the only
+          run where ticking this could do anything
+        -->
+        @if (picksReindex()) {
+          <label class="check">
+            <input
+              type="checkbox"
+              name="reindex"
+              [checked]="!reindex()"
+              (change)="reindex.set(!$any($event.target).checked)"
+            />
+            <span>Skip indexing - work from what is already indexed</span>
+          </label>
+          <p class="hint">
+            Useful for downloading your fics in a new format, or to fill in any blanks in
+            your downloaded files if your index is already up-to-date
+          </p>
+          @if (!reindex()) {
+            <p class="hint warn skip-index-warning">
+              Your files are only checked against your last index, not against live AO3 data:
+              a fic AO3 has updated since it was last indexed will not be seen as needing an
+              update.
+            </p>
+          }
+        }
+
+        @if (picksCollectionWorks()) {
+          <label class="check">
+            <input
+              type="checkbox"
+              name="collectionWorks"
+              [checked]="collectionWorks()"
+              (change)="collectionWorks.set($any($event.target).checked)"
+            />
+            <span>Index and download encountered works</span>
+          </label>
+          <div class="info" data-collection-works-info>
+            <p>
+              You can run without this if you are only scanning a collection of your own
+              bookmarks - those works are already in your index.
+            </p>
+            <p>
+              <strong>Recommended</strong> if you are scanning a collection that you think has
+              works or bookmarks outside of your own bookmark collection.
+            </p>
+          </div>
+          <p class="hint">
+            Every work in {{ action() === 'collection' ? 'the collection' : 'your collections' }}
+            - its works and its bookmarked items - is indexed as it is read, then downloaded, or
+            updated where AO3 has a newer version than your copy. A work you have not bookmarked
+            is indexed as not bookmarked.
+          </p>
+          <p class="hint">
+            Indexing them is free: it is read off the same pages the collection is. But with this
+            on, every collection's works are read again even when its count has not changed, and
+            each download is a request per format.
+          </p>
+        }
+
+        @if (picksCollectionWorks()) {
+          <label class="check">
+            <input
+              type="checkbox"
+              name="subcollections"
+              [checked]="subcollections()"
+              (change)="subcollections.set($any($event.target).checked)"
+            />
+            <span>Include subcollections</span>
+          </label>
+          <label class="check">
+            <input
+              type="checkbox"
+              name="parentCollections"
+              [checked]="parentCollections()"
+              (change)="parentCollections.set($any($event.target).checked)"
+            />
+            <span>Include parent collections</span>
+          </label>
+          <p class="hint">
+            Each related collection is indexed like the ones asked for - and, with
+            <strong>Index and download encountered works</strong> ticked, so are its works.
+            Its own subcollections or parent are followed in turn, however far removed. Each
+            collection is read at most once, so a family whose collections link back to each
+            other cannot keep the run going round; a run stops following after 200.
+          </p>
+        }
+
+        @if (picksSeries()) {
+          <label class="check">
+            <input type="checkbox" [checked]="series()" (change)="series.set($any($event.target).checked)" />
+            <span>Get all works from encountered series</span>
+          </label>
+          <p class="hint">
+            @if (picksCollectionWorks()) {
+              If a work in the collection belongs to a series, download the rest of the series
+              too - even if its other works are not in the collection.
+            } @else {
+              If a bookmarked work belongs to a series, download the rest of the series too - even
+              if its other works are not bookmarked.
+            }
+          </p>
+        }
+
+        @if (picksNonBookmarks()) {
+          <label class="check">
+            <input
+              type="checkbox"
+              name="nonBookmarks"
+              [checked]="nonBookmarks()"
+              (change)="nonBookmarks.set($any($event.target).checked)"
+            />
+            <span>Check all non-bookmarks for updates too</span>
+          </label>
+          <p class="hint">
+            This option will check: any works that were added by URL or id, any works that were
+            imported, any works indexed from a collection, and any works that <i>aren't</i>
+            bookmarked but <i>are</i> a part of a series you have indexed previously.
+          </p>
+        }
+
+        <!-- after series and non-bookmarks: the last choice on a full scan; a custom run's images follow it -->
+        @if (picksOverwrite()) {
+          <label class="check">
+            <input
+              type="checkbox"
+              name="overwrite"
+              [checked]="overwrite()"
+              (change)="overwrite.set($any($event.target).checked)"
+            />
+            <span>Overwrite existing downloads, even if there has been no update</span>
+          </label>
+          <p class="hint">
+            Check this if you are concerned about file integrity issues and would like to
+            re-download each file again, in the formats you ask for.
+          </p>
+          <!-- the non-bookmarks it re-reads are downloaded with the rest, so they are overwritten too -->
+          @if (overwrite() && picksNonBookmarks() && nonBookmarks()) {
+            <p class="hint overwrite-non-bookmarks">This will include any non-bookmarks in this scan too.</p>
+          }
+        }
+
+        @if (picksImages()) {
+          <label class="check">
+            <input type="checkbox" [checked]="images()" (change)="images.set($any($event.target).checked)" />
+            <span>Also save embedded images separately</span>
+          </label>
+          <!-- only once ticked: a note about a choice not made yet is one more thing to read -->
+          @if (images()) {
+            <p class="hint">
+              <strong>Please note:</strong> images are already embedded inside all regular
+              downloaded works, and display when you read them. This option just also exports
+              any images to their own folder in your downloads directory, for you to look at
+              separately. It will make the download longer.
+            </p>
+          }
+        }
+
+        </fieldset>
+
+
+      </section>
+      <footer>
+        <button type="button" class="button subtle" (click)="backFrom('options')">
+          {{ hasStepBefore('options') ? 'Back' : 'Cancel' }}
+        </button>
+        <button type="button" class="button primary" (click)="afterOptions()">Continue</button>
+      </footer>
+    }
+
+    <!--
+      step 2b: which earlier scan a quick scan measures back to. only the scans that can be a
+      floor are listed - completed, and covering the whole listing - and the helper says
+      which those are, so the rule lives in one place
+    -->
+    @if (step() === 'floor-warning') {
+      <section class="body">
+        @if (automaticFloor(); as floor) {
+          <div class="retry-warning floor-warning" role="note">
+            <p>
+              This quick scan will measure back to the last scan, which started
+              <strong>{{ baselineOf(floor).slice(0, 10) }}</strong> - but that scan could not
+              download {{ floor.missingDownloads?.length }}
+              {{ floor.missingDownloads?.length === 1 ? 'work' : 'works' }}:
+              {{ floor.missingDownloads?.join(', ') }}.
+            </p>
+            <p>
+              Its indexing all passed, so it still covers everything up to then. Would you still
+              like to use it as the floor, or choose a different scan to measure back to?
+            </p>
+          </div>
+        } @else {
+          <p class="hint">Reading your scan history...</p>
+        }
+      </section>
+      <footer>
+        <button type="button" class="button subtle" (click)="step.set('options')">Back</button>
+        <button type="button" class="button" [disabled]="!automaticFloor()" (click)="chooseAnotherFloor()">
+          Choose a different scan
+        </button>
+        <button type="button" class="button primary" [disabled]="!automaticFloor()" (click)="useAutomaticFloor()">
+          Use it as the floor
+        </button>
+      </footer>
+    }
+
+    @if (step() === 'floor') {
+      <section class="body">
+        <p>Choose the scan to measure back to. This run indexes everything changed since it started.</p>
+
+        @if (floorRuns() === null) {
+          <p class="hint">Reading your scan history...</p>
+        } @else if (floorRuns()!.length === 0) {
+          <p class="warning">
+            Nothing on record can be measured back to yet. Only a finished
+            <strong>full scan</strong>, or a finished <strong>quick scan with no date range</strong>,
+            counts: a quick scan given a date range stopped at that date instead of checking
+            everything before it. Go back and choose another option - a quick scan with no date
+            range will become the first one you can pick.
+          </p>
+        } @else {
+          <fieldset class="floor-runs">
+            <legend>Completed scans</legend>
+            @for (run of floorRuns(); track run.id) {
+              <label class="check">
+                <input type="radio" name="floorRun" [value]="run.id"
+                       [checked]="floorRun() === run.id"
+                       (change)="floorRun.set(run.id)" />
+                <span>
+                  <!-- the day its reach began: for a resumed run, its first attempt's -->
+                  <strong>{{ baselineOf(run).slice(0, 10) }}</strong>
+                  {{ run.actionName || run.action }}
+                  <span class="dim">- started {{ run.started.slice(11, 16) }}@if (run.finished) {, finished {{ run.finished.slice(0, 10) }} {{ run.finished.slice(11, 16) }}}</span>
+                  @if (run.missingDownloads?.length) {
+                    <span class="hint warn">
+                      Partly finished - could not download {{ run.missingDownloads!.join(', ') }}
+                    </span>
+                  }
+                </span>
+              </label>
+            }
+          </fieldset>
+        }
+      </section>
+      <footer>
+        <button type="button" class="button subtle" (click)="backFrom('floor')">Back</button>
+        <button type="button" class="button primary" [disabled]="!floorRun()" (click)="afterFloor()">
+          Continue
+        </button>
+      </footer>
+    }
+
+    <!--
+      step 2c: which unfinished run a custom run picks up. the helper says which can be, so
+      the rule lives in one place; the ones that cannot are listed, greyed, saying why
+    -->
+    @if (step() === 'resume') {
+      <section class="body retry">
+        <p class="warning">
+          Runs an earlier run again, as that run, with its
+          settings - from the top, or carrying on from where it stopped. See helper_files/RESUMING.md.
+        </p>
+
+        @if (retryableRuns() === null) {
+          <p class="hint">Reading your run history...</p>
+        } @else if (retryableRuns()!.length === 0) {
+          <p class="warning">There are no earlier runs to retry.</p>
+        } @else {
+          <fieldset class="floor-runs">
+            <legend>Earlier runs</legend>
+            @for (run of retryableRuns(); track run.id) {
+              <label class="check" [class.unavailable]="!run.retry.default"
+                     [title]="run.retry.default ? '' : whyNotRetryable(run)">
+                <input type="radio" name="resumeRun" [value]="run.id"
+                       [disabled]="!run.retry.default"
+                       [checked]="resumeRun() === run.id"
+                       (change)="chooseRetryRun(run.id)" />
+                <span>
+                  <strong>{{ run.actionName || run.action }}</strong>
+                  <span class="dim">
+                    - started {{ run.started.slice(0, 10) }} {{ run.started.slice(11, 16) }},
+                    {{ statusWord(run.status) }}
+                  </span>
+                  <!-- a run that cannot be picked says why where it is listed, not only on hover -->
+                  @if (!run.retry.default) {
+                    <span class="hint why-not">{{ whyNotRetryable(run) }}</span>
+                  }
+                  @for (warning of run.warnings; track $index) {
+                    <span class="hint warn">{{ warning }}</span>
+                  }
+                </span>
+              </label>
+            }
+          </fieldset>
+
+          @if (chosenResume(); as run) {
+            @if (run.warnings.length) {
+              <div class="retry-warning" role="note">
+                @for (warning of run.warnings; track $index) {
+                  <p>{{ warning }}</p>
+                }
+              </div>
+            }
+            @if (stepsOf(run).length) {
+              <div class="retry-steps">
+                <p><strong>How it went</strong></p>
+                <ol>
+                  @for (step of stepsOf(run); track step.id) {
+                    <li [attr.data-outcome]="step.outcome">
+                      {{ step.label }} - <span class="outcome">{{ outcomeWord(step.outcome) }}</span>
+                    </li>
+                  }
+                </ol>
+                @if (lastFinishedStep(run); as last) {
+                  <p class="hint">The last step it finished was <strong>{{ last }}</strong>.</p>
+                }
+              </div>
+            }
+
+          }
+        }
+      </section>
+      <footer>
+        <button type="button" class="button subtle" (click)="backFrom('resume')">Back</button>
+        <button type="button" class="button primary" [disabled]="!chosenResume()?.retry?.default"
+                (click)="afterRetryChoice()">
+          Continue
+        </button>
+      </footer>
+    }
+
+    <!-- step 2c: how the chosen run is retried, with the dates and settings it carries -->
+    @if (step() === 'retry-how') {
+      <section class="body retry">
+        @if (retryableRuns() === null) {
+          <p class="hint">Reading this run...</p>
+        } @else if (!chosenResume()) {
+          <p class="warning">That run could not be read, so it cannot be retried from here.</p>
+        } @else {
+          @if (chosenResume(); as run) {
+            <p class="retry-which">
+              Retrying <strong>{{ run.actionName || run.action }}</strong>
+              <span class="dim">
+                - started {{ run.started.slice(0, 10) }} {{ run.started.slice(11, 16) }},
+                {{ statusWord(run.status) }}
+              </span>
+            </p>
+            <div class="retry-issues">
+              <p><strong>What went wrong last time</strong></p>
+              @if (retryIssues().length) {
+                <ul>
+                  @for (issue of retryIssues(); track $index) {
+                    <li>
+                      {{ issue.summary }}
+                      @if (issue.details.length) {
+                        <ul class="retry-issue-details">
+                          @for (line of issue.details; track $index) {
+                            <li>{{ line }}</li>
+                          }
+                          @if (issue.more) {
+                            <li class="dim">and {{ issue.more | number }} more - History lists them all</li>
+                          }
+                        </ul>
+                      }
+                    </li>
+                  }
+                </ul>
+              } @else {
+                <p class="dim">Nothing - its record holds no failures, gaps or copies to check.</p>
+              }
+            </div>
+            @if (run.warnings.length) {
+              <div class="retry-warning" role="note">
+                @for (warning of run.warnings; track $index) {
+                  <p>{{ warning }}</p>
+                }
+              </div>
+            }
+            <fieldset class="retry-modes">
+              <legend>Retry it</legend>
+              @for (choice of run.retry.modes; track choice.mode) {
+                <label class="check" [class.unavailable]="!choice.available"
+                       [title]="choice.available ? '' : choice.reason">
+                  <input type="radio" name="retryMode" [value]="choice.mode"
+                         [disabled]="!choice.available"
+                         [checked]="retryMode() === choice.mode"
+                         (change)="retryMode.set(choice.mode)" />
+                  <span>
+                    {{ retryLabel(choice.mode, run) }}
+                    @if (choice.mode === run.retry.default) {
+                      <span class="dim">(picks up from the first step that did not finish)</span>
+                    }
+                    @if (!choice.available) {
+                      <span class="hint">{{ choice.reason }}</span>
+                    }
+                  </span>
+                </label>
+              }
+            </fieldset>
+
+            @if (retryTerms(run); as terms) {
+              <div class="retry-terms">
+                <p><strong>It runs with the original run's dates and settings</strong></p>
+                <p class="retry-dates">{{ terms.dates }}</p>
+                <ul>
+                  @for (line of terms.settings; track $index) {
+                    <li>{{ line }}</li>
+                  }
+                </ul>
+                <label class="check">
+                  <input type="checkbox" name="retryAcknowledged"
+                         [checked]="retryAcknowledged()"
+                         (change)="retryAcknowledged.set($any($event.target).checked)" />
+                  <span>
+                    I understand this retry uses the date(s) of the original run and the original
+                    run's settings, as above - not today's date, and not settings chosen now.
+                  </span>
+                </label>
+              </div>
+            }
+          }
+        }
+      </section>
+      <footer>
+        <button type="button" class="button subtle" (click)="backFrom('retry-how')">Back</button>
+        <button type="button" class="button primary"
+                [disabled]="!chosenResume()?.retry?.default || !retryMode() || !retryAcknowledged()"
+                (click)="afterResume()">
+          Continue
+        </button>
+      </footer>
+    }
+
+    <!-- step 2a: what this particular run cannot do, read before logging in for it -->
+    @if (step() === 'acknowledge') {
+      <section class="body">
+        @if (action() === 'update') {
+          <p>
+            This checks the fics your index <strong>last saw unfinished</strong>. It reads the
+            index for those, opens each one on AO3, brings its entry up to date, and
+            re-downloads the ones that have grown.
+          </p>
+
+          <p class="warning">
+            <strong>It will not find a fic that was already finished.</strong> If a work was
+            marked complete and then updated afterwards - an epilogue added, chapters edited,
+            typos fixed - the index records it as complete, so this pass skips it entirely.
+          </p>
+
+          <!--
+            the other half of the same limitation: the first warning is about fics the
+            index has but calls finished, this one about fics the index does not have
+          -->
+          <p class="warning">
+            <strong>It will not pick up unfinished fics you have bookmarked since your last
+            scan.</strong> It works from the index you already have and reads no listing, so
+            a work that has never been indexed is not in the list it checks - however
+            unfinished it is.
+          </p>
+
+          <p class="hint">
+            To pick either of those up, run <strong>(Full scan) Reindex &amp; Update
+            All</strong> instead. That re-reads the whole listing, so it sees any fic AO3
+            now reports as updated more recently than your copy - finished or not, and newly
+            bookmarked or not.
+          </p>
+
+          <label class="check">
+            <input
+              type="checkbox"
+              name="acknowledge"
+              [checked]="acknowledged()"
+              (change)="acknowledged.set($any($event.target).checked)"
+            />
+            <span>I understand that fics completed before their last update will be skipped</span>
+          </label>
+        } @else if (action() === 'bookmarks') {
+          <p class="warning">
+            <strong>This will take a really long time.</strong> A full scan walks every page
+            of your bookmarks and reindexes every fic on it, however many that is, and AO3
+            will ask it to slow down repeatedly along the way. On a large library this is
+            hours, not minutes.
+          </p>
+
+          <p>
+            It is the thorough option, and worth running occasionally - it is the only run
+            that can find a fic your index has wrong, or one that was finished when it was
+            last indexed and has been added to since.
+          </p>
+
+          <p class="hint">
+            <strong>If you have used this app before, you probably want
+            <strong>Download new bookmarks and update incomplete fics</strong> instead.</strong>
+            It covers new bookmarks, unfinished fics and missing formats in a fraction of the
+            requests, because it stops indexing as soon as it reaches a fic you already have.
+          </p>
+
+          <label class="check">
+            <input
+              type="checkbox"
+              name="acknowledge"
+              [checked]="acknowledged()"
+              (change)="acknowledged.set($any($event.target).checked)"
+            />
+            <span>I understand this may take hours, and I want the full scan</span>
+          </label>
+        } @else {
+          @if (action() === 'quick') {
+            <!--
+              which caveats are true depends on what was chosen a step ago: measuring back
+              to the last run and measuring back to a date you picked fail differently
+            -->
+            @if (useDates()) {
+              <p>
+                Scans for and updates any work you <strong>bookmarked</strong>, or AO3
+                <strong>updated</strong>, in this date range - reading your bookmarks once by
+                date bookmarked and once by date updated.
+              </p>
+
+              <p class="warning">
+                The further back the older end of the range goes, the longer it will take to
+                index. Both walks start at your newest bookmark whatever the newer end is.
+              </p>
+            } @else {
+              <!-- what it does in general is said on the options page; only a chosen scan is new here -->
+              @if (chosenFloorRun(); as chosen) {
+                <p>
+                  Scans for and updates anything that has changed since the scan you chose,
+                  which started on {{ chosen.started.slice(0, 10) }}.
+                </p>
+              }
+
+              <p class="warning">
+                Files missing from earlier runs due to an incomplete or damaged index - for
+                example, if an earlier run was interrupted, or files were deleted - will not
+                be restored by this Quick Scan.
+              </p>
+
+              <p class="hint">
+                If you are concerned about your file integrity, run
+                <strong>(Full scan) Reindex &amp; Update All</strong> instead. It is far
+                slower, but it checks and restores everything.
+              </p>
+            }
+          } @else {
+            <p>
+              This does three passes: your newest bookmarks, then the fics your index last
+              saw unfinished, then any finished fic missing a format you asked for on this
+              run.
+            </p>
+
+            <p class="warning">
+              <strong>It trusts the index you already have.</strong> Indexing stops at the
+              first bookmark it recognises, so if your index is incomplete or damaged - an
+              earlier run interrupted, files deleted - the fics behind that point stay unseen
+              and will not be downloaded or updated.
+            </p>
+
+            <p class="warning">
+              <strong>It will not notice changes to fics already marked complete.</strong> If
+              chapters are added to or edited on a work your index calls finished, this run
+              skips it.
+            </p>
+
+            <p class="warning">
+              <strong>It will not pick up changes to a bookmark you already have.</strong> For
+              a completed work, things that live on the bookmark rather than the fic - your
+              own notes and tags, whether you marked it a rec, whether it is private - are not
+              re-read, because the listing they come from is never walked that far.
+            </p>
+
+            <!-- the quick scan makes this point in its own words, just above -->
+            <p class="hint">
+              If that worries you, run
+              <strong>(Full scan) Reindex &amp; Update All</strong> instead. It is far
+              slower, and it checks everything.
+            </p>
+          }
+
+          <label class="check">
+            <input
+              type="checkbox"
+              name="acknowledge"
+              [checked]="acknowledged()"
+              (change)="acknowledged.set($any($event.target).checked)"
+            />
+            <span>I understand what this run will not pick up</span>
+          </label>
+
+          <label class="check">
+            <input
+              type="checkbox"
+              name="dontAskAgain"
+              [checked]="dontAskAgain()"
+              (change)="dontAskAgain.set($any($event.target).checked)"
+            />
+            <span>Don't show this again</span>
+          </label>
+        }
+      </section>
+      <footer>
+        <button type="button" class="button subtle" (click)="backFrom('acknowledge')">
+          {{ hasStepBefore('acknowledge') ? 'Back' : 'Cancel' }}
+        </button>
+        <button
+          type="button"
+          class="button primary"
+          [disabled]="!acknowledged()"
+          (click)="fromAcknowledgement()"
+        >
+          Continue
+        </button>
+      </footer>
+    }
+
+    <!-- running in the background, and its answers up front: a hosted copy only -->
+    @if (step() === 'background') {
+      <section class="body">
+          <!-- an import has no other page to say what it will do -->
+          @if (action() === 'import') {
+            @if (importRequestCount() > longImport && !background()) {
+              <p class="long-run-note" role="note">
+                This may take a long time, with ~{{ importRequestCount() | number }} requests to work through.
+                Please leave this window open until it finishes.
+              </p>
+            }
+            <ul class="import-summary">
+              @for (line of importPlan(); track line) { <li>{{ line }}</li> }
+            </ul>
+          }
+          <div class="background-choice" [class.blocked]="backgroundBlocked()">
+            <label class="check">
+              <input
+                type="checkbox"
+                name="background"
+                [checked]="background()"
+                [disabled]="!!backgroundBlocked()"
+                (change)="setBackground($any($event.target).checked)"
+              />
+              <span>Run as background task</span>
+            </label>
+            @if (backgroundBlocked()) {
+              <p class="hint">{{ backgroundBlocked() }}</p>
+            } @else {
+              <p class="hint">
+                The run carries on in the helper after you close this page - start it, go away,
+                and come back hours later to see how it went, from the <strong>History</strong>
+                tab.
+              </p>
+            }
+
+            @if (background()) {
+              <div class="warning background-warning">
+                <p><strong>Before you start a background run:</strong></p>
+                <ul>
+                  <li>
+                    <strong>No other run can start until it has finished.</strong> The page will
+                    say so at the top while it is going.
+                  </li>
+                  <li>
+                    The helper holds your AO3 login and your Dropbox access for as long as the
+                    run lasts, in memory only, and lets go of both when it ends.
+                  </li>
+                  <li>
+                    <strong>Restarting the helper ends the run</strong> - closing its window, or
+                    on a hosted helper, deploying a new version. What it had already saved stays
+                    saved; start it again and it carries on from what is still missing.
+                  </li>
+                  <li>
+                    Nobody will be there to answer if it stops to ask something, so answer below
+                    now. It only uses an answer if the question actually comes up.
+                  </li>
+                </ul>
+              </div>
+
+              @if (backgroundQuestions().length) {
+                <fieldset class="background-answers">
+                  <legend>If this run needs to ask...</legend>
+
+                  @if (backgroundQuestions().includes('quick-floor')) {
+                    <div class="answer" data-question="quick-floor">
+                      <p>
+                        <strong>No earlier scan to measure back to, but files already indexed</strong>
+                        - how far back should it read?
+                      </p>
+                      <label class="check">
+                        <input type="radio" name="bg-quick" [checked]="quickFloorAnswer() === 'full'"
+                               (change)="quickFloorAnswer.set('full')" />
+                        <span>Read the whole listing (safest - nothing can be missed)</span>
+                      </label>
+                      <label class="check">
+                        <input type="radio" name="bg-quick" [checked]="quickFloorAnswer() === 'since'"
+                               (change)="quickFloorAnswer.set('since')" />
+                        <span>Only back to when the index was last written</span>
+                      </label>
+                    </div>
+                  }
+
+                  @if (backgroundQuestions().includes('fichub')) {
+                    <div class="answer" data-question="fichub">
+                      <p>
+                        <strong>Works AO3 will not give us</strong> - should the run try the
+                        FicHub mirror (fichub.net) for them?
+                      </p>
+                      <label class="check">
+                        <input type="radio" name="bg-fichub" [checked]="fichubAnswer() === 'yes'"
+                               (change)="fichubAnswer.set('yes')" />
+                        <span>Yes - index and download them from FicHub where it has them</span>
+                      </label>
+                      <label class="check">
+                        <input type="radio" name="bg-fichub" [checked]="fichubAnswer() === 'no'"
+                               (change)="fichubAnswer.set('no')" />
+                        <span>No - leave them listed as failures</span>
+                      </label>
+                    </div>
+                  }
+
+                  @if (backgroundQuestions().includes('overwrite-older')) {
+                    <div class="answer" data-question="overwrite-older">
+                      <p>
+                        <strong>A copy newer than the version this run would write</strong> -
+                        replace it anyway?
+                      </p>
+                      <label class="check">
+                        <input type="radio" name="bg-overwrite-older" [checked]="overwriteOlderAnswer() === 'no'"
+                               (change)="overwriteOlderAnswer.set('no')" />
+                        <span>No - keep the newer copy (changes nothing)</span>
+                      </label>
+                      <label class="check">
+                        <input type="radio" name="bg-overwrite-older" [checked]="overwriteOlderAnswer() === 'yes'"
+                               (change)="overwriteOlderAnswer.set('yes')" />
+                        <span>Yes - replace it with the older version</span>
+                      </label>
+                    </div>
+                  }
+                </fieldset>
+              }
+            }
+          </div>
+      </section>
+      <footer>
+        <button type="button" class="button subtle" (click)="backFrom('background')">
+          {{ hasStepBefore('background') ? 'Back' : 'Cancel' }}
+        </button>
+        <button type="button" class="button primary" [disabled]="!backgroundAnswersReady()"
+                (click)="step.set('credentials')">
+          Continue
+        </button>
+      </footer>
+    }
+
+    <!-- step 2: who you are, or that you are going without logging in -->
+    @if (step() === 'credentials') {
+      <form class="body" (submit)="submit($event)">
+        @if (action() === 'import' && !offersBackground()) {
+          @if (importRequestCount() > longImport && !background()) {
+            <p class="long-run-note" role="note">
+              This may take a long time, with ~{{ importRequestCount() | number }} requests to work through.
+              Please leave this window open until it finishes.
+            </p>
+          }
+          <ul class="import-summary">
+            @for (line of importPlan(); track line) { <li>{{ line }}</li> }
+          </ul>
+        }
+
+        @if (logsIn()) {
+        @if (action() === 'import') {
+          <p class="login-reason">
+            Log in to AO3 in case some of these works are restricted to AO3 users - logged out,
+            AO3 will not show them, and they cannot be indexed or downloaded from there.
+          </p>
+        } @else {
+          <p>Log in to AO3 so restricted works and your own {{ listingWord() }} are visible.</p>
+        }
+
+        <label class="field">
+          <span>Username</span>
+          <input
+            type="text"
+            name="username"
+            autocomplete="username"
+            required
+            [readonly]="guest()"
+            [class.ghost-typing]="ghostTyping()"
+            [value]="username()"
+            (input)="setUsername($any($event.target).value)"
+          />
+        </label>
+
+        <label class="field">
+          <span>Password</span>
+          <input
+            type="password"
+            name="password"
+            autocomplete="current-password"
+            required
+            [readonly]="guest()"
+            [class.ghost-typing]="ghostTyping()"
+            [value]="password()"
+            (input)="setPassword($any($event.target).value)"
+          />
+        </label>
+
+        @if (guest()) {
+          <p class="hint guest-login">
+            You're a guest, so a made-up AO3 login fills itself in. This run is pretend - nothing
+            is sent to AO3 or saved anywhere.
+          </p>
+        }
+        <!-- a repair is not a run anyone comes back to by name: nothing to remember - and a
+             guest's login is made up -->
+        @if (action() !== 'import' && !guest()) {
+          <label class="check">
+            <input
+              type="checkbox"
+              [checked]="remember()"
+              (change)="toggleRemember($any($event.target).checked)"
+            />
+            <span>Remember my username</span>
+          </label>
+
+          <p class="hint">
+            Only the username is saved by this page. Your password is sent straight to AO3 to log
+            in and is never stored here - let your browser's password manager keep it if you want
+            it filled in next time.
+          </p>
+        }
+        } @else if (needsUsername()) {
+          <!-- logged out, a scan of your own listing still finds it by your name -->
+          <p>Enter your username to scan your public {{ listingWord() }}.</p>
+          <label class="field">
+            <span>Username</span>
+            <input
+              type="text"
+              name="username"
+              autocomplete="username"
+              required
+              [readonly]="guest()"
+              [class.ghost-typing]="ghostTyping()"
+            [class.ghost-typing]="ghostTyping()"
+              [value]="username()"
+              (input)="setUsername($any($event.target).value)"
+            />
+          </label>
+          @if (!guest()) {
+            <label class="check">
+              <input
+                type="checkbox"
+                [checked]="remember()"
+                (change)="toggleRemember($any($event.target).checked)"
+              />
+              <span>Remember my username</span>
+            </label>
+          }
+        }
+
+        <div class="login-choice">
+          <label class="check">
+            <input
+              type="checkbox"
+              name="skipLogin"
+              [checked]="skipLogin()"
+              (change)="skipLogin.set($any($event.target).checked)"
+            />
+            <span>Skip AO3 login?</span>
+          </label>
+          @if (skipLogin()) {
+            <div class="warning skip-login-warning">
+              <p><strong>This is not recommended.</strong></p>
+              <p>
+                Without logging in, AO3 shows this run only what anyone can see. Private
+                bookmarks will not be picked up, and fics their authors have restricted to AO3
+                users will fail - the run may have to fall back on fetching those from FicHub
+                instead.
+              </p>
+            </div>
+          }
+        </div>
+      </form>
+      <footer>
+        <!-- indexing your own collections has no earlier step, so this reads Cancel there -->
+        <button type="button" class="button subtle" (click)="backFrom('credentials')">
+          {{ hasStepBefore('credentials') ? 'Back' : 'Cancel' }}
+        </button>
+        <button type="button" class="button primary" [disabled]="!backgroundAnswersReady() || !credentialsReady()"
+                [attr.title]="credentialsReady() ? null : 'Enter your AO3 username' + (logsIn() ? ' and password' : '') + ' first'"
+                (click)="submit($event)">
+          @if (action() === 'import') {
+            {{ background() ? 'Start repair in the background' : 'Start repair' }}
+          } @else {
+            {{ background() ? 'Start in the background' : 'Start download' }}
+          }
+        </button>
+      </footer>
+    }
+
+    <!-- step 3: working -->
+    @if (step() === 'running' && waiting()) {
+      <section class="body run-waiting" role="status">
+        @if (waiting() === 'floor-warning') {
+          @if (automaticFloor(); as floor) {
+            <div class="retry-warning floor-warning" role="note">
+              <p>
+                This quick scan will measure back to the last scan, which started
+                <strong>{{ baselineOf(floor).slice(0, 10) }}</strong> - but that scan could not
+                download {{ floor.missingDownloads?.length }}
+                {{ floor.missingDownloads?.length === 1 ? 'work' : 'works' }}:
+                {{ floor.missingDownloads?.join(', ') }}.
+              </p>
+              <p>
+                Its indexing all passed, so it still covers everything up to then. Would you still
+                like to use it as the floor, or choose a different scan to measure back to?
+              </p>
+            </div>
+          }
+        } @else {
+          <p class="preparing">
+            <span class="spinner" aria-hidden="true"></span>
+            <span>
+              {{ waiting() === 'helper' ? 'Waiting for the helper to answer' : 'Finding the scan to measure back to' }}...
+              <span class="dim">({{ waitedSeconds() }}s)</span>
+            </span>
+          </p>
+          <p class="hint">
+            Nothing has started yet. A hosted helper that has been asleep can take a minute or so
+            to wake; this gives up after 2 minutes.
+          </p>
+        }
+      </section>
+      <footer>
+        <button type="button" class="button subtle" (click)="cancelWaiting()">Cancel</button>
+        @if (waiting() === 'floor-warning') {
+          <button type="button" class="button" (click)="chooseAnotherFloorFromRun()">Choose a different scan</button>
+          <button type="button" class="button primary" (click)="startWithFloor()">Use it as the floor</button>
+        }
+      </footer>
+    }
+    @if (step() === 'running' && !waiting()) {
+      <section class="body">
+        @if (runningInBackground()) {
+          <p class="notice background-running">
+            <strong>This run is going in the background.</strong> It does not need this page:
+            press <strong>Continue in background</strong> to close this window and carry on
+            browsing, or close the tab altogether. It stays in the <strong>History</strong>
+            tab while it runs, where <strong>View progress</strong> brings this back.
+          </p>
+        } @else {
+          <p class="warning">
+            <strong>Leave this tab open.</strong> Refreshing, closing or navigating away will
+            interrupt the download.
+            <strong>This may take a long time</strong> - AO3 will ask the run to slow down along
+            the way, and it waits those breaks out rather than giving up. Leave this window open
+            and running until it finishes.
+          </p>
+        }
+
+        <!-- first thing in the window, since it answers the Pause button just pressed -->
+        @if (confirmingPause()) {
+          <div class="warning confirm-pause" role="alertdialog" aria-label="Pause this background run?">
+            <p>
+              <strong>Pause this background run?</strong> A background run left paused for
+              {{ pauseTimeout() }} {{ pauseTimeout() === 1 ? 'minute' : 'minutes' }} is
+              <strong>abandoned</strong>: the helper ends it, keeping everything it has saved.
+              It can be resumed from the History tab afterwards, or started again to carry on
+              from what is still missing.
+            </p>
+            <div class="confirm-actions">
+              <button type="button" class="button" (click)="confirmingPause.set(false)">
+                Keep running
+              </button>
+              <button type="button" class="button primary" (click)="togglePause()">
+                Pause anyway
+              </button>
+            </div>
+          </div>
+        }
+
+
+        @if (phase() === 'authenticating' && loginVerified() === null) {
+          <p class="checking">
+            <span class="spinner" aria-hidden="true"></span>
+            <span>Verifying your AO3 login...</span>
+          </p>
+        } @else if (loginVerified() === true) {
+          <p class="signed-in">
+            Signed in@if (signedInAs()) { as <strong>{{ signedInAs() }}</strong>}.
+          </p>
+        }
+
+        <!-- straight under the sign-in, so a run sitting still says why before anything else -->
+        @if (paused(); as pause) {
+          <p class="warning pause">
+            AO3 has asked us to slow down, so the download is paused for
+            {{ pause.seconds }} seconds@if (pause.until) { , resuming around {{ pause.until }}}.
+            This is normal - nothing has gone wrong, and it will carry on by itself.
+          </p>
+        }
+
+        @if (phaseLabel() && phase() !== 'authenticating') {
+          <p class="phase">
+            <span class="step">Step</span>
+            <span>{{ phaseLabel() }}</span>
+          </p>
+        }
+
+        <!--
+          what is being fetched right now. it sits under the step because that is what it
+          qualifies - the step says what part of the run this is, this says which fic. when
+          nothing is being fetched it goes away rather than standing empty or, worse, still
+          naming the fic it finished with
+        -->
+        @if (currentTitle()) {
+          <div class="current">
+            <span class="label">{{ phase() === 'updating' ? 'Updating' : 'Downloading' }}</span>
+            <span class="fic">{{ currentTitle() }}</span>
+            @if (currentFiletype()) {
+              <span class="format">{{ currentFiletype() }}</span>
+            }
+          </div>
+        }
+
+        <!--
+          the run is stopped here until this is answered, so it comes before progress.
+          more than one question can stop a run, and they are answered through the same
+          endpoint - so the panel is keyed on which one is being asked, not on the count
+        -->
+        @if (asking() && question() === 'quick-floor') {
+          <div class="question">
+            <!-- the date is when the index was last written (`last_indexed`), never a work's own
+                 updated date -->
+            <p class="question-text">
+              You have no prior successful runs, but your index already holds
+              <strong>{{ asking() | number }}</strong> {{ asking() === 1 ? 'work' : 'works' }} - the
+              most recent of which was indexed on <strong>{{ writtenDate(askedDate()) }}</strong>.
+              Would you like to just find what has changed since {{ writtenDate(askedDate()) }}, or
+              go ahead and read your entire bookmarks?
+            </p>
+
+            <!-- the wait, said once: from the run's own setting, the default in its button's words -->
+            @if (askedDefault()) {
+              <p class="hint question-default">
+                If nobody answers within {{ askedWait() }},
+                the run carries on with: <strong>{{ defaultWords() }}</strong>
+                @if (!guest()) { (change this in User settings) }.
+              </p>
+            }
+            <div class="question-actions">
+              <button type="button" class="button primary" [disabled]="answering()"
+                      (click)="quickScanSinceIndex()">
+                Only scan up until {{ writtenDate(askedDate()) }}
+              </button>
+              <button type="button" class="button" [disabled]="answering()"
+                      (click)="quickScanWholeListing()">
+                Scan all bookmarks to be safe
+              </button>
+            </div>
+
+            <p class="hint">
+              If these indexes came from an interrupted or failed run, then continuing only up to
+              this point may risk missing some of your older bookmarks. If you aren't sure then
+              please select 'Scan all bookmarks to be safe'.
+            </p>
+          </div>
+        }
+
+        @if (asking() && question() === 'fichub') {
+          <div class="question">
+            <p class="question-text">
+              AO3 would not give us <strong>{{ asking() | number }}</strong>
+              {{ asking() === 1 ? 'work' : 'works' }} on this run. Would you like to try
+              getting {{ asking() === 1 ? 'it' : 'them' }} from FicHub, a mirror of AO3 that
+              keeps copies of works AO3 no longer serves?
+            </p>
+            @if (askedIds().length) {
+              <p class="hint">
+                @for (id of askedIds().slice(0, 10); track id; let last = $last) {
+                  <a [href]="'https://archiveofourown.org/works/' + id" [appWorkLink]="id" target="_blank" rel="noopener">{{ id }}</a>@if (!last) {, }
+                }
+                @if (askedIds().length > 10) { and {{ askedIds().length - 10 | number }} more }
+              </p>
+            }
+
+            <!-- the wait, said once: from the run's own setting, the default in its button's words -->
+            @if (askedDefault()) {
+              <p class="hint question-default">
+                If nobody answers within {{ askedWait() }},
+                the run carries on with: <strong>{{ defaultWords() }}</strong>
+                @if (!guest()) { (change this in User settings) }.
+              </p>
+            }
+            <div class="question-actions">
+              <button type="button" class="button primary" [disabled]="answering()"
+                      (click)="tryFicHub()">
+                Try FicHub
+              </button>
+              <button type="button" class="button" [disabled]="answering()"
+                      (click)="skipFicHub()">
+                No, leave them
+              </button>
+            </div>
+
+            <p class="hint">
+              Anything FicHub has is indexed from what it says and downloaded in the formats
+              this run asked for (FicHub makes no AZW3), and its index entry is marked as
+              coming from FicHub.
+            </p>
+          </div>
+        }
+
+        @if (asking() && question() === 'inferred-date') {
+          <div class="question" data-question="inferred-date" [attr.data-scenario]="askedScenario()">
+            <p class="question-text">
+              @for (format of askedFormats(); track format) {
+                Your {{ format }} of work
+                @for (id of askedIds(); track id) {
+                  <a [href]="'https://archiveofourown.org/works/' + id" [appWorkLink]="id" target="_blank" rel="noopener">{{ id }}</a>
+                }
+                has no date in its name written the way this app writes one, so we can't be sure
+                which version it holds:
+              }
+            </p>
+            @for (format of askedFormats(); track format) {
+              <p class="file-name"><code>{{ askedFileNames()[format] || format }}</code></p>
+              <!-- the nominated file for comparison: the rest of the format's copies are named
+                   under it, and kept whatever is answered -->
+              @if (askedOtherFiles()[format]?.length) {
+                <div class="other-copies">
+                  <p class="hint">
+                    You also have other copies of this {{ format }} - these will be kept for now,
+                    and can be cleaned up later.
+                  </p>
+                  @for (name of askedOtherFiles()[format]; track name) {
+                    <p class="file-name other"><code>{{ name }}</code></p>
+                  }
+                </div>
+              }
+            }
+            <p class="question-text">
+              @if (askedScenario().endsWith('older') && askedFileDates()[askedFormats()[0]] === askedDate()) {
+                <!-- an overwriting run: the same date is replaced, as a file dated the app's way would be -->
+                Its name looks dated <strong>{{ writtenDate(askedFileDates()[askedFormats()[0]]) }}</strong> (a guess),
+                the same as {{ askedSource() || 'AO3' }}'s version
+                (<strong>{{ writtenDate(askedDate()) }}</strong>), and this run overwrites. We recommend replacing it.
+              } @else if (askedScenario().endsWith('older')) {
+                Its name looks dated <strong>{{ writtenDate(askedFileDates()[askedFormats()[0]]) }}</strong> (a guess),
+                so we <strong>think</strong> {{ askedSource() || 'AO3' }}'s version
+                (<strong>{{ writtenDate(askedDate()) }}</strong>) is newer. We recommend replacing it.
+              } @else if (askedScenario().endsWith('newer')) {
+                Its name looks dated <strong>{{ writtenDate(askedFileDates()[askedFormats()[0]]) }}</strong> (a guess),
+                so we <strong>think</strong> yours is as new as {{ askedSource() || 'AO3' }}'s version
+                (<strong>{{ writtenDate(askedDate()) }}</strong>) or newer. We recommend keeping it.
+              } @else {
+                No date can be read from its name, so we can't tell whether
+                {{ askedSource() || 'AO3' }}'s version
+                (<strong>{{ askedDate() ? writtenDate(askedDate()) : 'no date' }}</strong>) is newer.
+                @if (askedRecommended() === 'yes') {
+                  <span class="unsure-warning">But the incoming copy is AO3's own, so it is probably
+                  safe to replace it.</span> We recommend replacing it.
+                } @else if (askedSource() === 'FicHub') {
+                  FicHub's copy may be an older cached one, not up to date with AO3's latest.
+                  We recommend keeping it.
+                } @else {
+                  We recommend keeping it.
+                }
+              }
+            </p>
+            <!-- the wait, said once: from the run's own setting, the default in its button's words -->
+            @if (askedDefault()) {
+              <p class="hint question-default">
+                If nobody answers within {{ askedWait() }},
+                the run carries on with: <strong>{{ defaultWords() }}</strong>
+                @if (!guest()) { (change this in User settings) }.
+              </p>
+            }
+            <div class="question-actions">
+              <button type="button" class="button" [class.recommended]="askedRecommended() === 'yes'"
+                      [disabled]="answering()" (click)="answerUnsure('yes')">
+                {{ askedFormats().length > 1 ? 'Replace them' : 'Replace it' }}@if (askedRecommended() === 'yes') {<strong>{{ ' (recommended)' }}</strong>}
+              </button>
+              <button type="button" class="button" [class.recommended]="askedRecommended() === 'no'"
+                      [disabled]="answering()" (click)="answerUnsure('no')">
+                Keep mine@if (askedRecommended() === 'no') {<strong>{{ ' (recommended)' }}</strong>}
+              </button>
+              <!-- offered while the incoming version has a date to name its own file by -->
+              @if (askedChoices().includes('both')) {
+                <button type="button" class="button keep-both" [disabled]="answering()" (click)="answerUnsure('both')">
+                  Keep both
+                </button>
+              }
+            </div>
+            @if (askedChoices().includes('both')) {
+              <p class="hint keep-both-hint">
+                <strong>Keep both</strong> leaves your file as it is and saves {{ askedSource() || 'AO3' }}'s
+                version beside it, named with its own date.
+              </p>
+            }
+            <label class="check always-case">
+              <input type="checkbox" name="alwaysThisCase" [checked]="alwaysThisCase()"
+                     (change)="alwaysThisCase.set($any($event.target).checked)" />
+              <span>
+                Always choose this
+                @if (askedScenario().endsWith('older')) {
+                  when an existing file is guessed to be older than the incoming one (or the same, on a run that overwrites)
+                } @else if (askedScenario().endsWith('newer')) {
+                  when an existing file is guessed to be newer than the incoming one (or the same, on a run that does not overwrite)
+                } @else {
+                  when the date of an existing file cannot be judged
+                }
+                from {{ askedSource() || 'AO3' }}
+              </span>
+            </label>
+
+          </div>
+        }
+
+        @if (asking() && question() === 'retry-reread') {
+          <div class="question" data-question="retry-reread">
+            <p class="question-text">
+              This retry carries on downloading <strong>{{ asking() | number }}</strong>
+              {{ asking() === 1 ? 'work' : 'works' }} the earlier attempt indexed. If AO3 has
+              updated any of them since, the download would be named with the older date the index
+              still has. Read each work again from AO3 first? It costs one request a work - not one
+              for every file.
+            </p>
+
+            <!-- the wait, said once: from the run's own setting, the default in its button's words -->
+            @if (askedDefault()) {
+              <p class="hint question-default">
+                If nobody answers within {{ askedWait() }},
+                the run carries on with: <strong>{{ defaultWords() }}</strong>
+                @if (!guest()) { (change this in User settings) }.
+              </p>
+            }
+            <div class="question-actions">
+              <button type="button" class="button primary" [disabled]="answering()"
+                      (click)="answerRetryReread('no')">
+                No, use the index as it is
+              </button>
+              <button type="button" class="button" [disabled]="answering()"
+                      (click)="answerRetryReread('yes')">
+                Yes, read them again
+              </button>
+            </div>
+            <label class="check always-case">
+              <input type="checkbox" name="alwaysRetryReread" [checked]="alwaysThisCase()"
+                     (change)="alwaysThisCase.set($any($event.target).checked)" />
+              <span>Always do this, and do not ask me again</span>
+            </label>
+          </div>
+        }
+
+        @if (asking() && question() === 'overwrite-older') {
+          <div class="question" data-question="overwrite-older">
+            <p class="question-text">
+              This run replaces what you have, but your
+              <strong>{{ askedFormats().join(', ') }}</strong> of work
+              @for (id of askedIds(); track id) {
+                <a [href]="'https://archiveofourown.org/works/' + id" [appWorkLink]="id" target="_blank" rel="noopener">{{ id }}</a>
+              }
+              @if (askedNewer()) {
+                is <strong>newer</strong> ({{ writtenDate(askedNewer()) }}) than the version it would be replaced with
+                ({{ writtenDate(askedDate()) }}). Replace it with what could be an older, outdated version?
+              } @else {
+                has <strong>no date in its name</strong>, so it cannot be told whether it is newer
+                than the version it would be replaced with ({{ writtenDate(askedDate()) }}). Replace it with
+                what could be an older, outdated version?
+              }
+            </p>
+            @for (format of askedFormats(); track format) {
+              @if (askedFileNames()[format]) {
+                <p class="file-name"><code>{{ askedFileNames()[format] }}</code></p>
+              }
+              @if (askedOtherFiles()[format]?.length) {
+                <div class="other-copies">
+                  <p class="hint">
+                    You also have other copies of this {{ format }} - these will be kept for now,
+                    and can be cleaned up later.
+                  </p>
+                  @for (name of askedOtherFiles()[format]; track name) {
+                    <p class="file-name other"><code>{{ name }}</code></p>
+                  }
+                </div>
+              }
+            }
+
+            <!-- the wait, said once: from the run's own setting, the default in its button's words -->
+            @if (askedDefault()) {
+              <p class="hint question-default">
+                If nobody answers within {{ askedWait() }},
+                the run carries on with: <strong>{{ defaultWords() }}</strong>
+                @if (!guest()) { (change this in User settings) }.
+              </p>
+            }
+            <div class="question-actions">
+              <button type="button" class="button primary" [disabled]="answering()"
+                      (click)="keepNewerCopy()">
+                No, keep my newer copy
+              </button>
+              <button type="button" class="button" [disabled]="answering()"
+                      (click)="replaceWithOlder()">
+                Yes, replace it
+              </button>
+            </div>
+
+            <p class="hint">
+              Formats you do not have yet are still downloaded either way.
+            </p>
+          </div>
+        }
+
+        @if (asking() && question() === 'unindexed-copy') {
+          <div class="question" data-question="unindexed-copy">
+            <p class="question-text">
+              <!-- a file's version is only ever the date in its own name - the index never dates a file -->
+              Your library has
+              <strong>{{ askedFormats().join(', ') }}</strong> of work
+              @for (id of askedIds(); track id) {
+                <a [href]="'https://archiveofourown.org/works/' + id" [appWorkLink]="id" target="_blank" rel="noopener">{{ id }}</a>
+              }
+              but your index had no entry for the work when this run began. This probably means these
+              files were imported, and not downloaded through this tool. Do you want to replace them all with the
+              {{ askedSource() === 'FicHub' ? 'version from FicHub' : 'latest version from AO3' }}
+              ({{ askedDate() ? writtenDate(askedDate()) : 'no date' }})?
+            </p>
+            <ul class="file-dates">
+              @for (format of askedFormats(); track format) {
+                <li [attr.data-recommended]="askedRecommendedFormats().includes(format) ? 'yes' : 'no'">
+                  <strong>{{ format }}</strong>
+                  @if (askedFileNames()[format]) {{{ ' ' }}<code class="file-name">{{ askedFileNames()[format] }}</code>}
+                  - {{ sentence(askedReasons()[format]) }}
+                  @if (askedOtherFiles()[format]?.length) {
+                    <div class="other-copies">
+                      <p class="hint">
+                        You also have other copies of this {{ format }} - these will be kept for now,
+                        and can be cleaned up later.
+                      </p>
+                      @for (name of askedOtherFiles()[format]; track name) {
+                        <p class="file-name other"><code>{{ name }}</code></p>
+                      }
+                    </div>
+                  }
+                </li>
+              }
+            </ul>
+
+            <!-- the wait, said once: from the run's own setting, the default in its button's words -->
+            @if (askedDefault()) {
+              <p class="hint question-default">
+                If nobody answers within {{ askedWait() }},
+                the run carries on with: <strong>{{ defaultWords() }}</strong>
+                @if (!guest()) { (change this in User settings) }.
+              </p>
+            }
+            <div class="question-actions">
+              @if (askedRecommended() === 'recommended') {
+                <button type="button" class="button primary" [disabled]="answering()"
+                        (click)="replaceRecommendedCopies()">
+                  Replace only {{ askedRecommendedFormats().join(', ') }}
+                </button>
+              }
+              <button type="button" class="button" [class.primary]="askedRecommended() === 'yes'"
+                      [disabled]="answering()" (click)="replaceUnindexedCopy()">
+                {{ askedFormats().length > 1 ? 'Yes, replace them all' : 'Yes, replace it' }}
+              </button>
+              <button type="button" class="button" [class.primary]="askedRecommended() === 'no'"
+                      [disabled]="answering()" (click)="keepUnindexedCopy()">
+                {{ askedFormats().length > 1 ? 'No, keep them all' : 'No, keep my copy' }}
+              </button>
+              @if (askedChoices().includes('both')) {
+                <button type="button" class="button keep-both" [disabled]="answering()" (click)="keepBothUnindexed()">
+                  Keep both
+                </button>
+              }
+            </div>
+
+            <p class="hint">
+              Formats you do not have yet are still downloaded either way.
+              @if (askedChoices().includes('both')) {
+                <span class="keep-both-hint"><strong>Keep both</strong> leaves your
+                {{ askedBothFormats().join(', ') }} as {{ askedBothFormats().length === 1 ? 'it is' : 'they are' }}
+                and saves the new version beside {{ askedBothFormats().length === 1 ? 'it' : 'each' }}, named with
+                its own date@if (askedBothFormats().length < askedFormats().length) {; your other copies are kept}.</span>
+              }
+            </p>
+          </div>
+        }
+
+        <div
+          class="bar"
+          role="progressbar"
+          [attr.aria-valuenow]="percent()"
+          aria-valuemin="0"
+          aria-valuemax="100"
+        >
+          <div
+            class="fill"
+            [class.indeterminate]="percent() === null"
+            [style.width.%]="percent() ?? 100"
+          ></div>
+        </div>
+        <p class="status">
+          @if (percent() !== null) {
+            <span class="percent">{{ percent() }}%</span>
+          }
+          <span>{{ summary() || 'working...' }}</span>
+        </p>
+
+        <!-- what this run was asked to do -->
+        <dl class="chosen">
+          <dt>Saving as</dt>
+          <dd>{{ chosenFiletypes().join(', ') || 'nothing - indexing only' }}</dd>
+          @if (chosenOptions().length) {
+            <dt>Options</dt>
+            <dd>{{ chosenOptions().join(', ') }}</dd>
+          }
+          <dt>Into</dt>
+          <dd><code>{{ folder() }}</code></dd>
+        </dl>
+
+        <!--
+          the plan, so what is still to come is visible rather than only what has happened.
+          open by default: on a long run this is the thing worth looking at
+        -->
+        @if (steps().length) {
+          <details class="settings run-steps" open>
+            <summary>
+              Steps in this run
+              <span class="step-count">{{ stepsDone() }} of {{ steps().length }}</span>
+            </summary>
+            <ol class="step-list">
+              @for (step of steps(); track step.id) {
+                <li [class]="'step-' + step.status">
+                  <span class="step-mark" aria-hidden="true">
+                    @switch (step.status) {
+                      @case ('done') { &#10003; }
+                      @case ('earlier') { &#10003; }
+                      <!-- stepped over, not ticked off: a skipped step did not happen -->
+                      @case ('skipped') { &#187; }
+                      @case ('failed') { &times; }
+                      @case ('running') { <span class="spinner"></span> }
+                      @default { &#9203; }
+                    }
+                  </span>
+                  <span class="step-label">
+                    @if (step.status === 'skipped') {
+                      <span class="step-skip-tag">[SKIP]</span>
+                    }
+                    {{ step.label }}
+                  </span>
+                  <span class="step-state">
+                    @switch (step.status) {
+                      @case ('done') { done }
+                      @case ('earlier') { done in the earlier run }
+                      @case ('skipped') { skipped }
+                      @case ('failed') { failed }
+                      @case ('running') { in progress }
+                      @default { waiting }
+                    }
+                  </span>
+                </li>
+              }
+            </ol>
+          </details>
+        }
+
+        <!--
+          what this run was asked, and what settings.ini says. both belong here: the wizard
+          pages are gone by now, and between them they are everything the run is working
+          from - what you chose, and what pacing and naming it inherited
+        -->
+        @if (settings(); as ini) {
+          <details class="settings">
+            <summary>Settings this run is using</summary>
+            <dl>
+              @for (row of runSettings(); track row.label) {
+                <dt>{{ row.label }}</dt>
+                <dd>{{ row.value }}</dd>
+              }
+              <dt>Wait between requests</dt>
+              <dd>
+                {{ ini.extraWaitTime }}s
+                @if (ini.extraWaitTime === 0) {
+                  <span class="warn">- no pause, which is what trips AO3's rate limit</span>
+                }
+              </dd>
+              <dt>File names</dt>
+              <dd>
+                <code>{{ ini.fileNamePattern }}</code>, cut to
+                {{ ini.fileNameLength === 0 ? 'any length' : ini.fileNameLength + ' characters' }}
+                @if (ini.fileNameExample) {
+                  <span class="example">e.g. <code>{{ ini.fileNameExample }}</code></span>
+                }
+                <span class="example dim">
+                  If the filename is too long, then the fic title and author may be
+                  shortened to fit.
+                </span>
+              </dd>
+              <dt>Retries / timeouts</dt>
+              <dd>{{ ini.maxRetries === 0 ? 'unlimited' : ini.maxRetries }} / {{ ini.maxTimeouts }}</dd>
+              @if (ini.debugLogging) {
+                <dt>Debug logging</dt>
+                <dd>on</dd>
+              }
+              @if (ini.consoleLogging) {
+                <dt>Console logging</dt>
+                <dd>on - requests and run output are printed to the helper's console</dd>
+              }
+            </dl>
+          </details>
+        }
+
+        <!--
+          kept separate from AO3's own pause above, which looks the same and is nothing
+          alike: that one ends by itself, this one ends only when you say so
+        -->
+        @if (held()) {
+          <p class="warning held">
+            <strong>Paused.</strong> Whatever was being fetched when you pressed pause was
+            allowed to finish, so nothing is half-written, and nothing new will be started
+            until you press Resume. You can still stop the run from here.
+            @if (runningInBackground() && abandonsAt()) {
+              <strong>If it is not resumed by {{ abandonsAt() }}, the helper abandons it.</strong>
+            }
+          </p>
+        }
+
+        @if (log().length) {
+          <pre class="log">@for (line of log(); track $index) {<span class="log-time">{{ lineTime(line.at) }}</span> {{ line.text }}
+}</pre>
+        }
+
+        <!--
+          only when settings.ini asks for it. this is for working on the app, not for using
+          it: skipping really does skip, and the mocked report is a picture, not a result
+        -->
+        @if (debugTools()) {
+          <details class="settings debug">
+            <summary>Debug tools</summary>
+            <div class="debug-actions">
+              <button type="button" class="button" [disabled]="skipping()"
+                      (click)="skipCurrentStep()">
+                Skip this step
+              </button>
+              <button type="button" class="button" (click)="mockReport()">
+                Show a made-up report
+              </button>
+            </div>
+            <p class="hint">
+              <strong>Skip this step</strong> really skips it - whatever it would have done
+              does not happen, and the checklist marks it skipped rather than done.
+              <strong>Show a made-up report</strong> jumps to the end of the run and fills
+              both lists with invented entries, so their layout can be checked without
+              waiting for something to go wrong. Nothing in it happened.
+            </p>
+          </details>
+        }
+      </section>
+      <footer>
+        <!--
+          pausing is not offered while a question is up: the run is already stopped dead
+          waiting for that answer, so a pause would claim to do something it cannot
+        -->
+        @if (!asking()) {
+          <button
+            type="button"
+            class="button"
+            [disabled]="holdPending() || cancelling()"
+            (click)="togglePause()"
+          >
+            @if (holdPending()) {
+              {{ held() ? 'Resuming...' : 'Pausing...' }}
+            } @else {
+              {{ held() ? 'Resume' : 'Pause' }}
+            }
+          </button>
+        }
+        <button type="button" class="button danger" [disabled]="cancelling()" (click)="requestStop()">
+          {{ cancelling() ? 'Stopping...' : 'Stop' }}
+        </button>
+        @if (runningInBackground()) {
+          <button type="button" class="button primary continue-background"
+                  (click)="continueInBackground()">
+            Continue in background
+          </button>
+        }
+      </footer>
+    }
+
+    <!-- step 4: outcome -->
+    @if (step() === 'done') {
+      <section class="body">
+        @if (abandoned()) {
+          <p class="warning">
+            <strong>Abandoned.</strong> This background run was left paused for
+            {{ pauseTimeout() }} {{ pauseTimeout() === 1 ? 'minute' : 'minutes' }}, so the
+            helper ended it. Everything it saved was kept, in <code>{{ folder() }}</code>.
+            Resume it from the History tab, or start the same run again - it carries on from
+            what is still missing.
+          </p>
+        } @else if (wasCancelled() && guest()) {
+          <p class="warning">Stopped. This was a pretend run - nothing was fetched or saved.</p>
+        } @else if (wasCancelled()) {
+          <p class="warning">
+            Stopped. Everything downloaded before you stopped was kept, in
+            <code>{{ folder() }}</code>.
+          </p>
+        } @else {
+          @if (guest()) {
+            <p class="success">Finished. This was a pretend run - nothing was fetched or saved.</p>
+          } @else {
+            <p class="success">Finished. Files were saved to <code>{{ folder() }}</code>.</p>
+          }
+        }
+        @if (staleCount()) {
+          <p class="hint">
+            {{ staleCount() | number }}
+            {{ staleCount() === 1 ? 'work was' : 'works were' }} out of date and
+            {{ staleCount() === 1 ? 'was' : 'were' }} fetched again. The copy each one
+            replaced was removed only after the new file was confirmed saved.
+          </p>
+        }
+
+        @if (rescued().length) {
+          <p class="hint rescued">
+            <strong>{{ rescued().length | number }}</strong>
+            {{ rescued().length === 1 ? 'work AO3 would not give us came' : 'works AO3 would not give us came' }}
+            from FicHub instead.
+          </p>
+        }
+
+        <!--
+          a format there was no file of, taken from FicHub although FicHub's copy is dated
+          before the last known update date for the work: an older version beats none, but it
+          may be an older cached copy
+        -->
+        <!-- folding: a run over a large library can list a great many. open to begin with
+             while the list is short enough to read at a glance -->
+        @if (fichubOlder().length) {
+          <details class="failures fichub-older" [open]="fichubOlder().length <= 5">
+            <summary class="failures-text">
+              <strong>{{ fichubOlder().length | number }}</strong>
+              {{ fichubOlder().length === 1 ? 'work' : 'works' }} got a format from FicHub that
+              may be an <strong>older cached copy</strong> - dated before the last known update
+              date we have.
+            </summary>
+            <p class="hint">
+              Each was kept: either you had no file in that format, or it replaced a file of yours
+              that was older still. An older version is better than none - but AO3 had a newer one.
+            </p>
+            <ul class="failed-list">
+              @for (item of fichubOlder(); track $index) {
+                <li>
+                  <a [href]="item.link" [appWorkLink]="item.id" target="_blank" rel="noopener">{{ item.id }}</a>
+                  <span class="reason">{{ fichubOlderWords(item) }}</span>
+                </li>
+              }
+            </ul>
+          </details>
+        }
+
+        <!--
+          files with no date written the app's way were asked about, one at a time: dating them
+          in Resolve issues means the next run judges them by their date instead of asking
+        -->
+        @if (unsureFiles() || duplicateCopies()) {
+          <div class="unsure-files">
+            @if (unsureFiles()) {
+            <p>
+              <strong>{{ unsureFiles() | number }}</strong>
+              {{ unsureFiles() === 1 ? 'file' : 'files' }} in your library had no date in
+              {{ unsureFiles() === 1 ? 'its name' : 'their names' }} written the way this app
+              writes one, so this run had to guess or could not tell which version
+              {{ unsureFiles() === 1 ? 'it holds' : 'they hold' }}. We recommend refreshing your
+              library and dating {{ unsureFiles() === 1 ? 'it' : 'them' }} in
+              <strong>Resolve issues</strong>, so the next run does not have to ask again.
+            </p>
+            }
+            <!-- a run never deletes a copy it did not replace: works left with more than one
+                 file of a format are offered to Resolve issues, which sorts duplicates by hand -->
+            @if (duplicateCopies(); as dup) {
+              <p class="duplicate-copies">
+                <strong>{{ dup.works | number }}</strong>
+                {{ dup.works === 1 ? 'work still has' : 'works still have' }} more than one file of
+                the same format (<strong>{{ dup.files | number }}</strong> extra
+                {{ dup.files === 1 ? 'copy' : 'copies' }}). Each was judged by its newest copy dated
+                the way this app dates them, and every other copy was kept. Sort them in
+                <strong>Resolve issues</strong>.
+              </p>
+            }
+            <button type="button" class="button" (click)="resolveIssuesNow()">
+              Refresh library and resolve issues
+            </button>
+          </div>
+        }
+
+        @if (failures().length) {
+          <div class="failures">
+            <p class="failures-text">
+              <strong>{{ failures().length | number }}</strong>
+              {{ failures().length === 1 ? 'work' : 'works' }} could not be downloaded.
+              Everything else was saved.
+            </p>
+            <ul class="failed-list">
+              @for (failure of failures().slice(0, 5); track failure.link) {
+                <li>
+                  <a [href]="failure.link" [appWorkLink]="failure.id" target="_blank" rel="noopener">{{ failure.id || failure.link }}</a>
+                  <span class="reason">{{ failure.error }}</span>
+                </li>
+              }
+            </ul>
+            @if (failures().length > 5) {
+              <p class="hint">and {{ failures().length - 5 | number }} more.</p>
+            }
+          </div>
+        }
+
+        <!--
+          the download worked, so this is not a failure to retry - but the old copy is still
+          on disk beside the new one, and only the user can sort that out
+        -->
+        @if (keptCopies().length) {
+          <div class="failures kept">
+            <p class="failures-text">
+              <strong>{{ keptCopies().length | number }}</strong>
+              {{ keptCopies().length === 1 ? 'new copy was' : 'new copies were' }} downloaded
+              but {{ keptCopies().length === 1 ? 'needs' : 'need' }} checking by hand - either
+              the old copy could not be safely deleted, or the new file could not be confirmed.
+              Nothing was removed for these: check the new file opens, then delete any older
+              copy yourself.
+            </p>
+            <ul class="failed-list">
+              @for (item of keptCopies().slice(0, 5); track $index) {
+                <li>
+                  <a [href]="item.link" [appWorkLink]="item.id" target="_blank" rel="noopener">{{ item.id || item.link }}</a>
+                  <span class="reason">{{ item.file }} - {{ item.error }}</span>
+                </li>
+              }
+            </ul>
+            @if (keptCopies().length > 5) {
+              <p class="hint">and {{ keptCopies().length - 5 | number }} more.</p>
+            }
+          </div>
+        }
+
+        <!--
+          marked for removal in the check step, and still there: the run stopped or failed
+          before its cleanup step, or a file would not delete. nothing is lost - only left
+        -->
+        @if (notRemoved().length) {
+          <div class="failures kept">
+            <p class="failures-text">
+              <strong>{{ notRemoved().length | number }}</strong>
+              older {{ notRemoved().length === 1 ? 'copy was' : 'copies were' }} marked for
+              removal but {{ notRemoved().length === 1 ? 'is' : 'are' }} still there. The newest
+              copy of each is untouched. Start another run to be asked about them again, or delete them
+              yourself.
+            </p>
+            <ul class="failed-list">
+              @for (item of notRemoved().slice(0, 5); track $index) {
+                <li>
+                  <a [href]="item.link" [appWorkLink]="item.id" target="_blank" rel="noopener">{{ item.id }}</a>
+                  <span class="reason">{{ item.file }} - {{ item.error }}</span>
+                </li>
+              }
+            </ul>
+            @if (notRemoved().length > 5) {
+              <p class="hint">and {{ notRemoved().length - 5 | number }} more.</p>
+            }
+          </div>
+        }
+
+        <!--
+          kept apart from the failures above: nothing went wrong with these. there was no
+          work behind the bookmark to fetch, and running again would skip them again
+        -->
+        @if (skipped().length) {
+          <div class="failures skipped">
+            <p class="failures-text">
+              <strong>{{ skipped().length | number }}</strong>
+              {{ skipped().length === 1 ? 'bookmark was' : 'bookmarks were' }} not works, so
+              nothing could be downloaded for
+              {{ skipped().length === 1 ? 'it' : 'them' }}. Nothing has gone wrong - a
+              bookmark can be a series, a work hosted somewhere else, or one that has since
+              been deleted.
+            </p>
+            <ul class="failed-list">
+              @for (item of skipped().slice(0, 5); track $index) {
+                <li>
+                  @if (item.link) {
+                    <a [href]="item.link" target="_blank" rel="noopener">
+                      {{ item.id || item.title || item.link }}
+                    </a>
+                  } @else {
+                    <span>{{ item.title || 'a bookmark with no link' }}</span>
+                  }
+                  <span class="reason">{{ item.error }}</span>
+                </li>
+              }
+            </ul>
+            @if (skipped().length > 5) {
+              <p class="hint">and {{ skipped().length - 5 | number }} more.</p>
+            }
+          </div>
+        }
+
+        @if (issueCount()) {
+          <p class="hint export-issues">
+            Every issue above can be saved as one text file at any time from this run's entry
+            in the <strong>History</strong> tab - <strong>Download issues</strong>.
+          </p>
+        }
+
+        @if (stampedCount()) {
+          <p class="hint">
+            {{ stampedCount() | number }} existing
+            {{ stampedCount() === 1 ? 'file was' : 'files were' }} given a date. From now on
+            this page can tell when AO3 has a newer version of
+            {{ stampedCount() === 1 ? 'it' : 'them' }}.
+          </p>
+        }
+
+        <!--
+          an ordinary run's writes all go through this page, which takes them into the listing
+          as the run ends (refreshAfterRun) - nothing to say. a background run writes to Dropbox
+          itself, so the works list refreshes itself once it sees the run has finished
+        -->
+        @if (runningInBackground()) {
+          <p class="hint">
+            This run wrote to your library without this page. The works list brings itself up
+            to date once the run has finished.
+          </p>
+        }
+        @if (log().length) {
+          <pre class="log">@for (line of log(); track $index) {<span class="log-time">{{ lineTime(line.at) }}</span> {{ line.text }}
+}</pre>
+        }
+      </section>
+      <footer>
+        <button type="button" class="button primary" (click)="close()">
+          {{ wasCancelled() ? 'Close modal' : 'Done' }}
+        </button>
+      </footer>
+    }
+
+    @if (step() === 'failed') {
+      <section class="body">
+        @if (loginVerified() === false) {
+          <p class="error">
+            <strong>Login failed.</strong> AO3 did not accept those details, so nothing was
+            downloaded. Check your username and password and try again.
+          </p>
+          <p class="hint">AO3 reported: {{ error() }}</p>
+        } @else if (sessionExpired()) {
+          <p class="error">
+            <strong>Your AO3 login expired while this was running.</strong> The run stopped
+            rather than carrying on, because every restricted work after that point would
+            have failed for the same reason.
+          </p>
+          <p>
+            <strong>Nothing was lost.</strong> Everything downloaded before that is on disk
+            and indexed. Start the same run again and it carries on from what is still
+            missing - it works out what to do from your index and your folder, not from
+            where it got to, so there is nothing to pick up manually.
+          </p>
+          <p class="hint">
+            AO3 sessions do not last for ever, and a run left paused for a long time is the
+            usual way this happens.
+          </p>
+        } @else {
+          <p class="error">{{ error() }}</p>
+        }
+        @if (log().length) {
+          <pre class="log">@for (line of log(); track $index) {<span class="log-time">{{ lineTime(line.at) }}</span> {{ line.text }}
+}</pre>
+        }
+      </section>
+      <footer>
+        @if (helperNeverAnswered()) {
+          <!-- the run never started: the same run, once the helper answers -->
+          <button type="button" class="button primary" (click)="retryConnecting()">Try again</button>
+        } @else {
+          <!-- a rejected login sends you back to the details, not to the file types -->
+          <button type="button" class="button subtle"
+                  (click)="step.set(loginVerified() === false ? 'credentials' : firstStep())">
+            Try again
+          </button>
+        }
+        <button type="button" class="button" (click)="close()">Close</button>
+      </footer>
+    }
+  }
+</div>

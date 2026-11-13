@@ -1,0 +1,162 @@
+"""Shared pytest fixtures for ao3downloader tests."""
+
+import glob
+import os
+from unittest.mock import MagicMock, patch
+
+import pytest
+from bs4 import BeautifulSoup
+
+from source_code import access, naming, server, strings
+from source_code.fileio import FileOps
+from source_code.repo import Repository
+
+
+FIXTURES_DIR = os.path.join(os.path.dirname(__file__), 'fixtures')
+
+
+@pytest.fixture(autouse=True)
+def config_somewhere_else(tmp_path_factory, monkeypatch):
+    """settings.ini is read from, and now written to, a folder of each test's own.
+
+    The helper writes a missing settings.ini when it starts, so a test that starts it would
+    otherwise leave one wherever the tests were run from. A test that wants a particular
+    settings.ini sets this itself, which wins.
+    """
+
+    monkeypatch.setenv(strings.ENV_CONFIG_FOLDER, str(tmp_path_factory.mktemp('config')))
+
+
+@pytest.fixture(autouse=True)
+def default_file_names():
+    """Every test names and reads files by the default pattern, whatever one before it used."""
+
+    naming.use(None)
+    yield
+    naming.use(None)
+
+
+@pytest.fixture(autouse=True)
+def no_runs_left_over():
+    """Every test starts with a helper that is running nothing.
+
+    The helper allows one run at a time, and its list of runs is shared by the whole class -
+    a test that starts one with its thread stubbed out would otherwise leave a run 'in
+    progress' for ever, and every test after it would be refused.
+    """
+
+    # and with no updater - only the Windows app has one, and a test that gives it one would
+    # otherwise leave every helper after it offering to update itself. Nor packed default
+    # settings, which only the packaged app has (desktop.main sets them)
+    with patch.dict(server.Handler.jobs, clear=True), \
+         patch.object(server.Handler, 'updater', None), \
+         patch.object(server.Handler, 'settings_defaults', ''), \
+         patch.object(server.Handler, 'passcode_guard', access.PasscodeGuard()):
+        # and with no address blocked for wrong passcodes a test before it sent
+        yield
+
+
+@pytest.fixture(autouse=True)
+def fichub_left_alone(request, monkeypatch):
+    """No run asks about FicHub, or reaches it, unless the test is about FicHub.
+
+    A run with any failure asks whether to try FicHub, and an unanswered question waits half
+    an hour - every test that drives a run with a failure in it would hang. The step is
+    skipped as a run with nothing for FicHub skips it. Tests marked `fichub` get the real
+    step, and stand in for FicHub's site themselves.
+    """
+
+    if request.node.get_closest_marker('fichub'): return
+    monkeypatch.setattr(server, 'rescue_with_fichub',
+                        lambda job, fileops, ao3, report: job.steps.skip('fichub'))
+
+
+
+@pytest.fixture(autouse=True)
+def retry_reread_left_alone(request, monkeypatch):
+    """No retry asks whether to re-read its carried-on works unless the test is about that.
+
+    A retry carrying on its downloads asks once, and an unanswered question waits half an
+    hour - every retry test would hang. It is taken as the default (no: the index as it is),
+    with nothing asked. Tests marked `retry_reread` get the real question.
+    """
+
+    if request.node.get_closest_marker('retry_reread'): return
+    monkeypatch.setattr(server, 'reread_carried', lambda job, ao3, records, report=None: [])
+
+EBOOK_DIR = os.path.join(FIXTURES_DIR, 'ebook')
+
+
+def ebook_fixtures(work_id: str, ext: str) -> list[str]:
+    """Return sorted paths to ebook fixtures for a given work + extension.
+
+    Always includes files under `ebook/<work_id>/current/`. Additionally
+    includes `archive/` unless AO3_FIXTURE_MODE=current_only is set in the
+    environment (used by the CI two-pass check to verify a newly-refreshed
+    live fixture still parses correctly without help from archived versions).
+    """
+    root = os.path.join(EBOOK_DIR, work_id)
+    paths = sorted(glob.glob(os.path.join(root, 'current', '*' + ext)))
+    if os.environ.get('AO3_FIXTURE_MODE') != 'current_only':
+        paths += sorted(glob.glob(os.path.join(root, 'archive', '*' + ext)))
+    return paths
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Mark every test parametrized over an ebook fixture file with 'ebook'.
+
+    After a refresh from live ao3 (dev/refresh_fixtures.py), `pytest -m ebook` reruns only
+    these, to decide whether the pre-refresh ebooks need archiving
+    (dev/archive_old_fixtures.py).
+    """
+    for item in items:
+        callspec = getattr(item, 'callspec', None)
+        if callspec is None:
+            continue
+        if any(isinstance(value, str) and value.startswith(EBOOK_DIR)
+               for value in callspec.params.values()):
+            item.add_marker(pytest.mark.ebook)
+
+
+# region shared loaders
+
+@pytest.fixture
+def fixture_soup():
+    """Factory: load test/fixtures/<name>.html as a BeautifulSoup."""
+
+    def _load(name: str) -> BeautifulSoup:
+        path = os.path.join(FIXTURES_DIR, name + '.html')
+        with open(path, encoding='utf-8') as f:
+            return BeautifulSoup(f.read(), 'html.parser')
+
+    return _load
+
+# endregion
+
+
+# region fileops / repo
+
+@pytest.fixture
+def fake_fileops(tmp_path, monkeypatch) -> FileOps:
+    """Real FileOps whose paths are redirected under tmp_path."""
+
+    monkeypatch.chdir(tmp_path)  # so construction can't pick up a real settings.ini
+    fileops = FileOps()
+    fileops.logfile = str(tmp_path / 'log.jsonl')
+    fileops.inifile = str(tmp_path / 'settings.ini')
+    fileops.settingsfile = str(tmp_path / 'data.json')
+    fileops.downloadfolder = str(tmp_path / 'downloads')
+    os.makedirs(fileops.downloadfolder, exist_ok=True)
+    return fileops
+
+
+@pytest.fixture
+def mock_repo(fake_fileops, monkeypatch) -> Repository:
+    """Repository with a mocked session and no-op sleep, for retry-logic tests."""
+
+    monkeypatch.setattr('source_code.repo.sleep', lambda _: None)
+    repo = Repository(fake_fileops)
+    repo.session = MagicMock()
+    return repo
+
+# endregion

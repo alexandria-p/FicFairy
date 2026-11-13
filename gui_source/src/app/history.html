@@ -1,0 +1,567 @@
+<section class="history">
+  <div class="history-head">
+    <h2>
+      Run history
+      <!-- how many are listed, on hover or focus rather than as a line of its own -->
+      <span class="info-tip history-limit" tabindex="0" role="note" aria-label="About this list">
+        <span class="info-mark" aria-hidden="true">i</span>
+        <span class="info-text">
+          Shows your {{ historyLimit }} most recent runs. Older runs are still kept in your
+          library's <code>runs</code> folder, but are not listed here.
+        </span>
+      </span>
+    </h2>
+  </div>
+  <!-- only once the history has been read: with no library, or a read that failed, there is
+       nothing to refresh -->
+  @if (readAt(); as at) {
+  <p class="meta-line note">
+    <span>List refreshed {{ shownTime(at) }}</span>
+    <button
+      type="button"
+      class="refresh-icon"
+      [class.spinning]="loading()"
+      [disabled]="loading()"
+      [attr.title]="loading() ? 'Refreshing' + fromWhere() + '...' : 'Refresh the list - read the run history again' + fromWhere()"
+      [attr.aria-label]="loading() ? 'Refreshing' + fromWhere() : 'Refresh the list' + fromWhere()"
+      (click)="load()"
+    >
+      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+      <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+      <path d="M12.4 1.6v3h-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+    </button>
+  </p>
+  }
+  <!-- reading the library: under the title, as on every tab -->
+  <ng-content select="[listingProgress]" />
+
+  <!--
+    the run going now, pinned above everything: while it is going nothing else can start,
+    and this is where the banner at the top of the page sends people
+  -->
+  @for (active of activeRuns(); track active.id) {
+    <article class="run run-active" data-active-run>
+      <header class="run-head">
+        <span class="run-name">{{ active.actionName }}</span>
+        <span class="run-status">
+          In progress - {{ active.paused ? 'paused' : 'running' }}
+        </span>
+      </header>
+      <p class="run-when">
+        Started {{ when(active.started) }}
+        @if (active.background) { &middot; in the background }
+      </p>
+      @if (active.step) {
+        <p class="hint">Now: <strong>{{ active.step }}</strong></p>
+      }
+      @if (active.paused && active.abandonsAt) {
+        <p class="hint">
+          <strong>Abandoned at {{ timeOf(active.abandonsAt) }} unless resumed</strong> - a
+          background run left paused ends, keeping what it saved, and can be resumed.
+        </p>
+      }
+      @if (active.background) {
+        <div class="run-resume">
+          <button type="button" class="button primary" (click)="viewProgress.emit(active)">
+            View progress
+          </button>
+          <span class="hint">
+            Shows the run as it goes - pause it, stop it, or leave it to carry on.
+          </span>
+        </div>
+      } @else {
+        <p class="hint">
+          This run is not in the background, so its progress is shown only in the window that
+          started it - it needs that page open to reach the library.
+        </p>
+      }
+
+      <!-- the last resort, for a run that will not stop or whose window has gone -->
+      @if (confirmingForce() === active.id) {
+        <div class="warning force-stop-confirm">
+          <p>
+            <strong>Force stop this run?</strong> It ends now, without waiting for it to reach a
+            safe point. Whatever it was in the middle of is left unfinished - everything it had
+            already saved is kept. Its history says <strong>Stopped</strong>, with its log and
+            issues, and another run can start straight away.
+          </p>
+          <p class="hint">Try its own Stop button first, if its window is open.</p>
+          <div class="force-stop-actions">
+            <button type="button" class="button danger" [disabled]="forcing() === active.id"
+                    (click)="forceStop(active)">
+              {{ forcing() === active.id ? 'Stopping...' : 'Force stop' }}
+            </button>
+            <button type="button" class="button subtle" (click)="confirmingForce.set('')">
+              Keep it running
+            </button>
+          </div>
+          @if (forceProblem()) {
+            <p class="error">{{ forceProblem() }}</p>
+          }
+        </div>
+      } @else {
+        <div class="force-stop">
+          <button type="button" class="button subtle" (click)="confirmingForce.set(active.id)">
+            Force stop
+          </button>
+          <span class="hint">If it will not stop from its own window.</span>
+        </div>
+      }
+    </article>
+  }
+
+  @if (loading()) {
+    <!-- one bar at a time: while the library itself is read, its panel above says so -->
+    @if (!libraryLoading()) {
+      <app-progress-bar [caption]="'Reading past runs' + fromWhere() + '...'" />
+    }
+  } @else if (unavailable()) {
+    <p class="notice">
+      Open a library - choose a folder, or sign in to Dropbox - to see the runs recorded in it.
+    </p>
+  } @else if (!runs().length) {
+    <p class="notice">
+      No runs recorded yet. Every download or indexing run from now on is written down here -
+      what it did, which fics it touched, and how it ended.
+    </p>
+  } @else {
+    @for (run of runs(); track run.file) {
+      <article class="run" [class]="'run-' + run.status">
+        <header class="run-head">
+          <span class="run-name">{{ run.actionName }}</span>
+          <!-- the top right corner: how it ended, and under it the way to run it again -->
+          <span class="run-corner">
+            <span class="run-status">
+              {{ outcome(run) }}@if (run.background) { &middot; background }
+            </span>
+            @if (canRetry(run)) {
+              <button type="button" class="button primary retry"
+                      [disabled]="dummy()"
+                      [class.unavailable]="device.blocked()"
+                      [attr.aria-disabled]="device.blocked() ? 'true' : null"
+                      [title]="device.blocked() ? device.title() : guest() ? 'Not available in guest mode - these runs are made up, so there is nothing to retry' : dummy() ? 'Runs are held while debug mode shows dummy data' : 'Run it again - from the top, or carrying on from the first step that did not finish'"
+                      (click)="device.blocked() ? device.explain() : resume.emit(run.id)">
+                Retry
+              </button>
+            }
+          </span>
+        </header>
+
+        <p class="run-when">
+          {{ when(run.started) }}
+          @if (run.finished) { &ndash; {{ when(run.finished) }} }
+        </p>
+        @if (run.url) {
+          <!-- a several-fics run (or an import) keeps one link to a line: a few are shown as they
+               are, more fold away and are drawn only once opened -->
+          @if (linksOf(run).length <= linksShown) {
+            <p class="hint run-link">
+              @for (link of linksOf(run); track $index; let last = $last) {
+                <a [href]="link" target="_blank" rel="noopener">{{ link }}</a>@if (!last) {<br />}
+              }
+            </p>
+          } @else {
+            <details class="ids run-links" (toggle)="toggleList(run.file + ':links', $any($event.target).open)">
+              <summary>
+                Works asked for
+                <span class="ids-count">{{ linksOf(run).length | number }}</span>
+              </summary>
+              @if (openLists().has(run.file + ':links')) {
+                <ul class="id-list">
+                  @for (link of linksOf(run); track $index) {
+                    <li><a [href]="link" target="_blank" rel="noopener">{{ link }}</a></li>
+                  }
+                </ul>
+              }
+            </details>
+          }
+        }
+
+        @if (run.status === 'abandoned') {
+          <p class="hint">
+            This background run was left paused, so the helper ended it rather than keep
+            waiting. Anything it had already saved is kept.
+          </p>
+        }
+
+        @if (run.status === 'interrupted') {
+          <p class="hint">
+            @if (run.background) {
+              This background run never reported finishing - the helper stopped or restarted
+              while it was going (a crash, a deploy, or its window closed).
+            } @else {
+              This run never reported finishing - the page was closed, or the helper stopped.
+            }
+            Anything it had already saved is still on disk.
+          </p>
+        }
+
+        @if (run.indexFailures?.length) {
+          <div class="index-gaps">
+            <p>
+              <strong>Indexing did not finish.</strong>
+              Everything it indexed is kept and was downloaded, but the run never reached the
+              rest - so it is not a starting point for a quick scan.
+            </p>
+            <ul>
+              @for (gap of run.indexFailures; track $index) {
+                <li>{{ describeGap(gap) }}</li>
+              }
+            </ul>
+          </div>
+        }
+
+        @if (run.progress?.stepLabel && run.status !== 'success') {
+          <p class="hint">Got as far as: <strong>{{ run.progress!.stepLabel }}</strong></p>
+        }
+
+        @if (run.resumes) {
+          <p class="hint">
+            A retry of
+            @if (runById(run.resumes); as earlier) {
+              the run from {{ when(earlier.started) }},
+            } @else {
+              an earlier run,
+            }
+            measured from when the first attempt logged in ({{ when(run.baseline ?? null) }}).
+          </p>
+        }
+        @if (run.resumedBy) {
+          <p class="hint">
+            Retried by
+            @if (runById(run.resumedBy); as later) {
+              the run from {{ when(later.started) }}.
+            } @else {
+              a later run.
+            }
+          </p>
+        }
+
+
+
+        @if (run.error) {
+          <p class="run-error">{{ run.error }}</p>
+        }
+
+        @if (run.logPruned !== undefined) {
+          <p class="hint log-pruned">
+            This run's log was taken out - only the {{ recentRunLogs }} most recent runs keep theirs
+            (User settings, under Advanced).
+          </p>
+        }
+        @if (issuesIn(run) || run.logLines) {
+          <div class="run-issues">
+            @if (issuesIn(run)) {
+              <button type="button" class="button" (click)="downloadIssues(run)"
+                      title="Works that could not be downloaded, copies to check by hand, and bookmarks that are not works - with their links and reasons">
+                Download issues ({{ issuesIn(run) | number }})
+              </button>
+            }
+            @if (run.logLines) {
+              <button type="button" class="button" [disabled]="readingLog() === run.id"
+                      (click)="downloadLog(run)"
+                      title="Everything the run said in its window, line by line">
+                {{ readingLog() === run.id ? 'Reading the log...' : 'Download log' }}
+              </button>
+            }
+          </div>
+        }
+
+        <dl class="run-settings">
+          @if (run.username) {
+            <dt>AO3 account</dt>
+            <dd class="run-account">{{ run.username }}</dd>
+          }
+          <dt>File types</dt>
+          <dd>{{ run.filetypes.join(', ') || 'none' }}</dd>
+          @if (settingsOf(run).length) {
+            <dt>Options</dt>
+            <dd>{{ settingsOf(run).join(', ') }}</dd>
+          }
+        </dl>
+
+        @if (run.choices.length) {
+          <div class="run-choices">
+            <p class="choices-head"><strong>Questions asked</strong> ({{ run.choices.length | number }})</p>
+            @for (choice of run.choices; track $index) {
+              <div class="run-choice">
+              @if (choice.question === 'undated') {
+                <p>
+                  Asked about <strong>{{ choice.count | number }}</strong> undated
+                  {{ choice.count === 1 ? 'work' : 'works' }}@if (choice.files !== undefined) {
+                    ({{ choice.files | number }} {{ choice.files === 1 ? 'file' : 'files' }})},
+                  and chose
+                  <strong>{{ choice.choice }}</strong>@if (choice.date) { ({{ choice.date }})}.
+                </p>
+                @if (choice.works?.length) {
+                  <details class="ids">
+                    <summary>
+                      Works without a date
+                      <span class="ids-count">{{ choice.works!.length | number }}</span>
+                    </summary>
+                    <ul class="id-list">
+                      @for (id of choice.works; track id) {
+                        <li>
+                          <a [href]="workLink(id)" [appWorkLink]="id" target="_blank" rel="noopener">{{ id }}</a>
+                        </li>
+                      }
+                    </ul>
+                  </details>
+                }
+                @if (choice.renamed?.length) {
+                  <details class="ids">
+                    <summary>
+                      Files given a date
+                      <span class="ids-count">{{ choice.renamed!.length | number }}</span>
+                    </summary>
+                    <ul class="reason-list">
+                      @for (file of choice.renamed; track $index) {
+                        <li>
+                          <span class="who">{{ file.from }}</span>
+                          <span class="reason">&rarr; {{ file.to }}</span>
+                        </li>
+                      }
+                    </ul>
+                  </details>
+                }
+              } @else if (choice.question === 'duplicates') {
+                <p>
+                  Found <strong>{{ choice.files | number }}</strong> older
+                  {{ choice.files === 1 ? 'copy' : 'copies' }} across
+                  <strong>{{ choice.count | number }}</strong>
+                  {{ choice.count === 1 ? 'work' : 'works' }}, and chose to
+                  <strong>{{ choice.choice === 'newest' ? 'keep only the newest' : 'leave them all' }}</strong>.
+                </p>
+              } @else if (choice.question === 'fichub') {
+                <p>
+                  AO3 would not give us <strong>{{ choice.count | number }}</strong>
+                  {{ choice.count === 1 ? 'work' : 'works' }}, and chose
+                  <strong>{{ choice.choice === 'no' ? 'not to try FicHub' : 'to try FicHub' }}</strong>.
+                </p>
+              } @else if (choice.question === 'fichub-outdated') {
+                <p>
+                  FicHub only had an older copy of work {{ choice.works?.join(', ') }}, with no
+                  {{ choice.formats?.join(', ') }} on disk, and chose
+                  <strong>{{ choice.choice === 'no' ? 'not to take it' : 'to take the older version' }}</strong>.
+                </p>
+              } @else if (choice.question === 'inferred-date') {
+                <p class="inferred-choice">
+                  The {{ choice.formats?.join(', ') }} of work {{ choice.works?.join(', ') }}
+                  @for (file of choice.fileNames ?? []; track file) { - <code>{{ file }}</code> }
+                  - had no date in its name written the way this app writes one.
+                  @if (choice.formats?.length && choice.fileDates?.[choice.formats![0]]) {
+                    Its name looked dated {{ writtenDate(choice.fileDates![choice.formats![0]]) }} (a guess);
+                  } @else {
+                    No date could be read from its name;
+                  }
+                  {{ choice.source || 'AO3' }}'s version was dated
+                  {{ choice.date ? writtenDate(choice.date) : 'nothing' }}.
+                  @if (choice.recommended) {
+                    We recommended {{ choice.recommended === 'yes' ? 'replacing' : 'keeping' }} it.
+                  }
+                  Chose
+                  <strong>{{ choice.choice === 'no' ? 'to keep it'
+                    : choice.choice === 'both' ? 'to keep it, and save ' + (choice.source || 'AO3') + '\'s version beside it'
+                    : choice.choice === 'recommended' ? 'to replace only what was recommended'
+                    : 'to replace it with ' + (choice.source || 'AO3') + '\'s version' }}</strong>.
+                </p>
+              } @else if (choice.question === 'retry-reread') {
+                <p>
+                  This retry carried on downloading {{ choice.count | number }}
+                  {{ choice.count === 1 ? 'work' : 'works' }} the earlier attempt indexed, and chose
+                  <strong>{{ choice.choice === 'yes' ? 'to read each again from AO3 first' : 'to use the index as it was' }}</strong>.
+                </p>
+              } @else if (choice.question === 'overwrite-older') {
+                <p>
+                  The {{ choice.formats?.join(', ') }} of work {{ choice.works?.join(', ') }} on disk
+                  was newer than the version this run would write, and chose
+                  <strong>{{ choice.choice === 'yes' ? 'to replace it anyway' : 'to keep the newer copy' }}</strong>.
+                </p>
+              } @else if (choice.question === 'unindexed-copy') {
+                <p>
+                  Work {{ choice.works?.join(', ') }} had no index entry, so its
+                  {{ choice.formats?.join(', ') }} could not be judged by one. With the version from
+                  {{ choice.source || 'AO3' }} on offer@if (choice.recommended) { (recommended:
+                  {{ choice.recommended === 'recommended' ? 'some' : choice.recommended }})}, chose
+                  <strong>@if (choice.replaced?.length && choice.replaced!.length < (choice.formats?.length ?? 0)) {to replace only {{ choice.replaced!.join(', ') }}} @else if (choice.choice === 'yes' || choice.replaced?.length) {to replace it} @else if (choice.choice === 'both') {to keep the copy, and save the new version beside {{ choice.keptBoth?.join(', ') || 'it' }}} @else {to keep the copy}</strong>.
+                </p>
+              } @else if (choice.question === 'quick-floor') {
+                <p>
+                  No completed scan to measure back to, with
+                  <strong>{{ choice.count | number }}</strong> works already indexed. Chose
+                  <strong>{{ choice.choice === 'since' ? 'since the index' : 'the whole listing' }}</strong>@if (choice.choice === 'since' && choice.date) { ({{ choice.date }})}.
+                </p>
+              } @else {
+                <p>
+                  Asked <strong>{{ choice.question }}</strong>, and chose
+                  <strong>{{ choice.choice }}</strong>@if (choice.date) { ({{ choice.date }})}.
+                </p>
+              }
+              <!-- whether you chose, or a default was taken and why - kept since the record learnt it -->
+              @if (howWords(choice); as how) {
+                <p class="how" [attr.data-how]="choice.how">{{ how }}</p>
+              }
+              </div>
+            }
+          </div>
+        }
+
+        <!--
+          collapsed by default: a run that touched a thousand works would bury the next one,
+          and the number is usually all anybody wants from it
+        -->
+        @for (group of [
+          { label: 'Re-indexed', ids: run.reindexed },
+          { label: 'Downloaded', ids: run.downloaded },
+          { label: 'Updated', ids: run.updated }
+        ]; track group.label) {
+          @if (group.ids.length) {
+            <details class="ids" (toggle)="toggleList(run.file + ':' + group.label, $any($event.target).open)">
+              <summary>
+                {{ group.label }}
+                <span class="ids-count">{{ group.ids.length | number }}</span>
+              </summary>
+              @if (openLists().has(run.file + ':' + group.label)) {
+                <ul class="id-list">
+                  @for (id of group.ids; track id) {
+                    <li>
+                      <a [href]="workLink(id)" [appWorkLink]="id" target="_blank" rel="noopener">{{ id }}</a>
+                    </li>
+                  }
+                </ul>
+              }
+            </details>
+          }
+        }
+
+        @if (run.skipped.length) {
+          <details class="ids">
+            <summary>
+              Not works
+              <span class="ids-count">{{ run.skipped.length | number }}</span>
+            </summary>
+            <ul class="reason-list">
+              @for (item of run.skipped; track $index) {
+                <li>
+                  <span class="who">{{ item.id || item.title || 'a bookmark' }}</span>
+                  <span class="reason">{{ item.error }}</span>
+                </li>
+              }
+            </ul>
+          </details>
+        }
+
+        @if (removedOf(run).length) {
+          <details class="ids">
+            <summary>
+              Older copies removed
+              <span class="ids-count">{{ removedOf(run).length | number }}</span>
+            </summary>
+            <ul class="reason-list">
+              @for (item of removedOf(run); track $index) {
+                <li>
+                  <a [href]="workLink(item.id)" [appWorkLink]="item.id" target="_blank" rel="noopener">{{ item.id }}</a>
+                  <span class="reason">{{ item.file }} &middot; kept {{ item.keeping }}</span>
+                </li>
+              }
+            </ul>
+          </details>
+        }
+
+        @if (notRemovedOf(run).length) {
+          <details class="ids kept">
+            <summary>
+              Marked for removal, still there
+              <span class="ids-count">{{ notRemovedOf(run).length | number }}</span>
+            </summary>
+            <ul class="reason-list">
+              @for (item of notRemovedOf(run); track $index) {
+                <li>
+                  <a [href]="workLink(item.id)" [appWorkLink]="item.id" target="_blank" rel="noopener">{{ item.id }}</a>
+                  <span class="reason">
+                    {{ item.file }} &middot; {{ item.error || 'the run ended before its cleanup step' }}
+                  </span>
+                </li>
+              }
+            </ul>
+          </details>
+        }
+
+        @if (run.fichubOlder?.length) {
+          <details class="ids fichub-older">
+            <summary>
+              From FicHub, maybe an older cached copy
+              <span class="ids-count">{{ run.fichubOlder!.length | number }}</span>
+            </summary>
+            <ul class="reason-list">
+              @for (item of run.fichubOlder; track $index) {
+                <li>
+                  <a [href]="item.link" [appWorkLink]="item.id" target="_blank" rel="noopener">{{ item.id }}</a>
+                  <span class="reason">{{ fichubOlderWords(item) }}</span>
+                </li>
+              }
+            </ul>
+          </details>
+        }
+
+        @if (run.rescued?.length) {
+          <details class="ids">
+            <summary>
+              Fetched from FicHub instead of AO3
+              <span class="ids-count">{{ run.rescued!.length | number }}</span>
+            </summary>
+            <ul class="reason-list">
+              @for (item of run.rescued; track $index) {
+                <li>
+                  <a [href]="item.link" [appWorkLink]="item.id" target="_blank" rel="noopener">{{ item.id }}</a>
+                  <span class="reason">
+                    {{ item.title }}@if (item.downloaded.length) { &middot; {{ item.downloaded.join(', ') }}}
+                  </span>
+                </li>
+              }
+            </ul>
+          </details>
+        }
+
+        @if (run.keptCopies?.length) {
+          <details class="ids kept">
+            <summary>
+              Downloaded, but needs checking by hand
+              <span class="ids-count">{{ run.keptCopies!.length | number }}</span>
+            </summary>
+            <ul class="reason-list">
+              @for (item of run.keptCopies; track $index) {
+                <li>
+                  <a [href]="item.link" [appWorkLink]="item.id" target="_blank" rel="noopener">{{ item.id || item.link }}</a>
+                  <span class="reason">
+                    new: {{ item.file }}@if (item.old) { &middot; older copy still on disk: {{ item.old }}} &middot; {{ item.error }}
+                  </span>
+                </li>
+              }
+            </ul>
+          </details>
+        }
+
+        @if (run.failures.length) {
+          <details class="ids failed">
+            <summary>
+              Could not be fetched
+              <span class="ids-count">{{ run.failures.length | number }}</span>
+            </summary>
+            <ul class="reason-list">
+              @for (item of run.failures; track $index) {
+                <li>
+                  <a [href]="item.link" [appWorkLink]="item.id" target="_blank" rel="noopener">
+                    {{ item.id || item.link }}
+                  </a>
+                  <span class="reason">{{ item.error }}</span>
+                </li>
+              }
+            </ul>
+          </details>
+        }
+      </article>
+    }
+  }
+</section>

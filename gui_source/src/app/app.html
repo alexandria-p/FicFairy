@@ -1,0 +1,671 @@
+<!-- everything above the footer, tall enough to put it at the bottom of the window -->
+<div class="page-body">
+<header class="topbar">
+  <h1><img class="logo" src="ficfairy-logo.png" alt="" width="44" height="44" /><span class="name">Fic Fairy</span></h1>
+  <div class="picker">
+    <div class="storage" role="group" aria-label="Where your library is kept">
+      <button
+        type="button"
+        [class.current]="mode() === 'local'"
+        [attr.aria-pressed]="mode() === 'local'"
+        [disabled]="switchLocked()" [attr.title]="switchLockedTitle()"
+        (click)="setMode('local')"
+      >
+        @if (mode() === 'local') {
+          <svg class="highlight" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M 5 20 C 28 17, 62 23, 95 18" stroke-width="22" />
+            <path d="M 9 24 C 36 22, 64 26, 91 23" stroke-width="14" />
+          </svg>
+        }
+        This computer
+      </button>
+      <button
+        type="button"
+        [class.current]="mode() === 'dropbox'"
+        [attr.aria-pressed]="mode() === 'dropbox'"
+        [disabled]="switchLocked()" [attr.title]="switchLockedTitle()"
+        (click)="setMode('dropbox')"
+      >
+        @if (mode() === 'dropbox') {
+          <svg class="highlight" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M 5 20 C 28 17, 62 23, 95 18" stroke-width="22" />
+            <path d="M 9 24 C 36 22, 64 26, 91 23" stroke-width="14" />
+          </svg>
+        }
+        Dropbox
+      </button>
+    </div>
+
+    @if (mode() === 'local') {
+      @if (folderName() || openedName() || sourceName()) {
+        <span class="source" [title]="sourceName()">
+          @if (folderName()) {
+            <span class="remembered" title="Remembered - loads automatically next time">&#9679;</span>
+            {{ folderName() }}
+          } @else if (openedName()) {
+            <!-- open, but not remembered: a folder handed over as files, or the dummy library -->
+            <span class="remembered" title="Open now - choose it again next time">&#9679;</span>
+            {{ openedName() }}
+          } @else {
+            {{ sourceName() }}
+          }
+        </span>
+      }
+
+      @if (guest.active()) {
+        <!-- a guest has the dummy library only: nothing to choose -->
+      } @else if (canPickFolder) {
+        <button type="button" class="button" [disabled]="sourceLocked()" [attr.title]="sourceLockedTitle()" (click)="askBeforePicking()">
+          {{ folderName() ? 'Change folder' : 'Choose downloads folder' }}
+        </button>
+        @if (folderName()) {
+          <button type="button" class="button subtle" [disabled]="sourceLocked()" [attr.title]="sourceLockedTitle()" (click)="forget()">Forget</button>
+        }
+      } @else {
+        <!-- a button rather than a label, so the note can come first; it clicks the input -->
+        <button type="button" class="button" [disabled]="sourceLocked()" [attr.title]="sourceLockedTitle()" (click)="askBeforePicking()">
+          {{ data() ? 'Change folder' : 'Choose downloads folder' }}
+        </button>
+        <input #folderInput type="file" webkitdirectory multiple (change)="choose($event)" hidden />
+      }
+    } @else {
+      @switch (dropboxStatus()) {
+        @case ('signed-out') {
+          <button type="button" class="button primary" [disabled]="sourceLocked()" [attr.title]="sourceLockedTitle()" (click)="signInToDropbox()">
+            Sign in with Dropbox
+          </button>
+        }
+        @case ('signing-in') {
+          <span class="source">Signing in to Dropbox...</span>
+        }
+        @case ('signed-in') {
+          <span
+            class="source"
+            [title]="'Signed in as ' + (dropboxAccount()?.email ?? '') + ' - your library is ' + appFolderPath + ' in Dropbox'"
+          >
+            <span class="remembered" title="Remembered - opens automatically next time">&#9679;</span>
+            {{ appFolderPath }}
+          </span>
+          <button type="button" class="button subtle" [disabled]="sourceLocked()" [attr.title]="sourceLockedTitle()" (click)="signOutOfDropbox()">Sign out</button>
+        }
+      }
+    }
+
+  </div>
+</header>
+
+
+<!-- covers everything while a library's folders are made or its works moved -->
+<app-setup-overlay />
+
+<!-- said once, before anything else, because it decides whether any of this can work here -->
+@if (browserNotice() && !guest.active()) {
+  <app-browser-notice (dismissed)="browserNotice.set(false)" />
+}
+
+@if (warning()) {
+  <app-folder-warning (confirmed)="warningAccepted()" (cancelled)="warningCancelled()" />
+}
+
+
+<nav class="views" aria-label="What to show">
+  <button
+    type="button"
+    [class.current]="view() === 'bookmarks'"
+    [attr.aria-current]="view() === 'bookmarks' ? 'page' : null"
+    (click)="setView('bookmarks')"
+  >
+    Works
+    @if (works().length) {
+      <span class="count">{{ works().length | number }}</span>
+    }
+  </button>
+  <button
+    type="button"
+    [class.current]="view() === 'collections'"
+    [attr.aria-current]="view() === 'collections' ? 'page' : null"
+    (click)="setView('collections')"
+  >
+    Collections
+    @if (collections().length) {
+      <span class="count">{{ collections().length | number }}</span>
+    }
+  </button>
+  <button
+    type="button"
+    [class.current]="view() === 'history'"
+    [attr.aria-current]="view() === 'history' ? 'page' : null"
+    (click)="setView('history')"
+  >
+    History
+  </button>
+  <button
+    type="button"
+    [class.current]="view() === 'faq'"
+    [attr.aria-current]="view() === 'faq' ? 'page' : null"
+    (click)="setView('faq')"
+  >
+    FAQ
+  </button>
+  <!-- not for a guest: feedback is for the app, and a tour of it has nothing to report -->
+  @if (!guest.active()) {
+    <button
+      type="button"
+      [class.current]="view() === 'bug'"
+      [attr.aria-current]="view() === 'bug' ? 'page' : null"
+      (click)="setView('bug')"
+    >
+      Report a bug
+    </button>
+  }
+  <button
+    type="button"
+    [class.current]="view() === 'settings'"
+    [attr.aria-current]="view() === 'settings' ? 'page' : null"
+    (click)="setView('settings')"
+  >
+    User settings
+  </button>
+  @if (debugMode.on()) {
+    <button
+      type="button"
+      class="debug-tab-button"
+      [class.current]="view() === 'debug'"
+      [attr.aria-current]="view() === 'debug' ? 'page' : null"
+      (click)="setView('debug')"
+    >
+      DEBUG
+    </button>
+  }
+</nav>
+
+<!--
+  the notices: under the tabs, above whatever the tab shows, on every tab - debug mode, a run
+  going, an update, and the library's import issues. they are part of the page, not of a tab,
+  so changing tabs never hides one
+-->
+<div class="notices">
+<!-- guest mode says so first of all: a tour of the app, with nothing in it real -->
+@if (guest.active()) {
+  <div class="guest-banner" role="status">
+    <strong>You're looking around as a guest.</strong> This is a made-up library, and any run you
+    start is pretend - nothing is fetched from AO3 or saved anywhere.
+    To use FicFairy with your own bookmarks,
+    <a [href]="latestReleaseUrl()" target="_blank" rel="noopener">download it and run it on your own computer</a>.
+    @if (guest.checkingSaved()) {
+      <span class="guest-note">Checking the passcode saved in this browser...</span>
+    } @else if (guest.note()) {
+      <span class="guest-note">{{ guest.note() }}</span>
+    }
+    <!-- a preview, from the DEBUG tab: the way back, under the banner's own text -->
+    @if (guest.preview()) {
+      <span class="guest-preview">
+        <button type="button" class="button" (click)="guest.endPreview()">Leave guest preview</button>
+      </span>
+    }
+  </div>
+}
+<!-- debug mode says so above everything else, on every tab -->
+@if (debugMode.on()) {
+  <div class="debug-banner" role="status">
+    <strong>Debug mode is on.</strong> The DEBUG tab has tools for trying the app out. Turn it off
+    in User settings.
+    @if (dummyData.active()) {
+      <span class="dummy-note">Showing <strong>dummy data</strong> for
+      {{ mode() === 'dropbox' ? 'Dropbox' : 'This computer' }} - not your library. Runs are held.</span>
+    }
+  </div>
+}
+
+<!-- on every tab, until resolved or dismissed for this visit - and never once
+     'No, never ask me again' is chosen -->
+@if (importReminder()) {
+  <div class="import-issues" role="status">
+    <!-- what wraps is this half; the cross beside it stays in the top corner -->
+    <div class="import-issues-body">
+    <button type="button" class="button import-issues-button"
+            [disabled]="!!activeRun() || !!dialogAction()"
+            [title]="activeRun() ? 'Cannot be started while an active run is in progress' : ''"
+            (click)="openImport()">
+      Resolve issues found with import
+    </button>
+    <span class="import-issues-said">{{ importIssuesSaid() }}</span>
+    </div>
+    <button type="button" class="import-issues-close" aria-label="Dismiss" title="Dismiss until the library is opened again"
+            (click)="dismissImportReminder()">&times;</button>
+  </div>
+}
+
+<!--
+  one run at a time: while the helper has one going - in the background or in another tab -
+  nothing else can start, and saying so up here beats a run window refused at its last step
+-->
+@if (activeRun(); as run) {
+  <p class="run-in-progress" role="status">
+    <span>
+      <strong>A run is already in progress</strong> -
+      {{ run.actionName }}, {{ run.paused ? 'paused' : 'running' }}{{ run.background ? ' in the background' : '' }}.
+      You must wait until it is complete to start a new one.
+      @if (run.paused && run.abandonsAt) {
+        It will be abandoned at {{ timeOf(run.abandonsAt) }} unless resumed.
+      }
+    </span>
+    <button type="button" class="button" (click)="goToRun()">Go to this run</button>
+  </p>
+}
+
+<!--
+  a newer release than this page - said until installed, or until told not to again. the
+  Windows, Mac or Linux app can install it itself; anywhere else the page can only link it
+-->
+@switch (updateProgress().state) {
+  @case ('updating') {
+    <p class="update-available" role="status">
+      <span>
+        <strong>Updating to {{ updateTarget() }}...</strong>
+        The app is downloading it, then closes, swaps itself for the new version and starts
+        again. This page reloads by itself once it is back - leave it open.
+      </span>
+    </p>
+  }
+  @case ('failed') {
+    <p class="update-available update-failed" role="alert">
+      <span>
+        <strong>There was a problem updating the app:</strong> {{ updateError() }}.
+        This copy and your library are as they were. Please download the latest version again
+        by hand from <a class="manual-download" [href]="latestReleaseUrl()" target="_blank" rel="noopener">the
+        latest release on GitHub</a>, unzip it, and use it in place of this one - to keep your
+        settings, copy this copy's <code>config</code> folder into the new one.
+      </span>
+      <button type="button" class="button subtle" (click)="clearUpdateError()">OK</button>
+    </p>
+  }
+  @default {
+    @if (bannerRelease(); as release) {
+      <p class="update-available" role="status">
+        <span>
+          <strong>A newer version is available: {{ release.version }}</strong>
+          (this is {{ currentVersion() }}).
+          @if (canUpdate()) {
+            Update now and the app restarts as the new version in a few seconds - your
+            settings and your library stay as they are.
+          } @else {
+            <a [href]="release.url" target="_blank" rel="noopener">Download it from GitHub</a>
+            to run the latest on your computer.
+          }
+        </span>
+        <span class="update-actions">
+          @if (canUpdate()) {
+            <button type="button" class="button primary" [disabled]="updateProgress().state === 'starting' || !!activeRun()"
+              [title]="activeRun() ? 'Wait until the run in progress is complete - updating restarts the app' : ''"
+              (click)="updateNow()">
+              Update now
+            </button>
+          }
+          <button type="button" class="button subtle" (click)="dismissUpdates()">
+            Dismiss and do not ask me again
+          </button>
+        </span>
+      </p>
+    }
+  }
+}
+</div>
+
+
+<!--
+  the faq is something to read, not a folder to act on, so it carries no buttons - and
+  nothing is offered at all until a folder is picked, because every run reads that folder
+  to work out what it already has and writes everything back into it. the panel below
+  already asks for one, so an empty button bar above it would only repeat the question.
+-->
+<!-- the run buttons, shown in one of two places: see where runActions is used -->
+<ng-template #runActions>
+<div class="actions">
+  @if (view() === 'bookmarks') {
+    <!--
+      the everyday run first and the slow thorough one second, because that is the order
+      they should be reached for. the rest are each useful for one job and confusing as a
+      default, so they wait behind a disclosure rather than sitting in the way
+    -->
+    <button type="button" class="button primary" [disabled]="runsHeld()" [class.unavailable]="device.blocked()" [attr.aria-disabled]="device.blocked() ? 'true' : null" [attr.title]="device.blocked() ? device.title() : runsTitle()" (click)="openRun('quick')">
+      Quick Scan
+    </button>
+    <!-- the two scans are the runs people should reach for, so both wear the accent -->
+    <button type="button" class="button primary" [disabled]="runsHeld()" [class.unavailable]="device.blocked()" [attr.aria-disabled]="device.blocked() ? 'true' : null" [attr.title]="device.blocked() ? device.title() : runsTitle()" (click)="openRun('bookmarks')">
+      (Full scan) Reindex &amp; Update All
+    </button>
+
+    <!-- the runs for one job each, beside the two everyday ones rather than hidden away -->
+    <button type="button" class="button" [disabled]="runsHeld()" [class.unavailable]="device.blocked()" [attr.aria-disabled]="device.blocked() ? 'true' : null" [attr.title]="device.blocked() ? device.title() : runsTitle()" (click)="openRun('work')">
+      Download/update a specific fic
+    </button>
+    <button type="button" class="button" [disabled]="runsHeld()" [class.unavailable]="device.blocked()" [attr.aria-disabled]="device.blocked() ? 'true' : null" [attr.title]="device.blocked() ? device.title() : runsTitle()" (click)="openRun('works')">
+      Download/update several fics
+    </button>
+    <button type="button" class="button" [disabled]="runsHeld()" [class.unavailable]="device.blocked()" [attr.aria-disabled]="device.blocked() ? 'true' : null" [attr.title]="device.blocked() ? device.title() : runsTitle()" (click)="openRun('custom')">
+      Custom run
+    </button>
+
+    <!--
+      the passes the two scans are built from, each usable on its own. kept for working on the
+      app rather than for using it, so they appear only when settings.ini turns the debug tools
+      on - and wear the same colour as every other debug control, so nobody reaches for one by
+      habit. with nothing in it, the disclosure is not shown at all
+    -->
+    @if (debugTools()) {
+      <details class="advanced">
+        <summary>Advanced options</summary>
+        <div class="advanced-actions">
+          <button type="button" class="button debug" [disabled]="runsHeld()" [class.unavailable]="device.blocked()" [attr.aria-disabled]="device.blocked() ? 'true' : null" [attr.title]="device.blocked() ? device.title() : runsTitle()" (click)="openRun('sync')">
+            [DEBUG] Download new bookmarks and update incomplete fics
+          </button>
+          <button type="button" class="button debug" [disabled]="runsHeld()" [class.unavailable]="device.blocked()" [attr.aria-disabled]="device.blocked() ? 'true' : null" [attr.title]="device.blocked() ? device.title() : runsTitle()" (click)="openRun('update')">
+            [DEBUG] Just update any bookmarks marked as incomplete
+          </button>
+          <button type="button" class="button debug" [disabled]="runsHeld()" [class.unavailable]="device.blocked()" [attr.aria-disabled]="device.blocked() ? 'true' : null" [attr.title]="device.blocked() ? device.title() : runsTitle()" (click)="openRun('new')">
+            [DEBUG] Just download newly added bookmarks
+          </button>
+        </div>
+      </details>
+    }
+  } @else {
+    <button type="button" class="button primary" [disabled]="runsHeld()" [class.unavailable]="device.blocked()" [attr.aria-disabled]="device.blocked() ? 'true' : null" [attr.title]="device.blocked() ? device.title() : runsTitle()" (click)="openRun('collections')">
+      Index my collections
+    </button>
+    <button type="button" class="button" [disabled]="runsHeld()" [class.unavailable]="device.blocked()" [attr.aria-disabled]="device.blocked() ? 'true' : null" [attr.title]="device.blocked() ? device.title() : runsTitle()" (click)="openRun('collection')">
+      Index collection by URL
+    </button>
+  }
+</div>
+</ng-template>
+
+<!--
+  on the Works tab with a listing to show, the buttons sit inside it, under its heading and
+  'List refreshed' (projected into app-work-list); everywhere else, here above the content
+-->
+@if (view() !== 'faq' && view() !== 'history' && view() !== 'bug' && view() !== 'settings' && view() !== 'debug' && canRun() || device.blocked()) {
+  @if (!(view() === 'bookmarks' && (data() || loading())) && view() !== 'collections') {
+    <ng-container [ngTemplateOutlet]="runActions" />
+  }
+}
+
+@if (dialogAction(); as action) {
+  <app-download-dialog [action]="action" [resumeFrom]="resumeFrom()" [attachTo]="attachTo()" [prefill]="prefillLink()"
+                       [importing]="importing()" (closed)="dialogClosed()"
+                       (resolveIssues)="resolveIssuesAfterRun()" />
+}
+
+@if (importOpen()) {
+  <app-import-dialog [works]="imports.found()" [undatedElsewhere]="imports.undatedIndexed()" [duplicates]="imports.duplicates()"
+                     [misnamed]="imports.misnamed()" [renameFrom]="renameFrom()"
+                     [store]="library.store()"
+                     [formats]="importFormats()" [busy]="!!activeRun()"
+                     (askAgainChanged)="setImportOffered($event)"
+                     (closed)="importClosed($event)" (start)="importStart($event)"
+                     (remindLater)="dismissImportReminder()" />
+}
+
+
+<!-- above anything the tab shows, so it is in the same place on every tab -->
+@if (error()) {
+  <div class="error read-error" role="alert">
+    <p>{{ error() }}</p>
+    <!-- a failed read can be asked again, but only by hand, and only after a pause -->
+    @if (readFailure(); as failure) {
+      @if (failure.slowDown) {
+        <p class="slow-down">
+          Dropbox is asking for a breather. Give it a moment before trying again - asking again
+          straight away only makes it wait longer.
+        </p>
+      }
+      <button type="button" class="button try-again" [disabled]="retryCountdown() > 0" (click)="tryReadAgain()">
+        {{ retryCountdown() > 0 ? retryCountdown() + '...' : 'Try again' }}
+      </button>
+    }
+  </div>
+}
+
+@if (mode() === 'local') {
+  @if (needsReconnect()) {
+    <p class="reconnect">
+      <span>
+        <strong>{{ folderName() }}</strong> is remembered, but this browser needs you to confirm
+        access again.
+      </span>
+      <button type="button" class="button" (click)="reconnect()">Reconnect</button>
+    </p>
+  }
+
+  <!-- the faq is worth reading before a folder is chosen, so it is not held behind one - nor
+       are the user settings, which belong to this browser and not to any folder, nor the DEBUG
+       tab, which is where dummy data is turned off with no folder open -->
+  @if (isEmpty() && view() !== 'faq' && view() !== 'history' && view() !== 'bug' && view() !== 'settings' && view() !== 'debug') {
+    <section class="empty">
+      <h2>Choose your downloads folder</h2>
+      <p>
+        Pick the folder your library lives in - or an empty one to start a new library. Every run
+        saves into the folder you pick here: the index, your downloaded works in
+        <code>works</code>, and the run history.
+      </p>
+      <p class="hint">
+        Pick the folder itself, not files inside it. Nothing leaves your computer - the page reads
+        and writes the folder here in the browser, and keeps it open while a run is going.
+      </p>
+      @if (canPickFolder) {
+        <p class="hint">
+          You only have to do this once. The folder is remembered and reopens by itself next time.
+        </p>
+      }
+    </section>
+  }
+} @else {
+  @if (dropboxError()) {
+    <p class="error">{{ dropboxError() }}</p>
+  }
+}
+
+
+@if (setupReport()) {
+  <p class="reconnect">
+    <span>{{ setupReport() }}</span>
+    <button type="button" class="button subtle" (click)="setupReport.set('')">Dismiss</button>
+  </p>
+}
+
+<!--
+  reading the library: one bar, under the title of whichever tab is showing (projected into it as
+  [listingProgress]) - or here, above the content, where the tab has no title to go under
+-->
+<!-- Refresh: the same read the list does by itself after a run elsewhere, on demand - an icon
+     beside 'List refreshed' on Works and Collections -->
+<ng-template #refreshIcon>
+  <button
+    type="button"
+    class="refresh-icon"
+    [class.spinning]="refreshing() || loading()"
+    [disabled]="libraryLocked() || refreshing() || loading()"
+    [attr.title]="libraryLocked() ? lockedTitle : refreshing() || loading() ? refreshWords().busy : refreshWords().title"
+    [attr.aria-label]="refreshing() || loading() ? refreshWords().busy : refreshWords().label"
+    (click)="refreshLibrary()"
+  >
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+      <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+      <path d="M12.4 1.6v3h-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  </button>
+</ng-template>
+
+
+<ng-template #libraryProgress>
+  @if (setupWorking()) {
+    <!-- setting the library up, said step by step: a question alone gets a window -->
+    <app-progress-bar [percent]="setupPercent()" [caption]="setupCaption()" [note]="behindNote()"
+                      label="Setting up your library" />
+  } @else if (loading()) {
+    @if (mode() === 'dropbox' && reading(); as reading) {
+      <app-progress-bar [percent]="reading.percent" [caption]="reading.caption" [note]="behindNote()"
+                        label="Reading your library from Dropbox" />
+    } @else {
+      <app-progress-bar [caption]="mode() === 'dropbox' ? 'Reading your library from Dropbox...' : 'Reading files...'"
+                        [note]="behindNote()" />
+    }
+  }
+</ng-template>
+
+@if (progressOnTop()) {
+  <div class="progress-top"><ng-container [ngTemplateOutlet]="libraryProgress" /></div>
+}
+
+@if (mode() === 'dropbox' && !canRun() && !loading() && (view() === 'bookmarks' || view() === 'collections')) {
+  <section class="empty">
+    @switch (dropboxStatus()) {
+      @case ('unconfigured') {
+        <h2>Dropbox is not set up in this copy</h2>
+        <p>
+          Signing in needs a Dropbox app registered for this page, and its app key in
+          <code>gui_source/src/app/dropbox-config.ts</code>. That file says how to register one.
+        </p>
+      }
+      @default {
+        <h2>Keep your library in Dropbox</h2>
+        <p>
+          Sign in with Dropbox and your library lives in <code>{{ appFolderPath }}</code> there,
+          instead of in a downloads folder on this computer - the index, your downloaded works
+          and the run history.
+        </p>
+        <p class="hint">
+          That folder is all this app can see. Nothing else in your Dropbox is read or changed.
+        </p>
+      }
+    }
+  </section>
+} @else if (view() === 'bookmarks') {
+  <!-- shown from the first moment of a read, so the heading, buttons and bar never jump in -->
+  @if (data() || loading()) {
+    <app-work-list
+      [works]="works()"
+      [owner]="owner()"
+      label="Works"
+      [countBookmarks]="true"
+      [loading]="firstRead()"
+      [note]="listingNote() || 'List not yet loaded'"
+      [selectable]="true"
+    >
+      @if (listedAt()) {<span noteAction><ng-container [ngTemplateOutlet]="refreshIcon" /></span>}
+      <div listingProgress>
+        <ng-container [ngTemplateOutlet]="libraryProgress" />
+      </div>
+      @if (canRun() || device.blocked()) {
+        <div listingActions><ng-container [ngTemplateOutlet]="runActions" /></div>
+      }
+    </app-work-list>
+  } @else if ((!isEmpty() || mode() === 'dropbox') && !loading() && libraryWasRead()) {
+    <p class="notice">
+      No bookmarks indexed in this folder yet. Use <strong>Quick Scan</strong> above to
+      fetch them - with nothing indexed yet it will read your whole listing.
+    </p>
+  }
+} @else if (view() === 'collections' && (canRun() || loading() || collections().length)) {
+  <!-- only with a library open, or being opened: with none, the panel above says how to open one -->
+  <app-collections-view [preparing]="libraryPreparing()" [loading]="firstRead()">
+    @if (listedAt()) {<span noteAction><ng-container [ngTemplateOutlet]="refreshIcon" /></span>}
+    <div listingProgress>
+      <ng-container [ngTemplateOutlet]="libraryProgress" />
+    </div>
+    @if (canRun() || device.blocked()) {
+      <!-- the buttons join the collections view's own row, so they wrap with its New collection -->
+      <div listingActions class="joined-actions"><ng-container [ngTemplateOutlet]="runActions" /></div>
+    }
+  </app-collections-view>
+} @else if (view() === 'history') {
+  <app-history (resume)="resumeRun($event)" (viewProgress)="viewProgress($event)">
+    <div listingProgress><ng-container [ngTemplateOutlet]="libraryProgress" /></div>
+  </app-history>
+} @else if (view() === 'bug') {
+  <section class="report-bug">
+    <h2>Report a bug</h2>
+    <ng-container [ngTemplateOutlet]="libraryProgress" />
+    <p>
+      Something not working? Open an issue on
+      <a [href]="issuesUrl()" target="_blank" rel="noopener">GitHub</a>.
+    </p>
+    @if (feedbackOffered()) {
+      <p class="hint">
+        No GitHub account? Send feedback instead - it opens an issue for you, and can attach your
+        latest run's log.
+      </p>
+      <button type="button" class="button primary send-feedback" (click)="openFeedback()">
+        Send feedback
+      </button>
+    }
+  </section>
+} @else if (view() === 'settings') {
+  <app-user-settings (namePatternChanged)="namePatternChanged($event)">
+    <div listingProgress><ng-container [ngTemplateOutlet]="libraryProgress" /></div>
+  </app-user-settings>
+} @else if (view() === 'debug' && debugMode.on()) {
+  <app-debug-tab [formats]="importFormats()">
+    <div listingProgress><ng-container [ngTemplateOutlet]="libraryProgress" /></div>
+  </app-debug-tab>
+} @else {
+  <app-faq>
+    <div listingProgress><ng-container [ngTemplateOutlet]="libraryProgress" /></div>
+  </app-faq>
+}
+
+</div>
+
+<!-- on every tab, and pinned to the bottom of the window while a long listing scrolls -->
+<footer class="app-footer" #appFooter>
+  <!--
+    always says whether this is the latest, so someone who dismissed the banner still sees
+    a newer one is out - as underlined text rather than a button, quieter than the banner
+  -->
+  <span>
+    FicFairy {{ currentVersion() ? 'version ' + currentVersion() : '(built on this computer)' }}
+    @if (updateProgress().state === 'updating') {
+      &middot; <span class="footer-note">updating to {{ updateTarget() }}...</span>
+    } @else if (newerRelease(); as release) {
+      &middot;
+      @if (canUpdate()) {
+        <button type="button" class="footer-link" [disabled]="updateProgress().state === 'starting' || !!activeRun()"
+          [title]="activeRun() ? 'Wait until the run in progress is complete - updating restarts the app' : 'Download ' + release.version + ' and restart as it'"
+          (click)="updateNow()">update to latest ({{ release.version }})</button>
+      } @else {
+        <a class="footer-link" [href]="release.url" target="_blank" rel="noopener">update to latest ({{ release.version }})</a>
+      }
+    } @else if (upToDate()) {
+      &middot; <a class="footer-link" [href]="latestReleaseUrl()" target="_blank" rel="noopener">up to date with latest</a>
+    }
+  </span>
+  <a [href]="repositoryUrl()" target="_blank" rel="noopener">{{ repositoryName() }} on GitHub</a>
+  <!-- the hosted copy (GitHub Pages) points at the app, under the version line, rather than in the FAQ -->
+  @if (hosted) {
+    <p class="run-locally" role="note">
+      Run this on your own computer -
+      <a [href]="latestReleaseUrl()" target="_blank" rel="noopener">download the latest version from GitHub</a>
+    </p>
+  }
+</footer>
+
+@if (guest.loginOpen() || (passcodeWanted() && !guest.active())) {
+  <app-passcode-gate [closable]="guest.active()" (closed)="guest.closeLogin()" (unlocked)="unlocked()" />
+}
+
+<!-- a held run button or Retry, clicked on a phone or a browser that cannot write to a folder -->
+@if (device.explaining()) {
+  <div class="device-modal">
+    <div class="backdrop" (click)="device.explaining.set(false)"></div>
+    <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="device-message">
+      <p id="device-message">{{ device.message() }}</p>
+      <button type="button" class="button primary" (click)="device.explaining.set(false)">OK</button>
+    </div>
+  </div>
+}
+
+<!-- last, so its tab and its window sit above everything - a run window and the passcode included.
+     not for a guest: feedback is for the app, and a tour of it has nothing to report -->
+@if (!guest.active()) {
+  <app-feedback />
+}

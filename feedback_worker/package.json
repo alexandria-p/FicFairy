@@ -1,0 +1,10 @@
+{
+  "name": "ao3downloader-feedback",
+  "private": true,
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "description": "The app's feedback form, turned into a GitHub issue.",
+  "scripts": {
+    "test": "node --test"
+  }
+}

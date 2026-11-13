@@ -1,0 +1,106 @@
+/*
+  The title font: "FicFairy" in the header is always set in it, whatever font User settings
+  picks for the rest of the page. Doomsdays Dragons by GraphicSauce, Freeware, Non-Commercial
+  (https://www.fontspace.com/doomsdays-dragons-elegant-business-font-f161455) - fine for an app
+  given away free; credited in the README. Bundled with the page, never fetched from elsewhere.
+*/
+@font-face {
+  font-family: 'Doomsdays Dragons';
+  src: url('./fonts/doomsdays-dragons.otf') format('opentype');
+  font-display: swap;
+}
+
+:root {
+  color-scheme: dark;
+
+  /* the Charcoal palette - `appearance.ts` sets these again for the palette chosen */
+  --bg: #1e1e1e;
+  --surface: #262626;
+  --surface-2: #2d2d2d;
+  --surface-hover: #3a3a3a;
+  --border: #3d3d3d;
+  --border-strong: #4d4d4d;
+  --text: #d6d6d6;
+  --text-strong: #f0f0f0;
+  --text-dim: #9a9a9a;
+  --link: #e8e8e8;
+  --accent: #7fb3d5;
+  --accent-line: #5a7f9a;
+  --accent-fill: #33566b;
+  --accent-fill-hover: #3d6580;
+  --accent-bg: #22303a;
+  --accent-text: #9fc4dc;
+  /* the status colours, for a dark palette - `appearance.ts` swaps in STATUS_LIGHT for a
+     light one. failures red, copies to check amber, rescued and done green, notes violet */
+  --danger: #d97b7b;
+  --danger-text: #d08b8b;
+  --danger-border: #6b3a3a;
+  --danger-bg: #2e2020;
+  --danger-bg-hover: #4c2f2f;
+  --warn-text: #e0c97a;
+  --warn-text-dim: #a8995c;
+  --warn-border: #8a6d2f;
+  --warn-bg: #2d2616;
+  --warn-bg-strong: #4a3f12;
+  --ok-text: #8fc58a;
+  --ok-border: #4f7a58;
+  --ok-bg: #1f2a21;
+  --ok-fill: #5a8f6a;
+  --note-text: #c9b8ea;
+  --note-border: #6b5a8a;
+  --backdrop: rgba(0, 0, 0, 0.6);
+
+  /* the Charcoal palette's blue - `appearance.ts` sets it for the palette chosen */
+  --logo-filter: hue-rotate(-112deg);
+  --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, Ubuntu, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* a browser gives form controls its own font; the font chosen in User settings is for them too */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+a {
+  color: var(--link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  color: var(--text-strong);
+}
+
+code {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 0.9em;
+}
+
+/* a run button held for this device (device-support.ts): looks held, but still clicks, to say why */
+.button.unavailable {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

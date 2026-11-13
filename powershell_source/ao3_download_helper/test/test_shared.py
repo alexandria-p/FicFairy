@@ -1,0 +1,749 @@
+"""Tests for ao3downloader.actions.shared — folder input and file discovery."""
+
+import json
+import os
+from unittest.mock import MagicMock
+
+import pytest
+
+from source_code import indexing, parse_text, strings
+from source_code.actions import shared
+from source_code.fileio import FileOps
+from source_code.storage import LocalStorage
+
+
+# region get_files_of_type
+
+def test_get_files_of_type_returns_matching_files(tmp_path, capsys) -> None:
+    (tmp_path / 'work1.epub').write_bytes(b'')
+    (tmp_path / 'work2.EPUB').write_bytes(b'')
+    (tmp_path / 'work3.mobi').write_bytes(b'')
+    (tmp_path / 'readme.txt').write_bytes(b'')
+    sub = tmp_path / 'nested'
+    sub.mkdir()
+    (sub / 'work4.epub').write_bytes(b'')
+
+    results = shared.get_files_of_type(str(tmp_path), ['EPUB'])
+
+    paths = sorted(os.path.basename(r['path']) for r in results)
+    assert paths == ['work1.epub', 'work2.EPUB', 'work4.epub']
+    assert all(r['filetype'] == 'EPUB' for r in results)
+
+
+def test_get_files_of_type_nonexistent_folder_returns_empty(capsys) -> None:
+    bogus = '/definitely/does/not/exist/anywhere'
+    results = shared.get_files_of_type(bogus, ['EPUB'])
+
+    assert results == []
+    out = capsys.readouterr().out
+    assert bogus in out
+
+
+def test_get_files_of_type_quoted_path_returns_empty(capsys) -> None:
+    results = shared.get_files_of_type('"/tmp"', ['EPUB'])
+
+    assert results == []
+    out = capsys.readouterr().out
+    assert strings.INFO_NO_FOLDER.split('{')[0] in out
+
+# endregion
+
+
+# region update_folder
+
+def _fake_fileops() -> MagicMock:
+    fo = MagicMock(spec=FileOps)
+    fo._settings = {}
+    fo.get_setting.side_effect = lambda key: fo._settings.get(key, '')
+    def _save(key: str, value) -> None:
+        if value is None:
+            fo._settings.pop(key, None)
+        else:
+            fo._settings[key] = value
+    fo.save_setting.side_effect = _save
+    return fo
+
+
+def test_update_folder_accepts_quoted_paste(tmp_path, monkeypatch) -> None:
+    fo = _fake_fileops()
+    quoted = f'"{tmp_path}"'
+    monkeypatch.setattr('builtins.input', lambda: quoted)
+
+    result = shared.update_folder(fo)
+
+    assert result == str(tmp_path)
+    # normalized value is saved
+    assert fo._settings[strings.SETTING_UPDATE_FOLDER] == str(tmp_path)
+
+
+def test_update_folder_reprompts_on_invalid_then_accepts(tmp_path, monkeypatch) -> None:
+    fo = _fake_fileops()
+    inputs = iter(['/nope/not/a/real/path', str(tmp_path)])
+    monkeypatch.setattr('builtins.input', lambda: next(inputs))
+
+    result = shared.update_folder(fo)
+
+    assert result == str(tmp_path)
+
+
+def test_update_folder_detects_stale_saved_path(tmp_path, monkeypatch) -> None:
+    fo = _fake_fileops()
+    fo._settings[strings.SETTING_UPDATE_FOLDER] = '/stale/path/gone'
+    monkeypatch.setattr('builtins.input', lambda: str(tmp_path))
+
+    result = shared.update_folder(fo)
+
+    # stale path was cleared, user was reprompted, new path saved
+    assert result == str(tmp_path)
+    assert fo._settings[strings.SETTING_UPDATE_FOLDER] == str(tmp_path)
+
+
+def test_update_folder_normalizes_quoted_saved_path(tmp_path, monkeypatch) -> None:
+    fo = _fake_fileops()
+    fo._settings[strings.SETTING_UPDATE_FOLDER] = f'"{tmp_path}"'
+    monkeypatch.setattr('builtins.input', lambda: strings.PROMPT_YES)
+
+    result = shared.update_folder(fo)
+
+    assert result == str(tmp_path)
+    assert fo._settings[strings.SETTING_UPDATE_FOLDER] == str(f'"{tmp_path}"')
+
+
+def test_update_folder_reuses_valid_saved_path(tmp_path, monkeypatch) -> None:
+    fo = _fake_fileops()
+    fo._settings[strings.SETTING_UPDATE_FOLDER] = str(tmp_path)
+    monkeypatch.setattr('builtins.input', lambda: strings.PROMPT_YES)
+
+    result = shared.update_folder(fo)
+
+    assert result == str(tmp_path)
+
+
+def test_update_folder_says_no_to_saved_then_prompts(tmp_path, monkeypatch) -> None:
+    fo = _fake_fileops()
+    other = tmp_path / 'other'
+    other.mkdir()
+    fo._settings[strings.SETTING_UPDATE_FOLDER] = str(tmp_path)
+    inputs = iter([strings.PROMPT_NO, str(other)])
+    monkeypatch.setattr('builtins.input', lambda: next(inputs))
+
+    result = shared.update_folder(fo)
+
+    assert result == str(other)
+    assert fo._settings[strings.SETTING_UPDATE_FOLDER] == str(other)
+
+# endregion
+
+
+# region redownload_folder
+
+def test_redownload_folder_accepts_quoted_paste(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr('builtins.input', lambda: f'"{tmp_path}"')
+    assert shared.redownload_folder() == str(tmp_path)
+
+
+def test_redownload_folder_reprompts_on_invalid(tmp_path, monkeypatch) -> None:
+    inputs = iter(['/nope/not/a/real/path', str(tmp_path)])
+    monkeypatch.setattr('builtins.input', lambda: next(inputs))
+    assert shared.redownload_folder() == str(tmp_path)
+
+# endregion
+
+
+# region yes/no prompts
+
+@pytest.mark.parametrize('answer, expected', [
+    (strings.PROMPT_YES, True),
+    (strings.PROMPT_NO, False),
+    ('', False),
+])
+def test_series_returns_expected_bool(answer, expected, monkeypatch, capsys) -> None:
+    monkeypatch.setattr('builtins.input', lambda: answer)
+    assert shared.series() is expected
+
+
+@pytest.mark.parametrize('answer, expected', [
+    (strings.PROMPT_YES, True),
+    (strings.PROMPT_NO, False),
+])
+def test_images_returns_expected_bool(answer, expected, monkeypatch, capsys) -> None:
+    monkeypatch.setattr('builtins.input', lambda: answer)
+    assert shared.images() is expected
+
+
+@pytest.mark.parametrize('answer, expected', [
+    (strings.PROMPT_YES, True),
+    (strings.PROMPT_NO, False),
+])
+def test_metadata_returns_expected_bool(answer, expected, monkeypatch, capsys) -> None:
+    monkeypatch.setattr('builtins.input', lambda: answer)
+    assert shared.metadata() is expected
+
+
+@pytest.mark.parametrize('answer, expected', [
+    (strings.PROMPT_YES, True),
+    (strings.PROMPT_NO, False),
+])
+def test_metadata_work_dates_returns_expected_bool(answer, expected, monkeypatch, capsys) -> None:
+    monkeypatch.setattr('builtins.input', lambda: answer)
+    assert shared.metadata_work_dates() is expected
+
+
+@pytest.mark.parametrize('answer, expected_exclude', [
+    # pinboard_exclude has inverted logic — 'yes include unread' means don't exclude
+    (strings.PROMPT_YES, False),
+    (strings.PROMPT_NO, True),
+])
+def test_pinboard_exclude_inverts_input(answer, expected_exclude, monkeypatch, capsys) -> None:
+    monkeypatch.setattr('builtins.input', lambda: answer)
+    assert shared.pinboard_exclude() is expected_exclude
+
+# endregion
+
+
+# region download_types
+
+def _answers(monkeypatch, *answers: str) -> None:
+    responses = iter(answers)
+    monkeypatch.setattr('builtins.input', lambda: next(responses))
+
+
+def test_download_types_rejects_metadata_type_by_default(monkeypatch, capsys) -> None:
+    fileops = MagicMock()
+    fileops.get_setting.return_value = ''
+    # JSON is not offered outside the ao3 download action, so it re-prompts
+    _answers(monkeypatch, strings.AO3_DOWNLOAD_TYPE_METADATA, 'EPUB', strings.PROMPT_YES)
+
+    assert shared.download_types(fileops) == ['EPUB']
+
+
+def test_download_types_accepts_metadata_type_when_allowed(monkeypatch, capsys) -> None:
+    fileops = MagicMock()
+    fileops.get_setting.return_value = ''
+    _answers(monkeypatch, strings.AO3_DOWNLOAD_TYPE_METADATA, strings.PROMPT_YES)
+
+    result = shared.download_types(fileops, allow_metadata=True)
+
+    assert result == [strings.AO3_DOWNLOAD_TYPE_METADATA]
+    fileops.save_setting.assert_called_once_with(
+        strings.SETTING_FILETYPES, [strings.AO3_DOWNLOAD_TYPE_METADATA])
+
+
+def test_download_types_reuses_saved_list(monkeypatch, capsys) -> None:
+    fileops = MagicMock()
+    fileops.get_setting.return_value = ['EPUB', strings.AO3_DOWNLOAD_TYPE_METADATA]
+    _answers(monkeypatch, strings.PROMPT_YES)
+
+    result = shared.download_types(fileops, allow_metadata=True)
+
+    assert result == ['EPUB', strings.AO3_DOWNLOAD_TYPE_METADATA]
+
+
+def test_download_types_drops_saved_metadata_type_for_other_actions(monkeypatch, capsys) -> None:
+    # the saved list is shared between actions; one that can't export metadata
+    # must not be handed a JSON entry it would try to download as a file
+    fileops = MagicMock()
+    fileops.get_setting.return_value = ['EPUB', strings.AO3_DOWNLOAD_TYPE_METADATA]
+    _answers(monkeypatch, strings.PROMPT_YES)
+
+    assert shared.download_types(fileops) == ['EPUB']
+
+
+def test_download_types_prompts_when_saved_list_has_nothing_usable(monkeypatch, capsys) -> None:
+    fileops = MagicMock()
+    fileops.get_setting.return_value = [strings.AO3_DOWNLOAD_TYPE_METADATA]
+    # nothing usable survives the filter, so the saved-list prompt is skipped entirely
+    _answers(monkeypatch, 'PDF', strings.PROMPT_YES)
+
+    assert shared.download_types(fileops) == ['PDF']
+
+# endregion
+
+
+# region pages
+
+@pytest.mark.parametrize('answer, expected', [
+    ('5', 5),
+    ('0', None),
+    ('-1', None),
+    ('abc', None),
+    ('', None),
+])
+def test_pages_parses_int_with_fallback(answer, expected, monkeypatch, capsys) -> None:
+    monkeypatch.setattr('builtins.input', lambda: answer)
+    assert shared.pages() == expected
+
+# endregion
+
+
+# region pinboard_date
+
+def test_pinboard_date_returns_none_when_no(monkeypatch, capsys) -> None:
+    monkeypatch.setattr('builtins.input', lambda: strings.PROMPT_NO)
+    assert shared.pinboard_date() is None
+
+
+def test_pinboard_date_parses_entered_date(monkeypatch, capsys) -> None:
+    import datetime
+    inputs = iter([strings.PROMPT_YES, '03/15/2024'])
+    monkeypatch.setattr('builtins.input', lambda: next(inputs))
+
+    result = shared.pinboard_date()
+
+    assert result == datetime.datetime(2024, 3, 15)
+
+# endregion
+
+
+# region already_downloaded
+#
+# read from the folder, not from logs/log.jsonl - the log lives beside the helper and
+# describes every library ever downloaded into, where the folder says what this one holds
+
+def works_in(tmp_path, *names):
+    for name in names: make_file(tmp_path, name)
+    return shared.scan_downloaded_works(str(tmp_path), ['HTML', 'EPUB'])
+
+
+def link(work: str) -> str:
+    return f'{strings.AO3_BASE_URL}/works/{work}'
+
+
+def test_a_work_with_every_asked_for_format_in_the_folder_is_already_downloaded(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    existing = works_in(tmp_path, '111 One - A 2024-01-01.html', '111 One - A 2024-01-01.epub')
+    assert shared.already_downloaded(existing, ['HTML', 'EPUB']) == [link('111')]
+
+
+def test_a_work_missing_a_format_is_not(tmp_path, monkeypatch):
+    # it goes to the download, which fetches what it lacks
+    monkeypatch.chdir(tmp_path)
+    existing = works_in(tmp_path, '111 One - A 2024-01-01.html')
+    assert shared.already_downloaded(existing, ['HTML', 'EPUB']) == []
+
+
+def test_a_work_only_the_log_remembers_is_not_already_downloaded(tmp_path, monkeypatch):
+    # the bug this replaced: a log that names a work says nothing about this folder
+    monkeypatch.chdir(tmp_path)
+    fo = FileOps()
+    fo.logfile = str(tmp_path / 'log.jsonl')
+    fo.write_log({'link': link('222'), 'title': ['222 Two - B'], 'success': True})
+    assert shared.already_downloaded(works_in(tmp_path), ['HTML']) == []
+
+
+def test_an_out_of_date_copy_is_not_already_downloaded(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    existing = works_in(tmp_path, '111 One - A 2024-01-01.html', '222 Two - B 2024-01-01.html')
+    assert shared.already_downloaded(existing, ['HTML'], stale=[link('111')]) == [link('222')]
+
+
+def test_an_undated_copy_counts_as_downloaded(tmp_path, monkeypatch):
+    # whether to refetch it is the undated question's to answer, which puts it in `stale`
+    monkeypatch.chdir(tmp_path)
+    existing = works_in(tmp_path, '111 One - A.html')
+    assert shared.already_downloaded(existing, ['HTML']) == [link('111')]
+
+
+def test_a_work_is_named_the_way_each_download_path_names_it(tmp_path, monkeypatch):
+    # the listing is read into canonical links; an index record carries its own
+    monkeypatch.chdir(tmp_path)
+    existing = works_in(tmp_path, '111 One - A 2024-01-01.html')
+    records = [{'id': '111', 'link': 'https://archiveofourown.org/works/111?view_adult=true'}]
+    assert set(shared.already_downloaded(existing, ['HTML'], records)) == {
+        link('111'), 'https://archiveofourown.org/works/111?view_adult=true'}
+
+
+def test_the_ignore_list_is_still_honoured(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / strings.IGNORELIST_FILE_NAME).write_text(
+        f'{link("333")}; never this one\n{link("444")}', encoding='utf-8')
+    assert shared.already_downloaded({}, ['HTML']) == [link('333'), link('444')]
+
+
+def test_no_folder_and_no_ignore_list_skips_nothing(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    assert shared.already_downloaded({}, ['HTML']) == []
+
+# endregion
+
+
+# region read_index
+
+def index_fileops(tmp_path):
+    """A FileOps whose downloads folder is real and whose json reading is the real thing."""
+    fo = MagicMock()
+    fo.downloadfolder = str(tmp_path)
+    fo.storage = LocalStorage(str(tmp_path))
+    fo.load_json.side_effect = lambda name: FileOps.load_json(fo, name)
+    fo.read_text.side_effect = lambda path: FileOps.read_text(fo, path)
+    fo.list_files.side_effect = lambda folder: FileOps.list_files(fo, folder)
+    return fo
+
+
+def write_index(tmp_path, name: str, document: dict) -> None:
+    folder = tmp_path / strings.INDEXING_FOLDER_NAME
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / name).write_text(json.dumps(document), encoding='utf-8')
+
+
+def indexed(work: str, published, total) -> dict:
+    return {
+        'id': work, 'link': f'https://archiveofourown.org/works/{work}',
+        indexing.LAST_INDEXED: '2026-09-01T10:00:00+00:00',
+        indexing.INDEXES: [{
+            indexing.INDEXED_ON: '2026-09-01T10:00:00+00:00', 'title': f'Work {work}',
+            'chapters_published': published, 'chapters_total': total,
+        }],
+    }
+
+
+def test_the_index_is_read_off_disk_rather_than_from_ao3(tmp_path):
+    write_index(tmp_path, '111.json', indexed('111', 3, None))
+    write_index(tmp_path, '222.json', indexed('222', 5, 5))
+
+    records = shared.read_index(index_fileops(tmp_path))
+
+    assert [x['id'] for x in records] == ['111', '222']
+    assert records[0]['title'] == 'Work 111'
+
+
+def test_reading_the_index_where_there_is_none_finds_nothing(tmp_path):
+    assert shared.read_index(index_fileops(tmp_path)) == []
+
+
+def test_one_damaged_file_does_not_hide_the_rest_of_the_index(tmp_path):
+    write_index(tmp_path, '111.json', indexed('111', 3, None))
+    folder = tmp_path / strings.INDEXING_FOLDER_NAME
+    (folder / 'broken.json').write_text('not json at all', encoding='utf-8')
+
+    records = shared.read_index(index_fileops(tmp_path))
+
+    assert [x['id'] for x in records] == ['111']
+
+
+def test_only_records_with_a_link_are_kept(tmp_path):
+    # the link is how the work is re-read; without one there is nothing to go to
+    write_index(tmp_path, '111.json', indexed('111', 3, None))
+    write_index(tmp_path, 'nolink.json', {'id': '999', 'title': 'No link'})
+
+    records = shared.read_index(index_fileops(tmp_path))
+
+    assert [x['id'] for x in records] == ['111']
+
+
+def test_incomplete_works_picks_out_only_the_unfinished(tmp_path):
+    records = [
+        {'id': '111', 'chapters_published': 3, 'chapters_total': None},
+        {'id': '222', 'chapters_published': 5, 'chapters_total': 5},
+        {'id': '333', 'chapters_published': 2, 'chapters_total': 7},
+    ]
+
+    assert [x['id'] for x in shared.incomplete_works(records)] == ['111', '333']
+
+# endregion
+
+
+# region scan_downloaded_works
+
+def make_file(folder, name: str) -> str:
+    path = folder / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b'x')
+    return str(path)
+
+
+def with_folder(tmp_path):
+    fileops = MagicMock()
+    fileops.downloadfolder = str(tmp_path)
+    fileops.storage = LocalStorage(str(tmp_path))
+    fileops.list_files.side_effect = lambda folder: FileOps.list_files(fileops, folder)
+    return fileops
+
+
+def test_the_works_already_indexed_are_read_from_the_index_file_names(tmp_path):
+    indexing_folder = os.path.join(strings.INDEXING_FOLDER_NAME, '34816549 No Paths - Cal.json')
+    make_file(tmp_path, indexing_folder)
+
+    assert shared.indexed_work_ids(with_folder(tmp_path)) == {'34816549'}
+
+
+def test_a_downloaded_fic_is_not_an_index_entry(tmp_path):
+    # 'have we indexed this?' is not 'have we downloaded this?'. a fic with an html file and
+    # no index entry is exactly what a new-bookmarks run has to keep walking past, and
+    # counting it here would stop the walk on a fic it has never actually recorded
+    make_file(tmp_path, '111 Downloaded But Not Indexed 2024-12-14.html')
+    make_file(tmp_path, '222 Also Downloaded 2024-12-14.pdf')
+    make_file(tmp_path, '333 And This One.epub')
+    make_file(tmp_path, os.path.join(strings.INDEXING_FOLDER_NAME, '444 Indexed - Cal.json'))
+
+    assert shared.indexed_work_ids(with_folder(tmp_path)) == {'444'}
+
+
+def test_a_collection_file_is_not_an_index_entry_either(tmp_path):
+    # collections live in their own folder and are named by collection, not by work
+    make_file(tmp_path, os.path.join(strings.COLLECTIONS_FOLDER_NAME, '111 a collection.json'))
+
+    assert shared.indexed_work_ids(with_folder(tmp_path)) == set()
+
+
+def test_a_collection_made_in_the_page_is_never_read_as_one_from_ao3(tmp_path):
+    # the page keeps the collections people make themselves in collections/custom, and every
+    # helper read of collections/ lists that folder's own files only - so a work in a custom
+    # collection is not held back as doubtful, and no run links it into from_collections
+    collections = tmp_path / strings.COLLECTIONS_FOLDER_NAME
+    (collections / 'custom').mkdir(parents=True)
+    (collections / 'yuletide.json').write_text(
+        json.dumps({'name': 'yuletide', 'title': 'Yuletide', 'work_ids': ['111']}), encoding='utf-8')
+    (collections / 'custom' / 'custom-ab12.json').write_text(
+        json.dumps({'name': 'custom-ab12', 'custom': True, 'title': 'Mine', 'work_ids': ['222']}), encoding='utf-8')
+    make_file(tmp_path, os.path.join(strings.INDEXING_FOLDER_NAME, '111 In Yuletide - Cal.json'))
+    make_file(tmp_path, os.path.join(strings.INDEXING_FOLDER_NAME, '222 Mine - Cal.json'))
+    fileops = with_folder(tmp_path)
+    fileops.load_json.side_effect = lambda path: json.loads(
+        (tmp_path / path).read_text(encoding='utf-8')) if (tmp_path / path).is_file() else {}
+
+    known = shared.indexed_work_ids(fileops)
+
+    assert '111' in known.doubtful
+    assert '222' not in known.doubtful
+
+
+def test_a_file_in_the_index_folder_that_is_not_json_is_ignored(tmp_path):
+    make_file(tmp_path, os.path.join(strings.INDEXING_FOLDER_NAME, '111 stray.html'))
+    make_file(tmp_path, os.path.join(strings.INDEXING_FOLDER_NAME, '222 real - Cal.json'))
+
+    assert shared.indexed_work_ids(with_folder(tmp_path)) == {'222'}
+
+
+def test_an_index_file_not_named_for_a_work_is_ignored(tmp_path):
+    # the same rule that pairs a download to its entry: digits, then a separator
+    make_file(tmp_path, os.path.join(strings.INDEXING_FOLDER_NAME, 'notes.json'))
+    make_file(tmp_path, os.path.join(strings.INDEXING_FOLDER_NAME, '99Red Balloons.json'))
+
+    assert shared.indexed_work_ids(with_folder(tmp_path)) == set()
+
+
+def test_nothing_indexed_yet_is_not_an_error(tmp_path):
+    assert shared.indexed_work_ids(with_folder(tmp_path)) == set()
+
+
+def test_scan_finds_works_by_the_number_their_name_starts_with(tmp_path):
+    make_file(tmp_path, '34816549 No Paths - Cal 2024-12-14.html')
+    make_file(tmp_path, '99 Red Balloons 2020-01-02.epub')
+
+    found = shared.scan_downloaded_works(str(tmp_path), ['HTML', 'EPUB'])
+
+    assert sorted(found) == ['34816549', '99']
+    assert found['34816549']['HTML']['date'] == '2024-12-14'
+    assert found['99']['EPUB']['date'] == '2020-01-02'
+
+
+def test_the_pages_list_of_hidden_works_is_never_taken_for_a_work(tmp_path):
+    # the page keeps the works hidden from its listing in hidden-works.json at the top of the
+    # library. a run must pass it over: it is json, and json is a requested file type
+    (tmp_path / 'hidden-works.json').write_text('{"hidden": [{"key": "individual work:111"}]}')
+    make_file(tmp_path, '111 Hidden But Still Here 2024-12-14.html')
+
+    found = shared.scan_downloaded_works(str(tmp_path), ['HTML', 'JSON'])
+
+    assert sorted(found) == ['111']
+    assert 'JSON' not in found['111']
+
+
+def test_scan_reports_an_undated_file_as_having_no_date(tmp_path):
+    make_file(tmp_path, '34816549 No Paths - Cal.html')
+
+    found = shared.scan_downloaded_works(str(tmp_path), ['HTML'])
+
+    assert found['34816549']['HTML']['date'] is None
+
+
+def test_scan_keeps_each_file_type_apart(tmp_path):
+    make_file(tmp_path, '34816549 A 2024-12-14.html')
+    make_file(tmp_path, '34816549 A 2024-12-14.epub')
+
+    found = shared.scan_downloaded_works(str(tmp_path), ['HTML', 'EPUB'])
+
+    assert sorted(found['34816549']) == ['EPUB', 'HTML']
+
+
+def test_scan_prefers_the_newest_when_a_work_has_two_copies_of_a_type(tmp_path):
+    make_file(tmp_path, '34816549 A 2023-01-01.html')
+    make_file(tmp_path, '34816549 A 2024-12-14.html')
+
+    found = shared.scan_downloaded_works(str(tmp_path), ['HTML'])
+
+    assert found['34816549']['HTML']['date'] == '2024-12-14'
+
+
+def test_scan_treats_an_undated_copy_as_older_than_a_dated_one(tmp_path):
+    make_file(tmp_path, '34816549 A.html')
+    make_file(tmp_path, '34816549 A 2024-12-14.html')
+
+    found = shared.scan_downloaded_works(str(tmp_path), ['HTML'])
+
+    assert found['34816549']['HTML']['date'] == '2024-12-14'
+
+
+def test_scan_ignores_the_metadata_folders(tmp_path):
+    # an index or collection file is not a downloaded work and carries no date by design
+    make_file(tmp_path, os.path.join(strings.INDEXING_FOLDER_NAME, '34816549 A.json'))
+    make_file(tmp_path, os.path.join(strings.COLLECTIONS_FOLDER_NAME, '111 c.json'))
+    make_file(tmp_path, os.path.join(strings.IMAGE_FOLDER_NAME, '34816549 A img000.png'))
+    # the run history lives here too now, and a record is json like an index entry is
+    make_file(tmp_path, os.path.join(strings.RUNS_FOLDER_NAME, '2026-09-13T120000-ab.json'))
+    make_file(tmp_path, '34816549 A 2024-12-14.html')
+
+    found = shared.scan_downloaded_works(str(tmp_path), ['HTML', 'JSON', 'PNG'])
+
+    assert list(found) == ['34816549']
+    assert list(found['34816549']) == ['HTML']
+
+
+def test_scan_ignores_files_that_do_not_start_with_a_work_number(tmp_path):
+    make_file(tmp_path, 'No Paths Are Bound.html')
+    make_file(tmp_path, '99Red Balloons.html')
+
+    assert shared.scan_downloaded_works(str(tmp_path), ['HTML']) == {}
+
+
+def test_scan_of_a_folder_that_is_not_there_is_empty(tmp_path):
+    assert shared.scan_downloaded_works(str(tmp_path / 'nope'), ['HTML']) == {}
+
+# endregion
+
+
+
+
+# region plan_downloads
+
+def record(work: str, updated: str) -> dict:
+    return {'id': work, 'link': f'https://archiveofourown.org/works/{work}',
+            'date_updated': updated}
+
+
+def held(date, path='old.html') -> dict:
+    return {'HTML': {'path': path, 'date': date}}
+
+
+def test_a_work_updated_since_it_was_saved_is_fetched_again():
+    plan = shared.plan_downloads(
+        [record('1', '20 Dec 2024')], {'1': held('2024-12-14')}, ['HTML'])
+
+    assert plan['stale'] == ['https://archiveofourown.org/works/1']
+    assert plan['superseded']['https://archiveofourown.org/works/1']['HTML'] == 'old.html'
+
+
+def test_a_work_that_has_not_changed_is_left_alone():
+    plan = shared.plan_downloads(
+        [record('1', '14 Dec 2024')], {'1': held('2024-12-14')}, ['HTML'])
+
+    assert plan['stale'] == []
+    assert plan['superseded'] == {}
+
+
+def test_a_local_copy_newer_than_ao3_is_not_refetched():
+    plan = shared.plan_downloads(
+        [record('1', '01 Jan 2024')], {'1': held('2024-12-14')}, ['HTML'])
+
+    assert plan['stale'] == []
+
+
+def test_a_work_with_no_local_copy_is_not_listed_here():
+    # nothing to replace: it is downloaded by the ordinary 'not done yet' route
+    plan = shared.plan_downloads([record('1', '20 Dec 2024')], {}, ['HTML'])
+
+    assert plan['stale'] == []
+    assert plan['undated'] == []
+
+
+def test_an_undated_copy_is_counted_but_left_alone():
+    plan = shared.plan_downloads(
+        [record('1', '20 Dec 2024')], {'1': held(None)}, ['HTML'])
+
+    assert plan['stale'] == []
+    assert plan['undated'] == ['https://archiveofourown.org/works/1']
+    assert plan['superseded'] == {}
+
+
+def test_an_undated_copy_is_refetched_when_the_run_asks_for_it():
+    plan = shared.plan_downloads(
+        [record('1', '20 Dec 2024')], {'1': held(None)}, ['HTML'], refresh_undated=True)
+
+    assert plan['stale'] == ['https://archiveofourown.org/works/1']
+    assert plan['superseded']['https://archiveofourown.org/works/1']['HTML'] == 'old.html'
+
+
+def test_overwriting_replaces_a_copy_that_is_perfectly_current():
+    # nothing here can see a damaged file - the name and the date are both right and only
+    # the bytes are wrong - so this is the one case where the user's answer overrules
+    plan = shared.plan_downloads(
+        [record('1', '14 Dec 2024')], {'1': held('2024-12-14')}, ['HTML'], overwrite=True)
+
+    assert plan['stale'] == ['https://archiveofourown.org/works/1']
+    assert plan['superseded']['https://archiveofourown.org/works/1']['HTML'] == 'old.html'
+
+
+def test_overwriting_replaces_an_undated_copy_without_anyone_being_asked():
+    # the question exists to decide what happens to these, and this has decided it
+    plan = shared.plan_downloads(
+        [record('1', '20 Dec 2024')], {'1': held(None)}, ['HTML'], overwrite=True)
+
+    assert plan['undated'] == []
+    assert plan['superseded']['https://archiveofourown.org/works/1']['HTML'] == 'old.html'
+
+
+def test_overwriting_still_touches_only_the_file_types_this_run_asked_for():
+    existing = {'1': {'HTML': {'path': 'old.html', 'date': '2024-12-20'},
+                      'EPUB': {'path': 'old.epub', 'date': '2024-12-20'}}}
+
+    plan = shared.plan_downloads([record('1', '20 Dec 2024')], existing, ['HTML'],
+                                 overwrite=True)
+
+    assert plan['superseded']['https://archiveofourown.org/works/1'] == {'HTML': 'old.html'}
+
+
+def test_overwriting_does_not_invent_a_copy_that_is_not_there():
+    plan = shared.plan_downloads([record('1', '20 Dec 2024')], {}, ['HTML'], overwrite=True)
+
+    assert plan['stale'] == []
+    assert plan['superseded'] == {}
+
+
+def test_only_the_file_types_that_are_out_of_date_are_replaced():
+    # re-downloading the html must not mark the epub for removal
+    existing = {'1': {'HTML': {'path': 'old.html', 'date': '2024-01-01'},
+                      'EPUB': {'path': 'new.epub', 'date': '2024-12-20'}}}
+
+    plan = shared.plan_downloads([record('1', '20 Dec 2024')], existing, ['HTML', 'EPUB'])
+
+    replacing = plan['superseded']['https://archiveofourown.org/works/1']
+    assert replacing == {'HTML': 'old.html'}
+
+
+def test_a_file_type_this_run_did_not_ask_for_is_never_touched():
+    existing = {'1': {'HTML': {'path': 'old.html', 'date': '2024-01-01'},
+                      'EPUB': {'path': 'old.epub', 'date': '2024-01-01'}}}
+
+    plan = shared.plan_downloads([record('1', '20 Dec 2024')], existing, ['HTML'])
+
+    assert plan['superseded']['https://archiveofourown.org/works/1'] == {'HTML': 'old.html'}
+
+
+def test_a_work_whose_updated_date_cannot_be_read_is_left_alone():
+    plan = shared.plan_downloads(
+        [record('1', 'sometime')], {'1': held('2024-12-14')}, ['HTML'])
+
+    assert plan['stale'] == []
+
+
+def test_records_without_an_id_or_link_are_skipped():
+    plan = shared.plan_downloads(
+        [{'id': None, 'link': None, 'date_updated': '20 Dec 2024'}],
+        {'1': held('2024-01-01')}, ['HTML'])
+
+    assert plan == {'stale': [], 'undated': [], 'superseded': {}}
+
+# endregion
+
+

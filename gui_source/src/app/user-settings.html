@@ -1,0 +1,654 @@
+<section class="user-settings">
+  <div class="heading">
+    <h2>User settings</h2>
+    <button type="button" class="button reset-all" [disabled]="guest()" [attr.title]="guest() ? 'Not available in guest mode' : null" (click)="openReset()">Reset to defaults</button>
+  </div>
+  <!-- reading the library: under the title, as on every tab -->
+  <ng-content select="[listingProgress]" />
+  <p class="hint">Every change is saved as you make it.</p>
+  @if (guest()) {
+    <p class="hint guest-hint">
+      You're a guest: only your AO3 time zone and the appearance can be changed, and they are saved
+      to this browser. Everything else is shown as it would be, but cannot be changed.
+    </p>
+  }
+
+  @if (choosingClear()) {
+    <div class="modal">
+      <div class="backdrop" (click)="choosingClear.set(false)"></div>
+      <div class="dialog choose-clear-dialog" role="dialog" aria-modal="true" aria-labelledby="clear-title">
+        <header>
+          <h2 id="clear-title">Clear data saved in this browser</h2>
+          <button type="button" class="icon" aria-label="Close" (click)="choosingClear.set(false)">&times;</button>
+        </header>
+        <section class="body">
+          <p>Tick what to clear from this browser:</p>
+          <ul class="clear-options">
+            @for (option of clearOptions(); track option.id) {
+              <li [attr.data-clear]="option.id" [class.held]="!!option.held">
+                <label class="check" [title]="option.held || ''">
+                  <input type="checkbox" [attr.aria-label]="option.label" [disabled]="!!option.held"
+                         [checked]="!option.held && clearTicked().has(option.id)"
+                         (change)="tickClear(option.id, $any($event.target).checked)" />
+                  <span>
+                    {{ option.label }}
+                    <span class="hint">{{ option.held || option.hint }}</span>
+                  </span>
+                </label>
+              </li>
+            }
+          </ul>
+          <p class="hint nothing-lost">
+            Nothing in your library is lost: your works, their index, collections and run history
+            stay in your folder or in Dropbox.
+          </p>
+        </section>
+        <footer>
+          <button type="button" class="button" (click)="choosingClear.set(false)">Cancel</button>
+          <button type="button" class="button primary confirm-clear" [disabled]="!clearChosen().length || clearingBrowser()"
+                  (click)="clearBrowser()">
+            {{ clearChosen().length ? 'Clear ' + clearChosen().length + (clearChosen().length === 1 ? ' item' : ' items') : 'Nothing ticked' }}
+          </button>
+        </footer>
+      </div>
+    </div>
+  }
+
+  @if (confirmingReset()) {
+    <div class="modal">
+      <div class="backdrop" (click)="confirmingReset.set(false)"></div>
+      <div class="dialog confirm-reset" role="dialog" aria-modal="true" aria-labelledby="reset-title">
+        <header>
+          <h2 id="reset-title">Reset to defaults</h2>
+          <button type="button" class="icon" aria-label="Close" (click)="confirmingReset.set(false)">&times;</button>
+        </header>
+        <section class="body">
+          @if (resetChanges().length) {
+            <p>These will change:</p>
+            <table class="changes">
+              <thead>
+                <tr><th scope="col">Setting</th><th scope="col">Current</th><th scope="col">Default</th></tr>
+              </thead>
+              <tbody>
+                @for (change of resetChanges(); track change.group + change.name) {
+                  <tr [attr.data-change]="change.name">
+                    <th scope="row">
+                      <span class="change-group">{{ change.group }}</span>
+                      {{ change.name }}
+                    </th>
+                    <td class="current">{{ change.current }}</td>
+                    <td class="default-value">&rarr; <strong>{{ change.default }}</strong></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          } @else {
+            <p class="nothing">Everything is already at its default.</p>
+          }
+        </section>
+        <footer>
+          <button type="button" class="button" (click)="confirmingReset.set(false)">Cancel</button>
+          <button type="button" class="button primary confirm" [disabled]="!resetChanges().length" (click)="resetAll()">
+            Reset to defaults
+          </button>
+        </footer>
+      </div>
+    </div>
+  }
+
+  <section class="group formats" [class.guest-locked]="guest()" [attr.inert]="guest() ? '' : null" [attr.aria-disabled]="guest() ? 'true' : null">
+    <div class="group-head">
+      <h3>Default download formats</h3>
+      <span class="saved-to" title="Kept in this browser's own storage, on this computer - another browser, or another computer, has its own">Saved to this browser</span>
+    </div>
+    @if (config(); as config) {
+      <p class="hint">
+        Ticked at the start of every run. You can still change them in a run's own window.
+      </p>
+      <div class="format-list">
+        @for (filetype of config.filetypes; track filetype) {
+          <label class="check">
+            <input
+              type="checkbox"
+              [attr.name]="'format-' + filetype"
+              [checked]="formats().includes(filetype)"
+              [disabled]="isForced(filetype)"
+              (change)="toggleFormat(filetype, $any($event.target).checked)"
+            />
+            <span>{{ filetype }}</span>
+            @if (isForced(filetype)) {
+              <span class="note">(always - it is the index)</span>
+            }
+          </label>
+        }
+      </div>
+      <button type="button" class="button subtle reset-formats" (click)="resetFormats()">
+        Use the app's defaults
+      </button>
+    } @else if (!helperAnswered()) {
+      <p class="hint">Start the helper to choose which formats a run starts with.</p>
+    }
+  </section>
+
+  <section class="group ao3-zone">
+    <div class="group-head">
+      <h3>Your AO3 time zone</h3>
+      <span class="saved-to" title="Kept in this browser's own storage, on this computer - another browser, or another computer, has its own">Saved to this browser</span>
+    </div>
+    <p class="hint">
+      Starts as this browser's own ({{ browserZone }}). This should match the time zone set in
+      your AO3 preferences.
+    </p>
+    <select class="zone-select" aria-label="Your AO3 time zone" (change)="setAo3Zone($any($event.target).value)">
+      @for (zone of zones; track zone) {
+        <option [value]="zone" [selected]="zone === ao3Zone()">
+          {{ zone }}{{ zone === browserZone ? ' (this browser)' : '' }}
+        </option>
+      }
+    </select>
+  </section>
+
+  <!-- collapsible: the palettes are a long list, and most visits are not to change them -->
+  <details class="group appearance">
+    <summary class="group-head">
+      <h3>Appearance</h3>
+      <span class="saved-to" title="Kept in this browser's own storage, on this computer - another browser, or another computer, has its own">Saved to this browser</span>
+    </summary>
+    <div class="font-choice">
+      <label class="field">
+        <span>Font</span>
+        <select name="font" aria-label="Font" (change)="setFont($any($event.target).value)">
+          @for (group of fontGroups; track group.name) {
+            @if (group.name) {
+              <optgroup [label]="group.name">
+                @for (font of group.fonts; track font.id) {
+                  <option [value]="font.id" [selected]="font.id === appearance.font()" [style.font-family]="font.stack || null">{{ font.name }}</option>
+                }
+              </optgroup>
+            } @else {
+              @for (font of group.fonts; track font.id) {
+                <option [value]="font.id" [selected]="font.id === appearance.font()" [style.font-family]="font.stack || null">{{ font.name }}</option>
+              }
+              <!-- a line under System, in browsers that draw one inside a list; others skip it -->
+              <hr />
+            }
+          }
+        </select>
+      </label>
+      @if (appearance.font() === customFontId) {
+        <label class="field">
+          <span>Font name</span>
+          <input type="text" name="customFont" placeholder="for example Comic Sans MS" [value]="appearance.customFont()"
+                 (change)="setCustomFont($any($event.target).value)" />
+        </label>
+        <p class="hint">Any font installed on this computer, by its name. One it does not have shows as the default.</p>
+      }
+      <p class="font-preview" [style.font-family]="fontPreview()">The quick brown fox bookmarks the lazy dog's fic.</p>
+    </div>
+    <fieldset class="palettes">
+      <legend>Palette</legend>
+      @for (group of paletteGroups; track group.mode) {
+      <p class="palette-group">{{ group.name }}</p>
+      @for (palette of group.palettes; track palette.id) {
+        <label class="palette" [attr.data-palette]="palette.id" [class.chosen]="palette.id === appearance.palette()"
+               [style.background]="palette.tokens.bg" [style.border-color]="palette.id === appearance.palette() ? palette.tokens['accent-line'] : palette.tokens['border']">
+          <input type="radio" name="palette" [value]="palette.id" [checked]="palette.id === appearance.palette()"
+                 (change)="setPalette(palette.id)" />
+          <span class="swatches" aria-hidden="true">
+            <span [style.background]="palette.tokens.surface"></span>
+            <span [style.background]="palette.tokens['accent-fill']"></span>
+            <span [style.background]="palette.tokens.accent"></span>
+            <span [style.background]="palette.tokens.text"></span>
+          </span>
+          <span class="palette-name" [style.color]="palette.tokens['text-strong']">{{ palette.name }}</span>
+        </label>
+      }
+      }
+    </fieldset>
+  </details>
+
+  @if (!local) {
+    <!-- collapsible: a long list, seldom changed -->
+    <details class="group questions" [class.guest-locked]="guest()" [attr.inert]="guest() ? '' : null" [attr.aria-disabled]="guest() ? 'true' : null">
+      <summary class="group-head">
+        <h3>Defaults used during a run</h3>
+        <span class="saved-to" title="Kept in this browser's own storage, on this computer - another browser, or another computer, has its own">Saved to this browser</span>
+      </summary>
+      <p class="hint">
+        What happens when a run comes across a question, but you don't answer before it times
+        out. Note that the answers you choose while setting up a background run will override
+        these.
+      </p>
+      <ul class="rows">
+        <li class="row" data-question-setting="timeout">
+          <div class="about">
+            <span class="name">
+              Minutes a question waits for you
+              <span class="default">default: {{ helperTimeout() }}</span>
+            </span>
+            <span class="description">0 takes the default answer at once, without asking.</span>
+          </div>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            aria-label="Minutes a question waits for you"
+            [value]="questionTimeout()"
+            (change)="setQuestionTimeout($any($event.target).value, $any($event.target))"
+          />
+        </li>
+        <li class="row" data-question-setting="guessed-timeout">
+          <div class="about">
+            <span class="name">
+              Minutes a question about a file with no date in its name waits
+              <span class="default">default: {{ helperGuessedTimeout() }}</span>
+            </span>
+            <span class="description">Replace it, or keep it? A run can ask one for every work and format, so these wait less. 0 takes the default at once.</span>
+          </div>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            aria-label="Minutes a question about a file with no date in its name waits"
+            [value]="guessedTimeout()"
+            (change)="setGuessedTimeout($any($event.target).value, $any($event.target))"
+          />
+        </li>
+        @for (wait of ownWaits; track wait.name) {
+          <li class="row" [attr.data-question-setting]="wait.name + '-timeout'">
+            <div class="about">
+              <span class="name">
+                {{ wait.label }}
+                <span class="default">default: {{ helperWait(wait.name) }}</span>
+              </span>
+              <span class="description">{{ wait.about }} 0 takes the default at once.</span>
+            </div>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              [attr.aria-label]="wait.label"
+              [value]="ownWait(wait.name)"
+              (change)="setOwnWait(wait.name, wait.label, $any($event.target).value, $any($event.target))"
+            />
+          </li>
+        }
+        <li class="row" data-question-setting="nobody-here">
+          <div class="about">
+            <span class="name">
+              When nobody answers, don't wait on the rest
+              <span class="default">default: {{ helperNobodyHere() ? 'On' : 'Off' }}</span>
+            </span>
+            <span class="description">
+              On: once a question goes unanswered, the rest of the same kind in that run take
+              their default at once, so a run left alone does not wait on every work. Off: every
+              question is asked and waits its time. An answer you chose to always use is taken
+              without asking either way.
+            </span>
+          </div>
+          <select aria-label="When nobody answers, don't wait on the rest"
+                  (change)="setNobodyHere($any($event.target).value === 'on')">
+            <option value="on" [selected]="nobodyHere()">On</option>
+            <option value="off" [selected]="!nobodyHere()">Off</option>
+          </select>
+        </li>
+        @for (question of questions; track question.name) {
+          <li class="row" [attr.data-question-setting]="question.name">
+            <div class="about">
+              <span class="name">
+                {{ question.label }}
+                <span class="default">default: {{ choiceLabel(question, helperAnswer(question.name)) }}</span>
+              </span>
+            </div>
+            <select
+              [attr.aria-label]="question.label"
+              (change)="setAnswer(question, $any($event.target).value)"
+            >
+              @for (choice of question.choices; track choice.value) {
+                <option [value]="choice.value" [selected]="answer(question.name) === choice.value">
+                  {{ choice.label }}
+                </option>
+              }
+            </select>
+          </li>
+        }
+      </ul>
+    </details>
+  }
+
+  <!-- collapsible: a long list, seldom changed -->
+  <details class="group always-answers" [class.guest-locked]="guest()" [attr.inert]="guest() ? '' : null" [attr.aria-disabled]="guest() ? 'true' : null">
+    <summary class="group-head">
+      <h3>Answers to always use</h3>
+      <span class="saved-to" title="Kept in this browser's own storage, on this computer - another browser, or another computer, has its own">Saved to this browser</span>
+    </summary>
+    <p class="hint">
+      A file whose name has no date written the way this app writes one is never replaced
+      without asking, and a retry asks whether to read its works again. When a run asks, you can
+      tick <em>Always choose this</em> - and that case is never asked about again, the answer you
+      gave taken instead. Change one here, or choose <em>Ask every time</em> to be asked again.
+    </p>
+    <ul class="rows">
+      @for (scenario of scenarios; track scenario.name) {
+        <li class="row" [attr.data-always]="scenario.name">
+          <div class="about">
+            <span class="name">{{ scenario.label }}</span>
+          </div>
+          <select
+            [attr.aria-label]="scenario.label"
+            (change)="setAlways(scenario.name, scenario.label, $any($event.target).value)"
+          >
+            <option value="" [selected]="!alwaysAnswers()[scenario.name]">Ask every time</option>
+            <option value="yes" [selected]="alwaysAnswers()[scenario.name] === 'yes'">Always: {{ scenario.yes }}</option>
+            <option value="no" [selected]="alwaysAnswers()[scenario.name] === 'no'">Always: {{ scenario.no }}</option>
+            @if (scenario.both) {
+              <option value="both" [selected]="alwaysAnswers()[scenario.name] === 'both'">Always: {{ scenario.both }}</option>
+            }
+          </select>
+        </li>
+      }
+    </ul>
+  </details>
+
+  <!-- collapsible: a long list, seldom changed -->
+  <details class="group prompts" [class.guest-locked]="guest()" [attr.inert]="guest() ? '' : null" [attr.aria-disabled]="guest() ? 'true' : null">
+    <summary class="group-head">
+      <h3>'Ask again' Prompts</h3>
+      <span class="saved-to" title="Kept in this browser's own storage, on this computer - another browser, or another computer, has its own">Saved to this browser</span>
+    </summary>
+    <p class="hint">
+      Every message that offers "don't ask again", whether you have seen it yet or not.
+    </p>
+    @for (group of areas; track group.area) {
+      <h4>{{ group.area }}</h4>
+      <ul class="rows">
+        @for (prompt of group.prompts; track prompt.key) {
+          <li class="row" [attr.data-prompt]="prompt.key">
+            <div class="about">
+              <span class="name">{{ prompt.name }}</span>
+              <span class="description">{{ prompt.description }}</span>
+            </div>
+            <select
+              [attr.aria-label]="prompt.name"
+              [value]="asking()[prompt.key]"
+              (change)="choose(prompt, $any($event.target).value)"
+            >
+              <option value="ask" [selected]="asking()[prompt.key] === 'ask'">{{ labelsOf(prompt).ask }}</option>
+              <option value="skip" [selected]="asking()[prompt.key] === 'skip'">{{ labelsOf(prompt).skip }}</option>
+            </select>
+          </li>
+        }
+      </ul>
+    }
+  </details>
+
+  <section class="group import-exclusions" [class.guest-locked]="guest()" [attr.inert]="guest() ? '' : null" [attr.aria-disabled]="guest() ? 'true' : null">
+    <div class="group-head">
+      <h3>Exclusion lists for imports</h3>
+      <span class="saved-to" [title]="'In import-excluded.json at the top of ' + libraryPlace() + ' - it goes wherever the library goes'">Saved in {{ libraryPlace() }}</span>
+    </div>
+    <p class="hint">
+      When your library is read, files with no date in their name or no index entry are offered
+      in Resolve issues found in your library, except any you said not to ask about again - those
+      are kept on exclusion lists in <code>import-excluded.json</code> at the top of the library.
+    </p>
+    <button type="button" class="button reset-exclusions"
+            [disabled]="!canResetExclusions() || resettingExclusions()"
+            [title]="canResetExclusions() ? '' : 'Open a library you can write to first'"
+            (click)="resetExclusions()">
+      Reset exclusion lists for imports
+    </button>
+  </section>
+
+  <section class="group index-cache" [class.guest-locked]="guest()" [attr.inert]="guest() ? '' : null" [attr.aria-disabled]="guest() ? 'true' : null">
+    <div class="group-head">
+      <h3>Dropbox library cache</h3>
+      <span class="saved-to">Saved to this browser</span>
+    </div>
+    <p class="hint">
+      This browser keeps a copy of your Dropbox library's index, so opening it downloads only the
+      index files that changed since last time. The copy is shown while Dropbox is checked, and
+      Dropbox always has the last word. Clearing it changes nothing in Dropbox - the next time the
+      library opens, its whole index is downloaded again. Signing out of Dropbox clears it too.
+      @if (cachedFiles() !== null) {
+        It holds {{ cachedFiles() }} index file{{ cachedFiles() === 1 ? '' : 's' }} now.
+      }
+    </p>
+    <button type="button" class="button clear-cache" [disabled]="clearingCache()" (click)="clearCache()">
+      Clear cache
+    </button>
+  </section>
+
+  <section class="group clear-browser" [class.guest-locked]="guest()" [attr.inert]="guest() ? '' : null" [attr.aria-disabled]="guest() ? 'true' : null">
+    <div class="group-head">
+      <h3>Clear data saved in this browser</h3>
+      <span class="saved-to">Saved to this browser</span>
+    </div>
+    <p class="hint">
+      Choose what to clear: your settings, the saved AO3 username, the visit log, the Dropbox
+      cache, or the library this browser has open - one at a time or all together.
+    </p>
+    <p class="hint nothing-lost">
+      <strong>Nothing in your library is lost.</strong> Your works, their index, collections, run
+      history, hidden works and import lists stay in your folder or in Dropbox, ready for when you
+      open it again.
+    </p>
+    <button type="button" class="button choose-clear" (click)="chooseWhatToClear()">
+      Choose what to clear&hellip;
+    </button>
+  </section>
+
+  @if (local && ini(); as file) {
+    @if (file.editable) {
+      <section class="group ini" [class.guest-locked]="guest()" [attr.inert]="guest() ? '' : null" [attr.aria-disabled]="guest() ? 'true' : null">
+        <div class="group-head">
+          <h3>settings.ini</h3>
+          <span class="saved-to" [title]="'In ' + file.file + ' on this computer, which the helper reads at the start of every run'">Saved to <code>settings.ini</code></span>
+        </div>
+        <p class="hint">
+          The helper's own settings, saved in <code>{{ file.file }}</code> as soon as you leave a
+          box. A change takes effect from the next run.
+        </p>
+        <ul class="rows">
+          <!-- FileNamePattern is changed from the DEBUG tab alone, which offers the renames it needs -->
+          @for (setting of file.settings; track setting.key) {
+            @if (setting.key !== 'FileNamePattern' && !RUN_LOG_KEYS.includes(setting.key)) {
+            <li class="row" [attr.data-setting]="setting.key">
+              <div class="about">
+                <span class="name">
+                  <code>{{ setting.key }}</code>
+                  <span class="default">default: {{ setting.default === '' ? '(empty)' : iniWords(setting.key, setting.default) }}</span>
+                </span>
+                <span class="description">{{ setting.about }}</span>
+              </div>
+              @switch (setting.kind) {
+                @case ('boolean') {
+                  <select
+                    [attr.aria-label]="setting.key"
+                    [value]="setting.value"
+                    (change)="editIni(setting, $any($event.target).value, $any($event.target))"
+                  >
+                    <option value="true" [selected]="setting.value === 'true'">{{ iniWords(setting.key, 'true') }}</option>
+                    <option value="false" [selected]="setting.value === 'false'">{{ iniWords(setting.key, 'false') }}</option>
+                  </select>
+                }
+                @case ('choice') {
+                  <select
+                    [attr.aria-label]="setting.key"
+                    [value]="setting.value"
+                    (change)="editIni(setting, $any($event.target).value, $any($event.target))"
+                  >
+                    @for (choice of setting.choices ?? []; track choice) {
+                      <option [value]="choice" [selected]="setting.value === choice">{{ iniWords(setting.key, choice) }}</option>
+                    }
+                  </select>
+                }
+                @case ('integer') {
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    [attr.aria-label]="setting.key"
+                    [value]="setting.value"
+                    (change)="editIni(setting, $any($event.target).value, $any($event.target))"
+                  />
+                }
+                @default {
+                  <input
+                    type="text"
+                    [attr.aria-label]="setting.key"
+                    [value]="setting.value"
+                    (change)="editIni(setting, $any($event.target).value, $any($event.target))"
+                  />
+                }
+              }
+            </li>
+            }
+          }
+        </ul>
+      </section>
+    }
+  }
+
+  <!-- always the last section on the page, folded away. A guest's holds only the owner's way in
+       (`GuestMode.openLogin`); anyone else's holds the file naming (a helper on this computer
+       only) and debug mode (on a downloaded app only when settings.ini's EnableDebugTools is
+       true, `DebugMode.allowed`) - neither ever shown to a guest, a preview included -->
+  @if (guest()) {
+    @if (guestMode.loginOffered()) {
+      <details class="group advanced guest-faded">
+        <summary class="group-head">
+          <h3>Advanced</h3>
+        </summary>
+        <p class="hint">
+          Access advanced features -
+          <button type="button" class="link-button owner-login" (click)="guestMode.openLogin()">enter passcode here</button>
+        </p>
+      </details>
+    }
+  } @else {
+    <details class="group advanced">
+      <summary class="group-head">
+        <h3>Advanced</h3>
+      </summary>
+
+      @if (namingOffered) {
+        <div class="advanced-part naming">
+          <span class="saved-to" title="Written to the settings.ini this helper reads">Saved to <code>settings.ini</code></span>
+          <app-name-pattern (namePatternChanged)="namePatternChanged.emit($event)" />
+        </div>
+      }
+
+      <div class="advanced-part visit-log">
+        <div class="group-head">
+          <h4>Visit log</h4>
+          <span class="saved-to" title="Kept in this browser's own storage, on this computer - another browser, or another computer, has its own">Saved to this browser</span>
+        </div>
+        <p class="hint">
+          What you have done since this page was opened - tabs, library reads, windows, runs
+          started and settings changed - kept by this page alone, and gone when you close or
+          reload it. Feedback attaches only its most recent part; the whole of it is here.
+        </p>
+        <label class="field visit-log-limit">
+          <span>Entries kept before the oldest start to be replaced</span>
+          <input type="number" name="visitLogLimit" [min]="visitLogMin" [max]="visitLogMax" step="100"
+                 [value]="visitLimit()" (change)="setVisitLogLimit($any($event.target))" />
+          <span class="hint">{{ visitLogMin.toLocaleString() }} to {{ visitLogMax.toLocaleString() }}; the default is {{ visitLogDefault.toLocaleString() }}. It holds {{ visitSize().toLocaleString() }} now.</span>
+        </label>
+        <button type="button" class="button download-visit-log" (click)="downloadVisitLog()">Download the full visit log for this session</button>
+      </div>
+
+      @if (runLogsOffered()) {
+        <div class="advanced-part run-logs">
+          <div class="group-head">
+            <h4>Run logs</h4>
+            @if (local) {
+              <span class="saved-to" title="Written to the settings.ini this helper reads">Saved to <code>settings.ini</code></span>
+            } @else {
+              <span class="saved-to" title="Kept in this browser's own storage, and sent with every run you start from it">Saved to this browser</span>
+            }
+          </div>
+          <p class="hint">
+            What each run said in its window, kept with the run and downloaded from History. A
+            feedback report only ever attaches the most recent part of one, however long it is.
+          </p>
+          <label class="field run-log-lines">
+            <span>Lines a run's log keeps before its oldest give way</span>
+            <input type="number" name="runLogMaxLines" [min]="runLogMin" [max]="runLogMax" step="500"
+                   [value]="runLogLinesNow()" (change)="setRunLogLines($any($event.target))" />
+            <span class="hint">{{ runLogMin.toLocaleString() }} to {{ runLogMax.toLocaleString() }}; the default is {{ runLogDefault.toLocaleString() }}. Applies from the next run.</span>
+          </label>
+          <label class="check">
+            <input type="checkbox" name="trimOldRunLogs" [checked]="trimOldRunLogsNow()"
+                   (change)="setTrimOldRunLogs($any($event.target))" />
+            <span>
+              Only keep logs of the last {{ recentRunLogs }} runs
+              <span class="hint">On by default. Older runs stay in History - their logs are taken out as each new run ends, so the runs folder does not keep growing.</span>
+            </span>
+          </label>
+        </div>
+      }
+
+      @if (local && ini()?.editable) {
+        <div class="advanced-part log-files">
+          <div class="group-head">
+            <h4>Log files on this computer</h4>
+            <span class="saved-to" title="Written to the settings.ini this helper reads">Saved to <code>settings.ini</code></span>
+          </div>
+          <p class="hint">
+            How large each may grow before its oldest lines are dropped as new ones are written.
+            0 for no limit.
+          </p>
+          @if (logFileSetting('LogFileMaxMB'); as setting) {
+            <label class="field log-file-size">
+              <span>The helper's log file, in MB</span>
+              <input type="number" name="LogFileMaxMB" min="0" step="1" [value]="setting.value"
+                     (change)="setLogFileSize('LogFileMaxMB', $any($event.target))" />
+              <span class="hint">Default {{ setting.default }}. A line for each download and each error.
+                @if (ini()?.logFiles?.logFile; as where) { It is at <code class="log-path">{{ where }}</code>. }
+              </span>
+            </label>
+          }
+          @if (logFileSetting('UpdateLogMaxMB'); as setting) {
+            <label class="field log-file-size">
+              <span>The update logs, in MB each</span>
+              <input type="number" name="UpdateLogMaxMB" min="0" step="1" [value]="setting.value"
+                     (change)="setLogFileSize('UpdateLogMaxMB', $any($event.target))" />
+              <span class="hint">Default {{ setting.default }}. What each <strong>Update now</strong> did.
+                @if (ini()?.logFiles?.updateLogs; as places) {
+                  They are at
+                  @for (where of places; track where; let last = $last) {<code class="log-path">{{ where }}</code>{{ last ? '.' : ' and ' }}}
+                } @else {
+                  Only the downloaded app updates itself, so only it has them.
+                }
+              </span>
+            </label>
+          }
+        </div>
+      }
+
+      @if (debugMode.allowed()) {
+        <div class="advanced-part debug-mode">
+          <div class="group-head">
+            <h4>Debug mode</h4>
+            <span class="saved-to" title="Kept in this browser's own storage, on this computer - another browser, or another computer, has its own">Saved to this browser</span>
+          </div>
+          <label class="check">
+            <input type="checkbox" name="debugMode" [checked]="debugMode.on()"
+                   (change)="setDebugMode($any($event.target).checked)" />
+            <span>
+              Turn on debug mode
+              <span class="hint">Shows a banner at the top and a DEBUG tab with tools for trying the app out - such as a mock of Resolve issues found in your library that touches no real files.</span>
+            </span>
+          </label>
+        </div>
+      }
+    </details>
+  }
+
+  @if (toast(); as toast) {
+    <div class="toast" [class.problem]="toast.kind === 'problem'" [attr.role]="toast.kind === 'problem' ? 'alert' : 'status'">
+      {{ toast.text }}
+    </div>
+  }
+</section>

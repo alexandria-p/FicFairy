@@ -1,0 +1,1096 @@
+/*
+ * The works listing, in ao3's own blurb style.
+ *
+ * These styles live with the component rather than in app.css because the listing is
+ * used in two places now: the bookmarks page, and the works inside a collection.
+ */
+
+/*
+ * Narrowing the listing. Collapsed by default: it is for finding one fic in a large
+ * library, not something to look at on the way to reading.
+ */
+.filters {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--surface);
+}
+
+.filters > summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text-strong);
+}
+
+.filter-count {
+  margin-left: 8px;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px 14px;
+  margin: 12px 0 0;
+}
+
+.filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.filter-field input,
+.filter-field select {
+  padding: 5px 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 4px;
+}
+
+.sort-empty {
+  margin: 10px 0 0;
+}
+
+.filter-hint {
+  color: var(--text-dim);
+  font-size: 0.76rem;
+}
+
+.filter-actions .button {
+  padding: 5px 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--surface-2);
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.filter-actions .button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* said beside the count, so a short listing is never mistaken for a small library */
+.filtered-note {
+  /* the space before it is the template's own; a margin as well left a wide gap */
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  font-weight: 400;
+}
+
+.listing-heading {
+  margin: 20px 0 4px;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.meta-line {
+  margin: 0 0 16px;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+}
+
+.error {
+  margin: 16px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--danger-border);
+  border-radius: 3px;
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.notice {
+  margin: 16px 0;
+  color: var(--text-dim);
+}
+
+/* a work a collection lists that the index knows nothing about beyond its number */
+.not-indexed {
+  margin: 4px 0 0;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+}
+
+/* region pagination */
+
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  margin: 18px 0;
+}
+
+.pagination button {
+  min-width: 26px;
+  padding: 3px 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  background: var(--surface-2);
+  color: var(--link);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.pagination button:hover:not(:disabled):not(.current) {
+  background: var(--surface-hover);
+  color: var(--text-strong);
+}
+
+.pagination button.current {
+  background: var(--text-strong);
+  border-color: var(--text-strong);
+  color: var(--bg);
+  font-weight: 600;
+  cursor: default;
+}
+
+.pagination button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.pagination .step {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-dim);
+}
+
+.pagination .gap {
+  padding: 0 2px;
+  color: var(--text-dim);
+}
+
+.member-of .membership + .membership {
+  margin-top: 4px;
+}
+
+.series-name {
+  font-weight: 600;
+}
+
+.series-link {
+  margin-left: 8px;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+
+.series-list li.current .title {
+  font-weight: 600;
+}
+
+/* endregion */
+
+/* region blurbs */
+
+.index {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.blurb {
+  position: relative;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--surface);
+}
+
+.blurb-head {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-right: 120px; /* room for the date, origin icon and FicHub badge at the top right */
+}
+
+.blurb-titles {
+  min-width: 0;
+}
+
+.symbols {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(2, 13px);
+  gap: 2px;
+  margin-top: 3px;
+}
+
+.tile {
+  display: block;
+  width: 13px;
+  height: 13px;
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  border-radius: 2px;
+  background: #6b6b6b;
+}
+
+.rating-general { background: #7fb069; }
+.rating-teen { background: #e0c341; }
+.rating-mature { background: #e08b41; }
+.rating-explicit { background: #cc4b4b; }
+.rating-none { background: #6b6b6b; }
+
+.tile.category { background: #5a8fc7; border-radius: 50%; }
+
+.warning-none { background: #e6e6e6; }
+.warning-maybe { background: #9a9a9a; }
+.warning-yes { background: #cc4b4b; }
+
+.complete-yes { background: #7fb069; border-radius: 50%; }
+.complete-no { background: #b05a5a; border-radius: 50%; }
+
+.blurb-corner {
+  position: absolute;
+  /* level with the entry's first line, the same as the tick box on the left */
+  top: 12px;
+  right: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.corner-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.blurb-corner .datetime {
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+}
+
+/* beside the date it needs no gap of its own after it */
+.blurb-corner .origin-icon {
+  margin-right: 0;
+}
+
+.heading {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.heading .by {
+  margin: 0 4px;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.heading a {
+  font-weight: 600;
+}
+
+/* a title with a downloaded copy behind it is worth telling apart from one that
+   will bounce out to ao3 */
+.heading a.title.local {
+  color: var(--text-strong);
+}
+
+.heading a.title:not(.local) {
+  color: var(--text);
+  text-decoration-style: dotted;
+}
+
+.fandoms {
+  margin: 0 0 8px;
+  font-size: 0.92rem;
+  font-weight: 400;
+}
+
+.tags {
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+  line-height: 1.7;
+}
+
+.tags li {
+  display: inline;
+}
+
+.tags li::after {
+  content: ',\00a0';
+  color: var(--text-dim);
+}
+
+.tags li:last-child::after {
+  content: '';
+}
+
+.tags li.warning .tag {
+  font-weight: 700;
+}
+
+.tag {
+  border-bottom: 1px solid var(--border-strong);
+  color: var(--link);
+  cursor: default;
+}
+
+.summary {
+  margin: 10px 0;
+  padding: 0;
+  color: var(--text);
+  font-size: 0.92rem;
+}
+
+.summary p {
+  margin: 0 0 8px;
+}
+
+.summary p:last-child {
+  margin-bottom: 0;
+}
+
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  justify-content: center;
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 0.82rem;
+  color: var(--text-dim);
+}
+
+.stats dt {
+  margin: 0;
+}
+
+.stats dd {
+  margin: 0;
+  color: var(--text);
+}
+
+.member-of .membership + .membership {
+  margin-top: 4px;
+}
+
+.series-name {
+  font-weight: 600;
+}
+
+.series-link {
+  margin-left: 8px;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+
+.series-list li.current .title {
+  font-weight: 600;
+}
+
+/* endregion */
+
+/* region bookmarker section */
+
+.user {
+  position: relative;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--surface-2);
+}
+
+.user .byline {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.user .datetime {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+}
+
+.badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-dim);
+  vertical-align: middle;
+}
+
+.badge.rec {
+  border-color: var(--warn-border);
+  color: var(--warn-text);
+}
+
+.notes {
+  margin: 8px 0 0;
+  padding: 0;
+  font-size: 0.88rem;
+}
+
+.notes p {
+  margin: 0 0 6px;
+}
+
+.notes p:last-child {
+  margin-bottom: 0;
+}
+
+.bookmark-tags {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+}
+
+.bookmark-tags .label {
+  margin-right: 4px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.member-of .membership + .membership {
+  margin-top: 4px;
+}
+
+.series-name {
+  font-weight: 600;
+}
+
+.series-link {
+  margin-left: 8px;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+
+.series-list li.current .title {
+  font-weight: 600;
+}
+
+/* endregion */
+
+@media (max-width: 620px) {
+  .blurb-corner {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    margin-bottom: 6px;
+  }
+
+  .blurb-head,
+  .heading {
+    margin-right: 0;
+  }
+}
+
+/* region series and external bookmarks */
+
+/* what kind of bookmark this card is, when it is not a single work */
+.kind {
+  margin: 0 0 2px;
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.blurb.series {
+  border-left: 3px solid var(--accent);
+}
+
+.blurb.external {
+  border-left: 3px dashed var(--border-strong);
+}
+
+.series-works {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+
+.series-toggle {
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.series-toggle:hover {
+  text-decoration: underline;
+}
+
+.chevron {
+  display: inline-block;
+  width: 1em;
+}
+
+.series-list {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.series-list li {
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+  font-size: 0.88rem;
+}
+
+.series-list li:first-child {
+  border-top: 0;
+}
+
+.part {
+  display: inline-block;
+  min-width: 4.5em;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+
+.part-meta {
+  display: block;
+  margin-left: 4.5em;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+
+.member-of .membership + .membership {
+  margin-top: 4px;
+}
+
+.series-name {
+  font-weight: 600;
+}
+
+.series-link {
+  margin-left: 8px;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+
+.series-list li.current .title {
+  font-weight: 600;
+}
+
+/* endregion */
+
+/* the buttons that open or save a work's downloaded copies, beside its title */
+.format {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+.format:hover {
+  border-color: var(--accent);
+  color: var(--text-strong);
+}
+
+
+/* picking works for a collection of your own */
+:host {
+  display: block;
+}
+
+/* pinned to the bottom of the window, just above the version bar, while the list is in view */
+.selection {
+  position: sticky;
+  bottom: var(--app-footer-height, 34px);
+  z-index: 2;
+  margin: 12px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px 4px 0 0;
+  background: var(--surface);
+  box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.selection-outcome,
+.selection .error {
+  margin: 6px 0 0;
+}
+
+.selection-bar,
+.add-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.selection-count {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.selection .button {
+  padding: 5px 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--surface-2);
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.selection .button.primary {
+  border-color: var(--accent-line);
+  background: var(--accent-fill);
+}
+
+.selection .button.danger {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+}
+
+.selection .button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+
+.add-panel fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.add-panel legend {
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.add-panel .choice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.add-panel .dim,
+.add-panel .hint {
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+
+.add-new {
+  margin: 8px 0 0;
+}
+
+.add-panel .hint {
+  margin: 8px 0;
+}
+
+.custom-mark {
+  color: var(--warn-text);
+}
+
+.selection-outcome {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+}
+
+/* the tick sits in the blurb's corner, out of the way of the title */
+.blurb.selectable {
+  padding-left: 38px;
+}
+
+.blurb .pick {
+  position: absolute;
+  top: 14px;
+  left: 12px;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.blurb.ticked {
+  border-color: var(--accent-line);
+}
+
+/* include and exclude by tag, side by side where there is room */
+.tag-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px 24px;
+  margin-top: 14px;
+}
+
+/* where a work came from, when that is not your own bookmarks, and whether it is hidden */
+.provenance:empty {
+  display: none;
+}
+
+.provenance {
+  margin: 0 0 4px;
+}
+
+/* the origin icon every entry carries, coloured like its badge */
+.origin-icon {
+  display: inline-flex;
+  vertical-align: middle;
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  color: var(--note-text);
+}
+
+.origin-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
+.origin-icon svg[fill='none'] {
+  fill: none;
+}
+
+.origin-icon.bookmarks {
+  color: var(--danger-text);
+}
+
+.origin-icon.collection {
+  color: var(--ok-text);
+}
+
+.origin-icon.other {
+  color: var(--text-dim);
+}
+
+.badge.origin {
+  border-color: var(--note-border);
+  color: var(--note-text);
+}
+
+.badge.origin.collection {
+  border-color: var(--ok-border);
+  color: var(--ok-text);
+}
+
+.badge.mirror {
+  border-color: var(--warn-border);
+  color: var(--warn-text);
+}
+
+.badge.hidden-badge {
+  border-color: var(--border-strong);
+  color: var(--text-dim);
+}
+
+.blurb.hidden-work {
+  opacity: 0.6;
+  border-style: dashed;
+}
+
+/* the entry's own actions sit in its bottom corner, away from the title and the date */
+/* a row of its own at the foot of the entry, so nothing later in the entry can cover it */
+.entry-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+  gap: 4px;
+  align-items: center;
+}
+
+.hide-toggle {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.hide-toggle:hover,
+.hide-toggle:focus-visible {
+  border-color: var(--border-strong);
+  color: var(--text-strong);
+}
+
+.hide-toggle.unhide {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.filter-hidden {
+  margin: 12px 0 0;
+  font-size: 0.88rem;
+}
+
+.filter-hidden label {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  cursor: pointer;
+}
+
+/* the 'are you sure' before hiding - the same modal shell as the rest of the page */
+.hide-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.hide-modal .backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--backdrop);
+}
+
+.hide-modal .dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(480px, 100%);
+  /* never taller than the window: the body scrolls instead, so the buttons stay in reach
+     however many works or series a window lists */
+  max-height: calc(100vh - 40px);
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  background: var(--surface);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.hide-modal header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.hide-modal h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--text-strong);
+}
+
+.hide-modal .body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 16px;
+  font-size: 0.9rem;
+}
+
+.hide-modal .body p {
+  margin: 0 0 10px;
+}
+
+.hide-modal .hint {
+  color: var(--text-dim);
+  font-size: 0.82rem;
+}
+
+.dont-warn {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.hide-modal footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.hide-modal .button {
+  padding: 6px 13px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--surface-2);
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.hide-modal .button.primary {
+  border-color: var(--accent-line);
+  background: var(--accent-fill);
+}
+
+.entry-menu {
+  position: relative;
+}
+
+.entry-menu-toggle {
+  padding: 0 7px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 1.1rem;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+.entry-menu-toggle:hover,
+.entry-menu-toggle:focus-visible,
+.entry-menu-toggle[aria-expanded='true'] {
+  border-color: var(--border-strong);
+  color: var(--text-strong);
+}
+
+/* opens upward and to the left: the button is in the blurb's bottom right corner */
+.entry-menu-items {
+  position: absolute;
+  z-index: 10;
+  right: 0;
+  bottom: calc(100% + 4px);
+  min-width: 190px;
+  margin: 0;
+  padding: 4px 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--surface);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  list-style: none;
+}
+
+.entry-menu-items button {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  background: none;
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.entry-menu-items button:hover {
+  background: var(--surface-2);
+}
+
+.entry-menu-items button.unavailable {
+  color: var(--text-dim);
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.series-left-out {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  font-size: 0.88rem;
+}
+
+.series-left-out .dim {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
+.add-panel fieldset {
+  margin: 0;
+}
+
+/* a long list of what will be left out scrolls on its own, inside the window */
+.series-left-out {
+  max-height: 40vh;
+  overflow-y: auto;
+  margin: 0 0 10px;
+  padding: 4px 4px 4px 22px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+
+/* a work known only by its number: the way to fetch it, as a link in its sentence */
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* under the Works tab's heading: how many of the works listed are your bookmarks */
+.bookmark-count {
+  margin: -4px 0 8px;
+  color: var(--text-dim);
+}
+
+/* a private bookmark: a lock just left of the bookmark icon, in the dim text colour */
+.private-icon {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  color: var(--text-dim);
+}
+
+.private-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}

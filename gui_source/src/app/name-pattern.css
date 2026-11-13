@@ -1,0 +1,77 @@
+.name-pattern h4 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.hint {
+  color: var(--text-dim);
+  font-size: 0.88rem;
+}
+
+.button {
+  padding: 7px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--surface-2);
+  color: var(--text-strong);
+  font: inherit;
+  cursor: pointer;
+}
+
+.button.primary {
+  border-color: var(--accent-line);
+  background: var(--accent-fill);
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* the file name pattern: its parts as tiles, a separator box between each */
+.pattern-parts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+  padding: 0;
+  margin: 10px 0;
+}
+.pattern-part {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border: 1px solid var(--accent-line);
+  border-radius: 6px;
+  background: var(--accent-bg);
+  color: var(--text-strong);
+  cursor: grab;
+}
+.pattern-part .grip { color: var(--text-dim); letter-spacing: -3px; }
+.pattern-part .nudge { padding: 0 4px; }
+.pattern-separator {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+}
+.pattern-separator .sep-hint { font-size: 0.75em; color: var(--text-dim); }
+.pattern-separator input {
+  width: 4.5em;
+  font-family: monospace;
+  text-align: center;
+}
+.pattern-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 8px; }
+.pattern-unsaved { color: var(--warn-text); font-size: 0.88rem; }
+/* side by side, under the heading - well away from Save */
+.pattern-presets { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.pattern-problem, .pattern-said.warning {
+  color: var(--warn-text);
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+}

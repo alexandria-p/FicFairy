@@ -1,0 +1,653 @@
+"""Tests for source_code.runs - the per-run history files."""
+
+import datetime
+import re
+import json
+import os
+from unittest.mock import MagicMock
+
+from source_code import runs
+from source_code.fileio import FileOps
+from source_code.storage import LocalStorage
+
+
+def on_disk(fileops, root: str):
+    """Give a mocked FileOps a real local library underneath: run records and index files are
+    read and written through the storage layer now, so a mock needs the real methods for it."""
+
+    fileops.storage = LocalStorage(root)
+    for name in ('read_text', 'write_text', 'list_files', 'is_file', 'exists', 'same_file',
+                 'describe'):
+        method = getattr(FileOps, name)
+        getattr(fileops, name).side_effect = (
+            lambda *args, _method=method: _method(fileops, *args))
+    return fileops
+
+
+def fake_fileops(tmp_path):
+    fileops = MagicMock()
+    fileops.runsfolder = str(tmp_path / 'runs')
+    return on_disk(fileops, str(tmp_path))
+
+
+def a_record(tmp_path, action='sync', filetypes=('JSON', 'HTML'), options=None):
+    return runs.RunRecord(fake_fileops(tmp_path), 'abcdef1234', action, 'A Button',
+                          list(filetypes), options or {'pages': 0})
+
+
+def written(tmp_path) -> list[dict]:
+    folder = tmp_path / 'runs'
+    return [json.loads((folder / name).read_text(encoding='utf-8'))
+            for name in sorted(os.listdir(folder))]
+
+
+# region a run writes itself down as it goes
+
+def test_a_run_is_on_disk_before_it_has_done_anything(tmp_path):
+    # a run killed mid-flight cannot write its own epitaph, so the file has to exist from
+    # the start - that is what makes an interrupted run recognisable at all
+    a_record(tmp_path)
+
+    records = written(tmp_path)
+    assert len(records) == 1
+    assert records[0]['status'] == runs.STATUS_RUNNING
+    assert records[0]['finished'] is None
+
+
+def test_a_record_says_which_button_and_which_settings(tmp_path):
+    a_record(tmp_path, action='custom', filetypes=['JSON', 'PDF'],
+             options={'pages': 3, 'reindex': False})
+
+    record = written(tmp_path)[0]
+    assert record['action'] == 'custom'
+    assert record['actionName'] == 'A Button'
+    assert record['filetypes'] == ['JSON', 'PDF']
+    assert record['options']['pages'] == 3
+    assert record['options']['reindex'] is False
+    assert record['started']
+
+
+def test_finishing_stamps_the_outcome_and_the_time(tmp_path):
+    record = a_record(tmp_path)
+
+    record.finish(runs.STATUS_SUCCESS)
+
+    saved = written(tmp_path)[0]
+    assert saved['status'] == runs.STATUS_SUCCESS
+    assert saved['finished']
+    assert saved['error'] == ''
+
+
+def test_a_failure_keeps_the_reason(tmp_path):
+    record = a_record(tmp_path)
+
+    record.finish(runs.STATUS_FAILED, 'invalid username or password')
+
+    assert written(tmp_path)[0]['error'] == 'invalid username or password'
+
+
+def test_the_fic_lists_are_kept_apart(tmp_path):
+    # they answer different questions: what got a fresh entry, what arrived as a file, and
+    # what replaced a copy that was already there
+    ao3 = MagicMock()
+    ao3.reindexed = {'111', '222'}
+    ao3.downloaded = {'222'}
+    ao3.updated = {'333'}
+    ao3.failures = [{'id': '444', 'link': 'x', 'error': 'timed out'}]
+    ao3.skipped_works = [{'id': None, 'link': '', 'error': 'deleted'}]
+    record = a_record(tmp_path)
+
+    record.collect(ao3)
+    record.finish(runs.STATUS_SUCCESS)
+
+    saved = written(tmp_path)[0]
+    assert saved['reindexed'] == ['111', '222']
+    assert saved['downloaded'] == ['222']
+    assert saved['updated'] == ['333']
+    assert saved['failures'][0]['id'] == '444'
+    assert saved['skipped'][0]['error'] == 'deleted'
+
+
+def test_a_run_with_no_downloader_still_finishes(tmp_path):
+    # a run that failed before it built one still has to close its record
+    record = a_record(tmp_path)
+
+    record.collect(None)
+    record.finish(runs.STATUS_FAILED, 'never got going')
+
+    assert written(tmp_path)[0]['status'] == runs.STATUS_FAILED
+
+
+def test_a_choice_the_run_stopped_to_ask_is_recorded(tmp_path):
+    # so a library renamed months ago can be explained by what was asked and answered
+    record = a_record(tmp_path)
+
+    record.choice({'question': 'undated', 'count': 12, 'choice': 'stamp',
+                   'date': '2024-06-01'})
+
+    choices = written(tmp_path)[0]['choices']
+    assert choices[0]['choice'] == 'stamp'
+    assert choices[0]['date'] == '2024-06-01'
+    assert choices[0]['at']
+
+
+def test_a_record_keeps_the_settings_the_run_worked_from(tmp_path):
+    # pacing, naming and retries all come from settings.ini, so a run cannot be explained
+    # afterwards without knowing what it said - or which settings.ini it was
+    runs.RunRecord(fake_fileops(tmp_path), 'abc', 'sync', 'A', ['JSON'], {},
+                   settings={'extraWaitTime': 15, 'file': 'C:\\app\\config\\settings.ini'})
+
+    saved = written(tmp_path)[0]['settings']
+    assert saved['extraWaitTime'] == 15
+    assert saved['file'] == 'C:\\app\\config\\settings.ini'
+
+
+def test_a_record_with_no_settings_to_hand_still_writes(tmp_path):
+    a_record(tmp_path)
+
+    assert written(tmp_path)[0]['settings'] == {}
+
+
+STAMP = re.compile(r'^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC\] ')
+
+
+def unstamped(log: list[str]) -> list[str]:
+    """A log's lines without the time each was said, every one of them checked to have one."""
+
+    assert all(STAMP.match(x) for x in log), log
+    return [STAMP.sub('', x) for x in log]
+
+
+def test_every_line_of_the_log_says_when_it_was_said(tmp_path, monkeypatch):
+    # the log is downloaded from History long after the run; without times it cannot say
+    # where a run spent an hour
+    monkeypatch.setattr(runs, 'utc_now', lambda: '2026-10-30 14:47:47')
+    record = a_record(tmp_path)
+
+    record.line('looking up work 75354806')
+    record.finish(runs.STATUS_SUCCESS)
+
+    assert written(tmp_path)[0]['log'] == ['[2026-10-30 14:47:47 UTC] looking up work 75354806']
+
+
+def test_the_time_on_a_line_is_utc_whatever_the_helper_s_own_zone(tmp_path):
+    record = a_record(tmp_path)
+    before = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+
+    record.line('indexing')
+    record.finish(runs.STATUS_SUCCESS)
+
+    stamp = written(tmp_path)[0]['log'][0][1:20]
+    said = datetime.datetime.strptime(stamp, '%Y-%m-%d %H:%M:%S').replace(tzinfo=datetime.timezone.utc)
+    assert abs((said - before).total_seconds()) < 5
+
+
+def test_the_console_output_is_kept_with_the_run(tmp_path):
+    # the modal is gone once the tab is closed, and this is the only lasting copy
+    record = a_record(tmp_path)
+
+    record.line('indexing')
+    record.line('fetching page 1 of 80')
+    record.finish(runs.STATUS_SUCCESS)
+
+    assert unstamped(written(tmp_path)[0]['log']) == ['indexing', 'fetching page 1 of 80']
+
+
+def test_lines_printed_before_the_record_existed_are_not_lost(tmp_path):
+    # the run says it is logging in before there is a file to say it into
+    record = runs.RunRecord(fake_fileops(tmp_path), 'abc', 'sync', 'A', ['JSON'], {},
+                            printed=[runs.stamped('logging in as someone')])
+
+    record.line('logged in')
+    record.finish(runs.STATUS_SUCCESS)
+
+    assert unstamped(written(tmp_path)[0]['log']) == ['logging in as someone', 'logged in']
+
+
+def test_a_line_saves_the_record_only_once_enough_time_has_passed(tmp_path):
+    # save rewrites the whole file - an upload, for a library in Dropbox - so a line per fic
+    # per format must not rewrite a growing file thousands of times
+    record = a_record(tmp_path)
+    record.save()
+    record.save = MagicMock()
+
+    for n in range(500):
+        record.line(f'line {n}')
+
+    record.save.assert_not_called()
+
+
+def test_a_few_lines_over_a_long_stretch_still_reach_disk(tmp_path):
+    # an index walk held up by ao3's rate limit prints a handful of lines an hour. time alone
+    # decides, so it is not left waiting for a batch of lines that never comes
+    record = a_record(tmp_path)
+    record.save()
+    record.line('fetching page 3')
+    record.save = MagicMock()
+    record.last_saved -= runs.LOG_FLUSH_SECONDS
+
+    record.line('fetching page 4')
+
+    record.save.assert_called_once()
+
+
+def test_saving_every_line_would_keep_the_whole_log(tmp_path, monkeypatch):
+    monkeypatch.setattr(runs, 'LOG_FLUSH_SECONDS', 0)
+    record = a_record(tmp_path)
+
+    for n in range(3):
+        record.line(f'line {n}')
+
+    assert unstamped(written(tmp_path)[0]['log']) == ['line 0', 'line 1', 'line 2']
+
+
+def test_the_default_wait_is_two_minutes():
+    assert runs.LOG_FLUSH_SECONDS == 120
+
+
+def test_an_interrupted_run_keeps_its_issues_and_fics_as_of_its_last_save(tmp_path):
+    # nothing closes the record of a run killed outright, so every save carries what the run
+    # has gathered so far - not only the one at the end it never reaches
+    record = a_record(tmp_path)
+    ao3 = MagicMock()
+    ao3.reindexed, ao3.downloaded, ao3.updated = {'2', '1'}, {'1'}, set()
+    ao3.failures = [{'id': '9', 'link': 'l', 'error': 'gone'}]
+    ao3.skipped_works = [{'id': '', 'link': 's', 'error': 'a series'}]
+    ao3.kept_copies = []
+    record.source = lambda: ao3
+
+    record.checkpoint(step='download')
+
+    saved = written(tmp_path)[0]
+    assert saved['reindexed'] == ['1', '2']
+    assert saved['downloaded'] == ['1']
+    assert saved['failures'] == [{'id': '9', 'link': 'l', 'error': 'gone'}]
+    assert saved['skipped'] == [{'id': '', 'link': 's', 'error': 'a series'}]
+    assert saved['status'] == runs.STATUS_RUNNING
+
+
+def test_a_run_with_no_downloader_yet_saves_as_it_did(tmp_path):
+    record = a_record(tmp_path)
+    record.source = lambda: None
+
+    record.checkpoint(step='login')
+
+    assert written(tmp_path)[0]['failures'] == []
+
+
+def test_a_source_that_cannot_be_read_never_stops_the_save(tmp_path):
+    record = a_record(tmp_path)
+    record.source = lambda: 1 / 0
+
+    record.checkpoint(step='login')
+
+    assert written(tmp_path)[0]['progress'] == {'step': 'login'}
+
+
+def test_a_very_long_run_keeps_the_end_of_its_log_and_says_what_it_dropped(tmp_path):
+    # whatever went wrong is at the end, so the start is what gives way - and a log that
+    # begins in the middle has to say so rather than reading as the whole run
+    record = a_record(tmp_path)
+
+    for n in range(runs.LOG_MAX_LINES + 10):
+        record.line(f'line {n}')
+    record.finish(runs.STATUS_SUCCESS)
+
+    saved = written(tmp_path)[0]
+    assert len(saved['log']) == runs.LOG_MAX_LINES
+    assert unstamped(saved['log'])[-1] == f'line {runs.LOG_MAX_LINES + 9}'
+    assert saved['logTrimmed'] == 10
+
+
+def test_a_run_log_can_be_made_longer_and_is_kept_in_range(tmp_path):
+    record = a_record(tmp_path)
+    record.max_lines = 600
+    for n in range(650):
+        record.line(f'line {n}')
+    record.finish(runs.STATUS_SUCCESS)
+    assert len(written(tmp_path)[0]['log']) == 600
+
+    assert runs.log_max_lines(20000) == 20000
+    assert runs.log_max_lines(10) == runs.LOG_MIN_LINES
+    assert runs.log_max_lines(10 ** 9) == runs.LOG_MOST_LINES
+    assert runs.log_max_lines('nonsense') == runs.LOG_MAX_LINES
+
+
+# endregion
+
+# region only the most recent runs keep their logs
+
+def some_runs(tmp_path, count: int, **fields) -> None:
+    folder = tmp_path / 'runs'
+    folder.mkdir(exist_ok=True)
+    for n in range(count):
+        (folder / f'2026{n:06d}T000000Z-{n:08d}.json').write_text(json.dumps(
+            {'id': f'{n:08d}', 'status': runs.STATUS_SUCCESS, 'log': [f'run {n} said this'], **fields}),
+            encoding='utf-8')
+
+
+def logs_of(tmp_path) -> dict[str, dict]:
+    folder = tmp_path / 'runs'
+    return {name: json.loads((folder / name).read_text(encoding='utf-8')) for name in os.listdir(folder)}
+
+
+def test_only_the_most_recent_runs_keep_their_logs_and_the_records_stay(tmp_path):
+    some_runs(tmp_path, 105)
+    fileops = fake_fileops(tmp_path)
+
+    assert runs.prune_old_logs(fileops) == 5
+
+    records = logs_of(tmp_path)
+    assert len(records) == 105
+    oldest = sorted(records)[:5]
+    for name, record in records.items():
+        if name in oldest:
+            assert record['log'] == [] and record['logPruned'] == 1
+            assert record['status'] == runs.STATUS_SUCCESS
+        else:
+            assert record['log'] and 'logPruned' not in record
+
+
+def test_pruning_stops_at_the_first_record_already_pruned(tmp_path):
+    some_runs(tmp_path, 105)
+    fileops = fake_fileops(tmp_path)
+    runs.prune_old_logs(fileops)
+    some_runs(tmp_path, 0)
+    # one more run: only the record that has just fallen past the newest 100 is read and pruned
+    (tmp_path / 'runs' / '20270000T000000Z-zzzzzzzz.json').write_text(
+        json.dumps({'id': 'zzzzzzzz', 'status': runs.STATUS_SUCCESS, 'log': ['new']}), encoding='utf-8')
+    reads = []
+    real = fileops.read_text.side_effect
+    fileops.read_text.side_effect = lambda path: (reads.append(path), real(path))[1]
+
+    assert runs.prune_old_logs(fileops) == 1
+    assert len(reads) == 2
+
+
+def test_a_run_still_going_keeps_its_log(tmp_path):
+    some_runs(tmp_path, 101, status=runs.STATUS_RUNNING)
+    assert runs.prune_old_logs(fake_fileops(tmp_path)) == 0
+    assert all(record['log'] for record in logs_of(tmp_path).values())
+
+
+def test_a_line_that_cannot_be_kept_does_not_take_the_run_down(tmp_path):
+    record = a_record(tmp_path)
+    record.data.pop('log')
+
+    record.line('something')
+
+
+def test_a_history_file_that_cannot_be_written_does_not_raise(tmp_path):
+    # a note about the run is not worth taking the run down for
+    fileops = on_disk(MagicMock(), str(tmp_path))
+    fileops.runsfolder = str(tmp_path / 'runs')
+    record = runs.RunRecord(fileops, 'abc', 'sync', 'A', ['JSON'], {})
+    record.path = str(tmp_path / 'runs' / 'no' / 'such' / '\0bad.json')
+
+    record.finish(runs.STATUS_SUCCESS)
+
+# endregion
+
+
+# region reading the history back
+
+def test_runs_come_back_newest_first(tmp_path):
+    folder = tmp_path / 'runs'
+    folder.mkdir(parents=True)
+    for name in ['2026-01-01T000000-a.json', '2026-06-01T000000-b.json']:
+        (folder / name).write_text(json.dumps({'id': name[:4]}), encoding='utf-8')
+
+    found = runs.read_runs(fake_fileops(tmp_path))
+
+    assert [x['file'] for x in found] == ['2026-06-01T000000-b.json',
+                                          '2026-01-01T000000-a.json']
+
+
+def test_the_listing_leaves_the_console_log_behind(tmp_path):
+    # a hundred records with thousands of lines each would be tens of megabytes, to build a
+    # page that does not show them. the count is what the listing can use; the lines stay
+    # in the file
+    record = a_record(tmp_path)
+    record.line('indexing')
+    record.line('fetching page 1 of 80')
+    record.finish(runs.STATUS_SUCCESS)
+
+    listed = runs.read_runs(fake_fileops(tmp_path))[0]
+
+    assert 'log' not in listed
+    assert listed['logLines'] == 2
+
+
+def test_the_log_can_be_asked_for_when_it_is_wanted(tmp_path):
+    record = a_record(tmp_path)
+    record.line('indexing')
+    record.finish(runs.STATUS_SUCCESS)
+
+    listed = runs.read_runs(fake_fileops(tmp_path), with_log=True)[0]
+
+    assert unstamped(listed['log']) == ['indexing']
+
+
+def test_a_record_written_before_logs_were_kept_still_lists(tmp_path):
+    # the history folder outlives any one version of the format
+    folder = tmp_path / 'runs'
+    folder.mkdir()
+    (folder / 'old.json').write_text(json.dumps({'id': 'x', 'status': 'success'}),
+                                     encoding='utf-8')
+
+    listed = runs.read_runs(fake_fileops(tmp_path))
+
+    assert listed[0]['logLines'] == 0
+
+
+def test_a_damaged_record_does_not_hide_the_rest(tmp_path):
+    folder = tmp_path / 'runs'
+    folder.mkdir(parents=True)
+    (folder / '2026-01-01T000000-a.json').write_text('{not json', encoding='utf-8')
+    (folder / '2026-02-01T000000-b.json').write_text(json.dumps({'id': 'b'}),
+                                                     encoding='utf-8')
+
+    assert [x['id'] for x in runs.read_runs(fake_fileops(tmp_path))] == ['b']
+
+
+def test_no_history_yet_is_not_an_error(tmp_path):
+    assert runs.read_runs(fake_fileops(tmp_path)) == []
+
+
+def records_on_disk(tmp_path, names_and_records):
+    folder = tmp_path / 'runs'
+    folder.mkdir(parents=True, exist_ok=True)
+    for name, record in names_and_records:
+        (folder / name).write_text(json.dumps(record), encoding='utf-8')
+    fileops = fake_fileops(tmp_path)
+    return fileops
+
+
+def read_names(fileops) -> list[str]:
+    return [os.path.basename(call.args[0]) for call in fileops.read_text.call_args_list]
+
+
+def test_the_last_successful_run_reads_only_as_far_as_the_first_that_qualifies(tmp_path):
+    fileops = records_on_disk(tmp_path, [
+        (f'202601{day:02}T000000Z-{day:08}.json', {'id': str(day), 'status': runs.STATUS_SUCCESS})
+        for day in range(1, 21)])
+
+    assert runs.last_successful(fileops)['id'] == '20'
+    assert read_names(fileops) == ['20260120T000000Z-00000020.json']
+
+
+def test_a_run_is_found_by_its_file_name_without_reading_the_rest(tmp_path):
+    fileops = records_on_disk(tmp_path, [
+        ('20260101T000000Z-aaaaaaaa.json', {'id': 'aaaaaaaa-1111', 'status': runs.STATUS_SUCCESS}),
+        ('20260102T000000Z-bbbbbbbb.json', {'id': 'bbbbbbbb-2222', 'status': runs.STATUS_STOPPED}),
+        ('20260103T000000Z-cccccccc.json', {'id': 'cccccccc-3333', 'status': runs.STATUS_SUCCESS}),
+    ])
+
+    assert runs.find_run(fileops, 'aaaaaaaa-1111')['file'] == '20260101T000000Z-aaaaaaaa.json'
+    assert read_names(fileops) == ['20260101T000000Z-aaaaaaaa.json']
+
+
+def test_a_run_in_a_file_named_otherwise_is_still_found(tmp_path):
+    fileops = records_on_disk(tmp_path, [
+        ('renamed by hand.json', {'id': 'dddddddd-4444', 'status': runs.STATUS_SUCCESS})])
+    assert runs.find_run(fileops, 'dddddddd-4444')['file'] == 'renamed by hand.json'
+
+
+def test_newer_names_sort_after_every_older_style_of_name():
+    # runs are listed newest first by name: the compact UTC names written now must come after
+    # the dashed local-time and +0000 names earlier versions wrote, whatever the date in them
+    older = ['2026-12-31T235959-aaaaaaaa.json', '2026-12-31T235959+0000-bbbbbbbb.json']
+    newer = '20260101T000000Z-cccccccc.json'
+    assert sorted([*older, newer], reverse=True)[0] == newer
+
+
+def test_the_last_successful_run_ignores_the_ones_that_did_not_finish(tmp_path):
+    # a stopped run may have stopped before reaching fics updated before it started, so
+    # trusting it as a floor would leave exactly those unseen
+    folder = tmp_path / 'runs'
+    folder.mkdir(parents=True)
+    (folder / '2026-01-01T000000-a.json').write_text(
+        json.dumps({'id': 'old', 'status': runs.STATUS_SUCCESS}), encoding='utf-8')
+    (folder / '2026-02-01T000000-b.json').write_text(
+        json.dumps({'id': 'stopped', 'status': runs.STATUS_STOPPED}), encoding='utf-8')
+    (folder / '2026-03-01T000000-c.json').write_text(
+        json.dumps({'id': 'running', 'status': runs.STATUS_RUNNING}), encoding='utf-8')
+
+    assert runs.last_successful(fake_fileops(tmp_path))['id'] == 'old'
+
+
+def test_there_may_never_have_been_a_successful_run(tmp_path):
+    assert runs.last_successful(fake_fileops(tmp_path)) is None
+
+
+def test_a_caller_can_say_which_finished_runs_count(tmp_path):
+    # finishing is not enough on its own: most runs cover only part of the listing, so a
+    # successful one says nothing about the works it was never looking at
+    folder = tmp_path / 'runs'
+    folder.mkdir(parents=True)
+    (folder / '2026-01-01T000000-a.json').write_text(
+        json.dumps({'id': 'scan', 'status': runs.STATUS_SUCCESS, 'action': 'bookmarks'}),
+        encoding='utf-8')
+    (folder / '2026-02-01T000000-b.json').write_text(
+        json.dumps({'id': 'sync', 'status': runs.STATUS_SUCCESS, 'action': 'sync'}),
+        encoding='utf-8')
+
+    found = runs.last_successful(fake_fileops(tmp_path),
+                                 match=lambda r: r.get('action') == 'bookmarks')
+
+    assert found['id'] == 'scan'
+
+# endregion
+
+
+def test_what_came_of_a_choice_is_added_to_it_afterwards(tmp_path):
+    record = a_record(tmp_path)
+    record.choice({'question': 'undated', 'count': 1, 'works': ['111'], 'choice': 'stamp'})
+
+    record.amend_choice({'renamed': [{'id': '111', 'from': 'a.html', 'to': 'a 2024.html'}]})
+
+    choice = written(tmp_path)[0]['choices'][0]
+    assert choice['works'] == ['111']
+    assert choice['renamed'][0]['to'] == 'a 2024.html'
+
+
+def test_amending_with_nothing_asked_does_nothing(tmp_path):
+    record = a_record(tmp_path)
+    record.amend_choice({'renamed': []})
+    assert written(tmp_path)[0]['choices'] == []
+
+
+def test_old_copies_that_would_not_go_are_kept_with_the_run(tmp_path):
+    record = a_record(tmp_path)
+    ao3 = MagicMock()
+    ao3.reindexed = ao3.downloaded = ao3.updated = set()
+    ao3.failures = ao3.skipped_works = []
+    ao3.kept_copies = [{'id': '1', 'link': 'l', 'file': 'new.html', 'old': 'old.html',
+                        'error': 'locked'}]
+
+    record.collect(ao3)
+    record.finish(runs.STATUS_SUCCESS)
+
+    assert written(tmp_path)[0]['keptCopies'][0]['file'] == 'new.html'
+
+
+# region whose account a run used
+
+def test_a_run_record_names_the_ao3_account_it_logged_in_as(tmp_path):
+    fileops = MagicMock()
+    fileops.runsfolder = str(tmp_path)
+    saved = {}
+    fileops.write_text.side_effect = lambda path, text: saved.update(json.loads(text))
+
+    runs.RunRecord(fileops, 'abcdef123', 'quick', 'Quick Scan', ['JSON'], {}, username='Someone')
+
+    assert saved['username'] == 'Someone'
+
+
+def test_every_run_records_its_username_and_never_its_password(tmp_path):
+    # through run_job, as a real run starts - and for a run whose login is refused too,
+    # since its record is written before the attempt
+    from unittest.mock import patch
+    from source_code import server
+
+    for refused in (False, True):
+        written: list[str] = []
+        fileops = MagicMock()
+        fileops.runsfolder = str(tmp_path)
+        fileops.write_text.side_effect = lambda path, text: written.append(text)
+        job = server.Job(server.ACTION_QUICK, ['JSON'], 'Someone', server.resolve_options({}))
+        with patch.object(server, 'FileOps', return_value=fileops), \
+             patch.object(server, 'Repository') as repository, \
+             patch.object(server, 'settings_for_record', return_value={}), \
+             patch.object(server, 'begin_record'), \
+             patch.object(server, 'runners', return_value={job.action: lambda *a: None}):
+            if refused:
+                repository.return_value.login.side_effect = Exception('login refused')
+            server.run_job(job, 'a-secret-password')
+
+        assert written, 'the run wrote no record'
+        assert all(json.loads(text)['username'] == 'Someone' for text in written)
+        assert not any('a-secret-password' in text for text in written)
+
+# endregion
+
+
+# region every time a run records is UTC, and says so
+
+def test_a_run_records_its_times_in_utc_marked_as_such():
+    import datetime as dt
+    stamp = runs.now()
+    assert stamp.endswith('+00:00')
+    at = dt.datetime.fromisoformat(stamp)
+    assert abs((dt.datetime.now(dt.timezone.utc) - at).total_seconds()) < 5
+
+
+def test_a_recorded_time_is_said_in_utc_and_an_older_naive_one_as_written():
+    assert runs.shown('2026-11-03T10:15:42+00:00') == '2026-11-03 10:15 UTC'
+    assert runs.shown('2026-11-03T21:15:42+11:00') == '2026-11-03 10:15 UTC'
+    assert runs.shown('2026-11-03T10:15:42') == '2026-11-03 10:15'
+    assert runs.shown('') == ''
+
+
+def test_a_run_s_file_name_still_sorts_by_when_it_started_and_ends_with_its_id(tmp_path):
+    record = runs.RunRecord(fake_fileops(tmp_path), 'abcdef1234', 'sync', 'A', ['JSON'], {})
+    name = os.path.basename(record.path)
+    assert re.fullmatch(r'\d{8}T\d{6}Z-abcdef12\.json', name)
+    # the name and the record's own start are the same moment
+    assert name[:16] == runs.file_stamp(record.data['started'])
+    # and it sorts after every name an older version wrote, in local time: those are all from
+    # before it, and within a year the digit after the year sorts after their '-'
+    assert name > f'{name[:4]}-12-31T235959-ffffffff.json'
+    assert record.data['started'].endswith('+00:00')
+
+
+# endregion
+
+
+def test_every_line_a_run_says_reaches_the_page_with_when_it_was_said_in_utc():
+    from source_code import progress, server
+    job = server.Job(server.ACTION_BOOKMARKS, ['JSON'], 'Someone')
+    job.emit({'type': progress.MESSAGE, 'text': 'looking up work 7'})
+    [event] = job.history
+    assert event['text'] == 'looking up work 7'
+    assert event['at'].endswith('+00:00')

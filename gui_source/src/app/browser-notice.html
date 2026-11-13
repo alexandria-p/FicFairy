@@ -1,0 +1,56 @@
+<div class="backdrop" (click)="dismiss()"></div>
+
+<div class="dialog" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+  <header>
+    <h2>Saving to Dropbox, or to this device</h2>
+    <button type="button" class="icon" (click)="dismiss()" aria-label="Close">&times;</button>
+  </header>
+
+  <section class="body">
+    <div class="option">
+      <h3>Planning to use Dropbox? <span class="plain">You can use this tool on any browser.</span></h3>
+    </div>
+
+    <div class="option">
+      <h3>Reading &amp; saving works to a folder on a device:</h3>
+      <ul>
+        <li>Computer-only (no mobile functionality for now)</li>
+        <li>Requires a Chromium browser. This includes Chrome, Edge, Opera or Arc.</li>
+      </ul>
+    </div>
+
+    @if (device.writesFolders()) {
+      <p class="hint">This is a Chromium browser, so you are good to go with either option.</p>
+    } @else if (device.mobile()) {
+      <!-- a phone's browser cannot, Chromium or not: switching browser would not help -->
+      <p class="warning">
+        This device cannot perform scans or save downloads. Use a computer with a Chromium browser.
+      </p>
+    } @else {
+      <p class="warning">
+        This browser cannot perform scans or save downloads to your device. Switch to a Chromium
+        browser, or consider using Dropbox instead. You can still read an imported library.
+      </p>
+    }
+
+    <p class="hint">
+      Leave it open as it runs. We recommend leaving it open overnight the first time you run a
+      full scan of your bookmarks.
+    </p>
+  </section>
+
+  <footer>
+    @if (always) {
+      <label class="check">
+        <input
+          type="checkbox"
+          name="dontShowAgain"
+          [checked]="dontShowAgain()"
+          (change)="dontShowAgain.set($any($event.target).checked)"
+        />
+        <span>Don't show this again</span>
+      </label>
+    }
+    <button type="button" class="button primary" (click)="dismiss()">Got it</button>
+  </footer>
+</div>
