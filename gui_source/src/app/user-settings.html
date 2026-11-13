@@ -32,7 +32,9 @@
                          (change)="tickClear(option.id, $any($event.target).checked)" />
                   <span>
                     {{ option.label }}
-                    <span class="hint">{{ option.held || option.hint }}</span>
+                    @if (option.held || option.hint) {
+                      <span class="hint">{{ option.held || option.hint }}</span>
+                    }
                   </span>
                 </label>
               </li>
@@ -390,37 +392,18 @@
     }
   </details>
 
-  <section class="group import-exclusions" [class.guest-locked]="guest()" [attr.inert]="guest() ? '' : null" [attr.aria-disabled]="guest() ? 'true' : null">
-    <div class="group-head">
-      <h3>Exclusion lists for imports</h3>
-      <span class="saved-to" [title]="'In import-excluded.json at the top of ' + libraryPlace() + ' - it goes wherever the library goes'">Saved in {{ libraryPlace() }}</span>
-    </div>
-    <p class="hint">
-      When your library is read, files with no date in their name or no index entry are offered
-      in Resolve issues found in your library, except any you said not to ask about again - those
-      are kept on exclusion lists in <code>import-excluded.json</code> at the top of the library.
-    </p>
-    <button type="button" class="button reset-exclusions"
-            [disabled]="!canResetExclusions() || resettingExclusions()"
-            [title]="canResetExclusions() ? '' : 'Open a library you can write to first'"
-            (click)="resetExclusions()">
-      Reset exclusion lists for imports
-    </button>
-  </section>
-
   <section class="group index-cache" [class.guest-locked]="guest()" [attr.inert]="guest() ? '' : null" [attr.aria-disabled]="guest() ? 'true' : null">
     <div class="group-head">
       <h3>Dropbox library cache</h3>
       <span class="saved-to">Saved to this browser</span>
     </div>
     <p class="hint">
-      This browser keeps a copy of your Dropbox library's index, so opening it downloads only the
-      index files that changed since last time. The copy is shown while Dropbox is checked, and
-      Dropbox always has the last word. Clearing it changes nothing in Dropbox - the next time the
-      library opens, its whole index is downloaded again. Signing out of Dropbox clears it too.
+      This browser caches information from Dropbox to speed up its page load. This means that
+      FicFairy only needs to download the index files that changed since last time.
       @if (cachedFiles() !== null) {
         It holds {{ cachedFiles() }} index file{{ cachedFiles() === 1 ? '' : 's' }} now.
       }
+      Signing out of Dropbox also clears this cache.
     </p>
     <button type="button" class="button clear-cache" [disabled]="clearingCache()" (click)="clearCache()">
       Clear cache
@@ -433,13 +416,13 @@
       <span class="saved-to">Saved to this browser</span>
     </div>
     <p class="hint">
-      Choose what to clear: your settings, the saved AO3 username, the visit log, the Dropbox
-      cache, or the library this browser has open - one at a time or all together.
+      This shows you any information saved to your browser memory (such as user settings, logs,
+      Dropbox cache). Choose whether to clear part or all of it.
     </p>
     <p class="hint nothing-lost">
-      <strong>Nothing in your library is lost.</strong> Your works, their index, collections, run
-      history, hidden works and import lists stay in your folder or in Dropbox, ready for when you
-      open it again.
+      <strong>Your downloaded works will not be lost.</strong> Fics, indexing, collections, run
+      history, hidden works and import lists always stay in your folder or in Dropbox, ready for
+      when you open it again.
     </p>
     <button type="button" class="button choose-clear" (click)="chooseWhatToClear()">
       Choose what to clear&hellip;
@@ -553,9 +536,10 @@
           <span class="saved-to" title="Kept in this browser's own storage, on this computer - another browser, or another computer, has its own">Saved to this browser</span>
         </div>
         <p class="hint">
-          What you have done since this page was opened - tabs, library reads, windows, runs
-          started and settings changed - kept by this page alone, and gone when you close or
-          reload it. Feedback attaches only its most recent part; the whole of it is here.
+          What you have done since this page was opened - tabs you clicked, file imports, runs
+          started and settings changed. It is deleted every time you close or reload the page. This
+          is kept locally, and only ever leaves your browser if you choose to attach logs to a
+          Feedback form you submit.
         </p>
         <label class="field visit-log-limit">
           <span>Entries kept before the oldest start to be replaced</span>
@@ -577,8 +561,9 @@
             }
           </div>
           <p class="hint">
-            What each run said in its window, kept with the run and downloaded from History. A
-            feedback report only ever attaches the most recent part of one, however long it is.
+            What happened in each run. These logs can be downloaded from the History tab at any time.
+            This is kept in your files, and only ever leaves your browser if you choose to attach logs
+            to a Feedback form you submit.
           </p>
           <label class="field run-log-lines">
             <span>Lines a run's log keeps before its oldest give way</span>
@@ -634,6 +619,23 @@
           }
         </div>
       }
+
+      <div class="advanced-part import-exclusions">
+        <div class="group-head">
+          <h4>Exclusion lists for imports</h4>
+          <span class="saved-to" [title]="'In import-excluded.json at the top of ' + libraryPlace() + ' - it goes wherever the library goes'">Saved in {{ libraryPlace() }}</span>
+        </div>
+        <p class="hint">
+          Keeps track of the files you told FicFairy to ignore in the Resolve Issues pop-up. Clearing
+          this is safe and does not affect any of your files.
+        </p>
+        <button type="button" class="button reset-exclusions"
+                [disabled]="!canResetExclusions() || resettingExclusions()"
+                [title]="canResetExclusions() ? '' : 'Open a library you can write to first'"
+                (click)="resetExclusions()">
+          Reset exclusion lists for imports
+        </button>
+      </div>
 
       @if (debugMode.allowed()) {
         <div class="advanced-part debug-mode">

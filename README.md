@@ -2,7 +2,7 @@
 
 Keep your own copy of your AO3 bookmarks and collections on your computer or Dropbox.
 
-<p align="center"><a href="https://alexandria-p.github.io/ficfairy/app/"><b>ଘ(੭ˊᵕˋ)੭* ✩‧₊˚ Try FicFairy in guest mode</b></a></p>
+<p align="center"><a href="https://alexandria-p.github.io/FicFairy/app/"><b>ଘ(੭ˊᵕˋ)੭* ✩‧₊˚ Try FicFairy in guest mode</b></a></p>
 
 **This app works best in Chrome web browser.**
 

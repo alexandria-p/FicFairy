@@ -43,7 +43,6 @@ import { LibraryImports } from './imports';
 import { Library } from './library';
 import { IndexCache } from './index-cache';
 import { DropboxSession } from './dropbox';
-import { DummyData } from './dummy-data';
 import { REMEMBER_USERNAME_KEY, SAVED_USERNAME_KEY } from './preferences';
 import { safeRemove } from './storage';
 import { StorageChoice } from './storage-choice';
@@ -91,12 +90,13 @@ export interface ResetChange {
 }
 
 /** something the Clear data window can clear from this browser */
-export type BrowserClear = 'settings' | 'username' | 'passcode' | 'visitLog' | 'dropboxCache' | 'library' | 'debug';
+export type BrowserClear = 'settings' | 'username' | 'visitLog' | 'dropboxCache' | 'library';
 
 export interface ClearOption {
   id: BrowserClear;
   label: string;
-  hint: string;
+  /** said under the label, when there is more to say */
+  hint?: string;
   /** why it cannot be ticked now, if it cannot */
   held?: string;
 }
@@ -155,7 +155,6 @@ export class UserSettings implements OnDestroy {
   private readonly library = inject(Library);
   private readonly indexCache = inject(IndexCache);
   private readonly dropbox = inject(DropboxSession);
-  private readonly dummyData = inject(DummyData);
   protected readonly debugMode = inject(DebugMode);
   /** FileNamePattern saved from Advanced: the old pattern, for `App.namePatternChanged` */
   readonly namePatternChanged = output<NamePattern>();
@@ -386,27 +385,17 @@ export class UserSettings implements OnDestroy {
    * held while a run is going, as the library's own buttons are.
    */
   protected readonly clearOptions = computed<ClearOption[]>(() => {
-    const options: ClearOption[] = [
-      { id: 'settings', label: 'Reset settings to their defaults',
-        hint: "Appearance, default formats, AO3 time zone, 'ask again' prompts, answers to always use, question defaults, run-log and visit-log lengths. settings.ini is not changed - Reset to defaults above does that." },
-      { id: 'username', label: 'Forget the saved AO3 username', hint: 'The one Remember my username keeps for the login. Your password is never saved.' },
-    ];
-    if (!this.local) {
-      options.push({ id: 'passcode', label: 'Forget the passcode for this page',
-        hint: 'You will be asked for it again before this page can reach its helper.' });
-    }
-    options.push(
-      { id: 'visitLog', label: 'Empty the visit log', hint: 'What you did on this visit, kept only until the page closes - the log a feedback report can attach.' },
+    return [
+      { id: 'settings', label: 'Reset user settings back to their defaults' },
+      { id: 'username', label: 'Forget any saved AO3 username' },
+      { id: 'visitLog', label: 'Empty the visit log',
+        hint: 'What actions you took this session, recorded in case you want to submit a troubleshooting report. This is always emptied when the page is closed regardless.' },
       { id: 'dropboxCache', label: 'Clear the Dropbox library cache',
-        hint: 'The next time your Dropbox library opens, its whole index is downloaded again.' },
+        hint: 'This speeds up the load from Dropbox. The next time your Dropbox library opens, its whole index will be downloaded again.' },
       { id: 'library', label: 'Forget the open library, and sign out of Dropbox',
-        hint: 'The folder this browser was given, and its Dropbox sign-in. Choose the folder or sign in again to carry on.',
+        hint: 'Close the file storage location this browser was given, and/or sign out of Dropbox.',
         held: this.jobs.activeRuns().length > 0 ? 'Cannot be changed while an active run is in progress' : '' },
-    );
-    if (this.debugMode.allowed()) {
-      options.push({ id: 'debug', label: 'Turn off debug mode and dummy data', hint: 'The DEBUG tab goes, and your own library shows again.' });
-    }
-    return options;
+    ];
   });
 
   protected readonly clearChosen = computed(() =>
@@ -449,11 +438,6 @@ export class UserSettings implements OnDestroy {
         safeRemove(REMEMBER_USERNAME_KEY);
         done.push('saved username forgotten');
       }
-      if (chosen.has('debug')) {
-        this.dummyData.set(false);
-        this.debugMode.set(false);
-        done.push('debug mode off');
-      }
       if (chosen.has('library') && !this.jobs.activeRuns().length) {
         // signing out of Dropbox clears its cache too
         await this.dropbox.signOut();
@@ -469,10 +453,6 @@ export class UserSettings implements OnDestroy {
       if (chosen.has('visitLog')) {
         this.visit.clear();
         done.push('visit log emptied');
-      }
-      if (chosen.has('passcode')) {
-        this.helper.forgetPasscode();
-        done.push('passcode forgotten');
       }
       this.choosingClear.set(false);
       this.say(`Cleared from this browser: ${done.join(', ')}. Nothing in your library was touched.`);

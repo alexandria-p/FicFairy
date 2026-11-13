@@ -367,8 +367,10 @@ describe('UserSettings', () => {
     await open();
 
     const section = element.querySelector('.import-exclusions')!;
-    expect(section.querySelector('h3')?.textContent).toContain('Exclusion lists for imports');
-    expect(section.querySelector('.hint')?.textContent).toContain('import-excluded.json');
+    // a part of Advanced now
+    expect(section.closest('details.advanced')).not.toBeNull();
+    expect(section.querySelector('h4')?.textContent).toContain('Exclusion lists for imports');
+    expect(section.querySelector('.hint')?.textContent).toContain('files you told FicFairy to ignore');
     const button = section.querySelector<HTMLButtonElement>('button.reset-exclusions')!;
     expect(button.textContent?.trim()).toBe('Reset exclusion lists for imports');
     button.click();
@@ -793,7 +795,7 @@ describe('UserSettings', () => {
     // and within it, each part says where it is kept
     expect(element.querySelector('.advanced-part.naming > .saved-to')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Saved to settings.ini');
     expect(element.querySelector('.advanced-part.debug-mode .saved-to')?.textContent?.trim()).toBe('Saved to this browser');
-    expect(named).toContainEqual(['Exclusion lists for imports', 'Saved in your library folder']);
+    expect(element.querySelector('.advanced-part.import-exclusions .saved-to')?.textContent?.trim()).toBe('Saved in your library folder');
     // a helper on this computer offers its settings.ini
     expect(named).toContainEqual(['settings.ini', 'Saved to settings.ini']);
     expect(element.querySelector('.browser-note')).toBeNull();
@@ -938,7 +940,7 @@ describe('UserSettings', () => {
 
   it('says nothing in the library is lost, and opens on everything it can clear, ticked', async () => {
     await open();
-    expect(element.querySelector('.clear-browser .nothing-lost')?.textContent).toContain('Nothing in your library is lost');
+    expect(element.querySelector('.clear-browser .nothing-lost')?.textContent).toContain('Your downloaded works will not be lost');
     expect(element.querySelector('.choose-clear')?.textContent).toContain('Choose what to clear');
     await openClear();
     const ids = [...element.querySelectorAll('[data-clear]')].map((x) => x.getAttribute('data-clear'));
@@ -1003,17 +1005,13 @@ describe('UserSettings', () => {
     expect(element.querySelector('.confirm-clear')?.textContent?.trim()).toBe('Clear 4 items');
   });
 
-  it('on a hosted copy, offers to forget the passcode', async () => {
+  it('offers neither the passcode nor debug mode, even on a hosted copy that has both', async () => {
     const helper = TestBed.inject(HelperConnection);
     helper.settings.set({ ...DEFAULT_PAGE_CONFIG, helperUrl: 'https://helper.example.com' });
-    const forgot = vi.spyOn(helper, 'forgetPasscode');
     await open();
     await openClear();
-    expect(clearBox('passcode')).not.toBeNull();
-    await untick('settings', 'username', 'visitLog', 'dropboxCache', 'library');
-    element.querySelector<HTMLButtonElement>('.confirm-clear')!.click();
-    await settle();
-    expect(forgot).toHaveBeenCalled();
+    const ids = [...element.querySelectorAll('[data-clear]')].map((x) => x.getAttribute('data-clear'));
+    expect(ids).toEqual(['settings', 'username', 'visitLog', 'dropboxCache', 'library']);
   });
 
   // endregion
