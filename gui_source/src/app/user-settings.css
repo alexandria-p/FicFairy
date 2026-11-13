@@ -528,3 +528,17 @@ select.zone-select {
 .nothing-lost strong {
   color: var(--text-strong);
 }
+
+/* the ding when the page waits for you: its switch and a button to hear it, under the palettes */
+.sound-choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-top: 16px;
+}
+
+.sound-choice .hint {
+  flex-basis: 100%;
+  margin: 0;
+}

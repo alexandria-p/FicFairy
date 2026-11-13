@@ -34,6 +34,7 @@ import { Library } from './library';
 import { LibraryStore } from './library-store';
 import { DropboxError } from './dropbox';
 import { VisitLog } from './visit-log';
+import { Chime } from './chime';
 import { inAo3Zone, writtenDate } from './preferences';
 
 type Step = 'overview' | 'rename' | 'renaming' | 'duplicates' | 'choose' | 'removing' | 'dates' | 'dating' | 'index' | 'formats';
@@ -89,6 +90,7 @@ export class ImportDialog {
   private readonly library = inject(Library);
   private readonly imports = inject(LibraryImports);
   private readonly visit = inject(VisitLog);
+  private readonly chime = inject(Chime);
 
   readonly worksFound = input.required<FoundWork[]>({ alias: 'works' });
   /** undated files of works the index does have - offered for dating beside the rest */
@@ -816,6 +818,8 @@ export class ImportDialog {
     if (standing === 'keep' || (standing === 'guess' && guess)) return Promise.resolve({ how: standing });
     return new Promise((resolve) => {
       this.asking.set(group);
+      // the bar has stopped until this is answered
+      this.chime.waiting();
       // a best guess is picked to begin with - or choosing, when none can be made, or a
       // standing choose, which shows the files straight away
       this.askHow.set(standing === 'choose' || !guess ? 'choose' : 'guess');

@@ -20,6 +20,7 @@ import { IMPORT_EXCLUDED_FILE, LibraryImports } from './imports';
 import { Library } from './library';
 import { LibraryStore } from './library-store';
 import { CUSTOM_FONT, CUSTOM_FONT_KEY, FONT_KEY, PALETTES, PALETTE_KEY, paletteById } from './appearance';
+import { CHIME_KEY, Chime, ChimePlayer } from './chime';
 import { IniSetting, TOAST_MS, UserSettings } from './user-settings';
 import { GuestMode } from './guest';
 import { RUN_LOG_LINES_KEY, RUN_LOG_LINES_MIN, TRIM_OLD_RUN_LOGS_KEY } from './run-logs';
@@ -273,6 +274,30 @@ describe('UserSettings', () => {
   // endregion
 
   // region appearance
+
+  it('turns the ding off from Appearance, plays it on asking, and Reset turns it back on', async () => {
+    const play = vi.spyOn(TestBed.inject(ChimePlayer), 'play').mockImplementation(() => {});
+    await open();
+    const box = element.querySelector<HTMLInputElement>('.appearance input[name="waitChime"]')!;
+    expect(box.checked).toBe(true);
+
+    element.querySelector<HTMLButtonElement>('.appearance button.play-chime')!.click();
+    expect(play).toHaveBeenCalledTimes(1);
+
+    box.checked = false;
+    box.dispatchEvent(new Event('change'));
+    await settle();
+    expect(localStorage.getItem(CHIME_KEY)).toBe('off');
+    expect(toast()).toContain('no sound');
+
+    element.querySelector<HTMLButtonElement>('button.reset-all')!.click();
+    await settle();
+    expect(element.querySelector('[data-change="Sound when waiting for you"] .current')?.textContent).toContain('Off');
+    element.querySelector<HTMLButtonElement>('.confirm-reset button.confirm')!.click();
+    await settle();
+    expect(localStorage.getItem(CHIME_KEY)).toBeNull();
+    expect(TestBed.inject(Chime).on()).toBe(true);
+  });
 
   it('changes the palette at once, keeps it in this browser, and offers it to Reset', async () => {
     await open();

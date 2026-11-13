@@ -2,6 +2,7 @@ import { DebugMode } from './debug-mode';
 import { ImportRequest } from './imports';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Chime, ChimePlayer } from './chime';
 import { DownloadDialog, GUEST_WORK, GUEST_WORKS, parseWorkList, startProgramFor } from './download-dialog';
 import { DEFAULT_PAGE_CONFIG, HelperConnection } from './helper-connection';
 import { RUN_LOG_LINES_KEY, TRIM_OLD_RUN_LOGS_KEY } from './run-logs';
@@ -1578,6 +1579,31 @@ describe('DownloadDialog', () => {
       .toBe('https://archiveofourown.org/works/75354806');
     expect(element.querySelectorAll('.question')).toHaveLength(1);
     expect(said).not.toContain('before file names carried a date');
+  });
+
+  it('dings when a question stops the run, so someone in another tab knows to come back', async () => {
+    const play = vi.spyOn(TestBed.inject(ChimePlayer), 'play').mockImplementation(() => {});
+    await open('bookmarks');
+    await advanceTo('running');
+    expect(play).not.toHaveBeenCalled();
+
+    jobs.push!({ type: 'question', name: 'fichub', count: 1, ids: ['75354806'],
+                 choices: ['yes', 'no'], default: 'yes', timeoutMinutes: 5 } as JobEvent);
+    await fixture.whenStable();
+    expect(play).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks without a ding once this browser turned the sound off', async () => {
+    const play = vi.spyOn(TestBed.inject(ChimePlayer), 'play').mockImplementation(() => {});
+    TestBed.inject(Chime).set(false);
+    await open('bookmarks');
+    await advanceTo('running');
+
+    jobs.push!({ type: 'question', name: 'fichub', count: 1, ids: ['75354806'],
+                 choices: ['yes', 'no'], default: 'yes', timeoutMinutes: 5 } as JobEvent);
+    await fixture.whenStable();
+    expect(element.querySelector('.question')).not.toBeNull();
+    expect(play).not.toHaveBeenCalled();
   });
 
   it('says what an unanswered question will take, and after how long', async () => {
