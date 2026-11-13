@@ -398,7 +398,7 @@ def test_a_work_already_indexed_is_not_marked_imported_by_an_import():
     ao3, repo, _ = make_ao3()
     ao3.origin_field = strings.FROM_IMPORT_FIELD
     repo.get_soup.return_value = _work_page_soup()
-    existing = {'id': '111', 'link': link(111), 'title': 'A Fic', 'authors': ['Cal'],
+    existing = {'id': '111', 'link': link(111), 'title': 'A Fic', 'authors': ['library_of_alexandria'],
                 'bookmarked': False}
 
     with patch.object(Ao3, 'proceed', side_effect=lambda soup: soup), \

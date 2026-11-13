@@ -16,7 +16,7 @@ describe('the file name pattern editor', () => {
     element.querySelector<HTMLButtonElement>('[aria-label="Move Work number later"]')!.click();
     await fixture.whenStable();
     expect(text()).toBe('{title} {worknum} - {author} {date}');
-    expect(element.querySelector('.pattern-example code')?.textContent).toBe('No Paths Are Bound 34816549 - Cataclysmic_Cal 2026-08-23.html');
+    expect(element.querySelector('.pattern-example code')?.textContent).toBe('The Trees Are Burning 1234567 - library_of_alexandria 2026-08-23.html');
     // a separator holding a digit would be read as part of a number
     const box = element.querySelector<HTMLInputElement>('.pattern-separator input')!;
     box.value = ' 2 ';
@@ -43,7 +43,7 @@ describe('the file name pattern editor', () => {
     preset('Set to AO3 default (with a date)').click();
     await fixture.whenStable();
     expect(text()).toBe('{title} - {author} - {worknum} {date}');
-    expect(element.querySelector('.pattern-example code')?.textContent).toBe('No Paths Are Bound - Cataclysmic_Cal - 34816549 2026-08-23.html');
+    expect(element.querySelector('.pattern-example code')?.textContent).toBe('The Trees Are Burning - library_of_alexandria - 1234567 2026-08-23.html');
 
     preset('Reset to app default').click();
     await fixture.whenStable();

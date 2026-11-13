@@ -26,7 +26,7 @@ export const GUEST_CONFIG: ServerConfig = {
     extraWaitTime: 3,
     fileNamePattern: DEFAULT_NAME_PATTERN,
     fileNameLength: 100,
-    fileNameExample: '34816549 No Paths Are Bound - Cataclysmic_Cal 2026-08-23.html',
+    fileNameExample: '1234567 The Trees Are Burning - library_of_alexandria 2026-08-23.html',
     maxRetries: 30,
     maxTimeouts: 5,
     debugLogging: false,

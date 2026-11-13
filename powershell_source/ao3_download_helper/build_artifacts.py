@@ -699,7 +699,7 @@ is longer - which is why longer titles end mid-word. The number and the date are
 A downloaded work also ends with the date it was last updated on ao3:
 
 ```
-34816549 No Paths Are Bound - Cataclysmic_Cal 2026-08-23.html
+1234567 The Trees Are Burning - library_of_alexandria 2026-08-23.html
 ```
 
 That is not when you downloaded it - it is which *version* of the fic the file holds, which
@@ -717,7 +717,7 @@ the rule is exact:
 - the digits at the **start** of the file name, and
 - followed by a space, `_`, `.` or `-` (or the name ends there)
 
-So `34816549 No Paths Are Bound.html` links up; `No Paths Are Bound 34816549.html` does
+So `1234567 The Trees Are Burning.html` links up; `The Trees Are Burning 1234567.html` does
 not, because the number is not first. `99Red Balloons.html` does not either, because
 nothing separates the digits from the title - which is deliberate, so a title that merely
 begins with digits is not mistaken for a work number. A pattern that puts the number last
@@ -863,8 +863,8 @@ changed over time:
 
 ```json
 {
-  "id": "34816549",
-  "link": "https://archiveofourown.org/works/34816549",
+  "id": "1234567",
+  "link": "https://archiveofourown.org/works/1234567",
   "source": "https://archiveofourown.org/users/you/bookmarks",
   "position": 4,
   "last_indexed": "2026-09-10T12:34:56+00:00",
@@ -919,7 +919,7 @@ exactly like an index file:
       "work_count": 4021,
       "parent_collection": "https://archiveofourown.org/collections/yuletide",
       "subcollections": ["https://archiveofourown.org/collections/..."],
-      "work_ids": ["34816549", "..."],
+      "work_ids": ["1234567", "..."],
       "bookmark_ids": ["..."],
       "external_ids": ["..."],
       "series_ids": ["..."]

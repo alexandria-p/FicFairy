@@ -24,8 +24,8 @@ const COLLECTION = {
 };
 
 const BOOKMARK = {
-  id: '34816549',
-  link: 'https://archiveofourown.org/works/34816549',
+  id: '1234567',
+  link: 'https://archiveofourown.org/works/1234567',
   source: 'https://archiveofourown.org/users/Someone/bookmarks',
   position: 4,
   indexes: [{ indexed_on: '2026-09-10T12:00:00+00:00', title: 'A Fic', kudos: 12 }],

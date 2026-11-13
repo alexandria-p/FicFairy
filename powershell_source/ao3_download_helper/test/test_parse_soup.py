@@ -329,9 +329,9 @@ def test_get_work_metadata_from_list_does_not_leak_from_other_blurbs(fixture_sou
 
 
 def test_get_work_metadata_from_list_series_and_bookmarker_tags(fixture_soup):
-    result = _list_metadata(fixture_soup, 'bookmarks', '34816549')
+    result = _list_metadata(fixture_soup, 'bookmarks', '1234567')
 
-    assert result['series'] == ['Part 1 of MXTX - Retellings', 'Part 1 of No Paths Are Bound + Extras']
+    assert result['series'] == ['Part 1 of MXTX - Retellings', 'Part 1 of The Trees Are Burning + Extras']
     assert result['updated'] == '08 Sep 2022'
     _assert_bookmark_date_format(result)
     assert result['bookmarker_tags'] == ['long work']
@@ -369,7 +369,7 @@ def test_get_work_metadata_from_list_marked_for_later_does_not_leak_from_other_b
 
 @pytest.mark.parametrize('fixture,worknum', [
     ('bookmarks', '66326125'),
-    ('bookmarks', '34816549'),
+    ('bookmarks', '1234567'),
     ('markedForLaterList', '334557'),
 ])
 def test_get_work_metadata_from_list_returns_same_keys_for_all_listing_types(fixture_soup, fixture, worknum):
@@ -482,7 +482,7 @@ def test_get_blurb_work_number_skips_non_work_bookmarks(fixture_soup):
 
     # the bookmarked series has no work number, so it is skipped rather than exported
     assert numbers.count(None) == 1
-    assert '34816549' in numbers
+    assert '1234567' in numbers
 
 
 # region why a bookmark was skipped
@@ -611,13 +611,13 @@ def test_get_blurb_work_number_ignores_external_works():
 
 
 def test_get_blurb_metadata_reads_every_exported_field(fixture_soup):
-    result = _blurb_metadata(fixture_soup, 'bookmarks', '34816549')
+    result = _blurb_metadata(fixture_soup, 'bookmarks', '1234567')
 
     assert 'error' not in result
-    assert result['id'] == '34816549'
-    assert result['link'] == 'https://archiveofourown.org/works/34816549'
-    assert result['title'] == 'No Paths Are Bound'
-    assert result['authors'] == ['Cataclysmic_Calamity']
+    assert result['id'] == '1234567'
+    assert result['link'] == 'https://archiveofourown.org/works/1234567'
+    assert result['title'] == 'The Trees Are Burning'
+    assert result['authors'] == ['library_of_alexandria']
     assert result['date_updated'] == '08 Sep 2022'
     assert result['fandoms'] == ['天官赐福 - 墨香铜臭 | Tiān Guān Cì Fú - Mòxiāng Tóngxiù']
     assert result['warnings'] == ['Graphic Depictions Of Violence']

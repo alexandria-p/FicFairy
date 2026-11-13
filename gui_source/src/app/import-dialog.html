@@ -193,15 +193,11 @@
               <tr [attr.data-group]="group.key" [class.skipped]="choiceOf(group) === 'skip'">
                 <td class="group-files">
                   <span class="group-title">Work {{ group.id }} - {{ group.format.toUpperCase() }}, {{ group.files.length }} files</span>
-                  @if (isClash(group)) {
-                    <span class="clash-note">Renaming would give a file the same name as another, so it was not renamed. The file you keep takes the app's name; Skip keeps both, the other still named as it was.</span>
-                  }
                   <ul>
                     @for (file of group.files; track file.path) {
                       <li [title]="file.name"
                           [class.newest]="choiceOf(group) === 'recent' && newestIn(group) === file"
                           [class.goes]="choiceOf(group) === 'recent' && newestIn(group) && newestIn(group) !== file">
-                        @if (isClashFile(file)) { <span class="clash-file">Not yet renamed:</span> }
                         <span class="file-name">{{ file.name }}</span>
                       </li>
                     }
@@ -284,9 +280,6 @@
                 </span>
               </label>
             </li>
-          }
-          @if (isClash(group)) {
-            <li class="hint clash-note">Renaming would give a file the same name as another, so it was not renamed. The file you keep takes the app's name; skipping keeps both, the other still named as it was.</li>
           }
           <li class="skip-this">
             <label class="check">

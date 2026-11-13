@@ -11,7 +11,7 @@ import {
 const TOKEN_LABELS: Record<NameToken, string> = { worknum: 'Work number', title: 'Title', author: 'Author', date: 'Date' };
 /** the example name the editor shows - the helper's own example's parts */
 const EXAMPLE: Record<NameToken, string> = {
-  worknum: '34816549', title: 'No Paths Are Bound', author: 'Cataclysmic_Cal', date: '2026-08-23',
+  worknum: '1234567', title: 'The Trees Are Burning', author: 'library_of_alexandria', date: '2026-08-23',
 };
 
 /**

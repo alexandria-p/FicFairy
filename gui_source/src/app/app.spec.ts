@@ -283,7 +283,7 @@ describe('App', () => {
         extraWaitTime: 15,
         fileNamePattern: '{worknum} {title} - {author} {date updated}',
         fileNameLength: 50,
-        fileNameExample: '34816549 A Fic - Someone 2026-01-01.html',
+        fileNameExample: '1234567 A Fic - Someone 2026-01-01.html',
         maxRetries: 0,
         maxTimeouts: 3,
         debugLogging: false,
@@ -1431,7 +1431,7 @@ describe('App', () => {
     expect(element.querySelector('app-folder-warning')?.textContent).toContain('work ID at the start');
     // and where the date goes in the ideal name, and how it is written
     const ideal = element.querySelector('app-folder-warning .ideal')?.textContent?.replace(/\s+/g, ' ');
-    expect(ideal).toContain('34816549 No Paths Are Bound - Cal 2024-12-14.html');
+    expect(ideal).toContain('1234567 The Trees Are Burning - library_of_alexandria 2024-12-14.html');
     expect(element.querySelector('app-folder-warning')?.textContent).toContain('YYYY-MM-DD');
     expect(opened).not.toHaveBeenCalled();
   });

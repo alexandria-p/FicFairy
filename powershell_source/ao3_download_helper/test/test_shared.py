@@ -461,10 +461,10 @@ def with_folder(tmp_path):
 
 
 def test_the_works_already_indexed_are_read_from_the_index_file_names(tmp_path):
-    indexing_folder = os.path.join(strings.INDEXING_FOLDER_NAME, '34816549 No Paths - Cal.json')
+    indexing_folder = os.path.join(strings.INDEXING_FOLDER_NAME, '1234567 The Trees - library_of_alexandria.json')
     make_file(tmp_path, indexing_folder)
 
-    assert shared.indexed_work_ids(with_folder(tmp_path)) == {'34816549'}
+    assert shared.indexed_work_ids(with_folder(tmp_path)) == {'1234567'}
 
 
 def test_a_downloaded_fic_is_not_an_index_entry(tmp_path):
@@ -474,7 +474,7 @@ def test_a_downloaded_fic_is_not_an_index_entry(tmp_path):
     make_file(tmp_path, '111 Downloaded But Not Indexed 2024-12-14.html')
     make_file(tmp_path, '222 Also Downloaded 2024-12-14.pdf')
     make_file(tmp_path, '333 And This One.epub')
-    make_file(tmp_path, os.path.join(strings.INDEXING_FOLDER_NAME, '444 Indexed - Cal.json'))
+    make_file(tmp_path, os.path.join(strings.INDEXING_FOLDER_NAME, '444 Indexed - library_of_alexandria.json'))
 
     assert shared.indexed_work_ids(with_folder(tmp_path)) == {'444'}
 
@@ -496,8 +496,8 @@ def test_a_collection_made_in_the_page_is_never_read_as_one_from_ao3(tmp_path):
         json.dumps({'name': 'yuletide', 'title': 'Yuletide', 'work_ids': ['111']}), encoding='utf-8')
     (collections / 'custom' / 'custom-ab12.json').write_text(
         json.dumps({'name': 'custom-ab12', 'custom': True, 'title': 'Mine', 'work_ids': ['222']}), encoding='utf-8')
-    make_file(tmp_path, os.path.join(strings.INDEXING_FOLDER_NAME, '111 In Yuletide - Cal.json'))
-    make_file(tmp_path, os.path.join(strings.INDEXING_FOLDER_NAME, '222 Mine - Cal.json'))
+    make_file(tmp_path, os.path.join(strings.INDEXING_FOLDER_NAME, '111 In Yuletide - library_of_alexandria.json'))
+    make_file(tmp_path, os.path.join(strings.INDEXING_FOLDER_NAME, '222 Mine - library_of_alexandria.json'))
     fileops = with_folder(tmp_path)
     fileops.load_json.side_effect = lambda path: json.loads(
         (tmp_path / path).read_text(encoding='utf-8')) if (tmp_path / path).is_file() else {}
@@ -510,7 +510,7 @@ def test_a_collection_made_in_the_page_is_never_read_as_one_from_ao3(tmp_path):
 
 def test_a_file_in_the_index_folder_that_is_not_json_is_ignored(tmp_path):
     make_file(tmp_path, os.path.join(strings.INDEXING_FOLDER_NAME, '111 stray.html'))
-    make_file(tmp_path, os.path.join(strings.INDEXING_FOLDER_NAME, '222 real - Cal.json'))
+    make_file(tmp_path, os.path.join(strings.INDEXING_FOLDER_NAME, '222 real - library_of_alexandria.json'))
 
     assert shared.indexed_work_ids(with_folder(tmp_path)) == {'222'}
 
@@ -528,13 +528,13 @@ def test_nothing_indexed_yet_is_not_an_error(tmp_path):
 
 
 def test_scan_finds_works_by_the_number_their_name_starts_with(tmp_path):
-    make_file(tmp_path, '34816549 No Paths - Cal 2024-12-14.html')
+    make_file(tmp_path, '1234567 The Trees - library_of_alexandria 2024-12-14.html')
     make_file(tmp_path, '99 Red Balloons 2020-01-02.epub')
 
     found = shared.scan_downloaded_works(str(tmp_path), ['HTML', 'EPUB'])
 
-    assert sorted(found) == ['34816549', '99']
-    assert found['34816549']['HTML']['date'] == '2024-12-14'
+    assert sorted(found) == ['1234567', '99']
+    assert found['1234567']['HTML']['date'] == '2024-12-14'
     assert found['99']['EPUB']['date'] == '2020-01-02'
 
 
@@ -551,57 +551,57 @@ def test_the_pages_list_of_hidden_works_is_never_taken_for_a_work(tmp_path):
 
 
 def test_scan_reports_an_undated_file_as_having_no_date(tmp_path):
-    make_file(tmp_path, '34816549 No Paths - Cal.html')
+    make_file(tmp_path, '1234567 The Trees - library_of_alexandria.html')
 
     found = shared.scan_downloaded_works(str(tmp_path), ['HTML'])
 
-    assert found['34816549']['HTML']['date'] is None
+    assert found['1234567']['HTML']['date'] is None
 
 
 def test_scan_keeps_each_file_type_apart(tmp_path):
-    make_file(tmp_path, '34816549 A 2024-12-14.html')
-    make_file(tmp_path, '34816549 A 2024-12-14.epub')
+    make_file(tmp_path, '1234567 A 2024-12-14.html')
+    make_file(tmp_path, '1234567 A 2024-12-14.epub')
 
     found = shared.scan_downloaded_works(str(tmp_path), ['HTML', 'EPUB'])
 
-    assert sorted(found['34816549']) == ['EPUB', 'HTML']
+    assert sorted(found['1234567']) == ['EPUB', 'HTML']
 
 
 def test_scan_prefers_the_newest_when_a_work_has_two_copies_of_a_type(tmp_path):
-    make_file(tmp_path, '34816549 A 2023-01-01.html')
-    make_file(tmp_path, '34816549 A 2024-12-14.html')
+    make_file(tmp_path, '1234567 A 2023-01-01.html')
+    make_file(tmp_path, '1234567 A 2024-12-14.html')
 
     found = shared.scan_downloaded_works(str(tmp_path), ['HTML'])
 
-    assert found['34816549']['HTML']['date'] == '2024-12-14'
+    assert found['1234567']['HTML']['date'] == '2024-12-14'
 
 
 def test_scan_treats_an_undated_copy_as_older_than_a_dated_one(tmp_path):
-    make_file(tmp_path, '34816549 A.html')
-    make_file(tmp_path, '34816549 A 2024-12-14.html')
+    make_file(tmp_path, '1234567 A.html')
+    make_file(tmp_path, '1234567 A 2024-12-14.html')
 
     found = shared.scan_downloaded_works(str(tmp_path), ['HTML'])
 
-    assert found['34816549']['HTML']['date'] == '2024-12-14'
+    assert found['1234567']['HTML']['date'] == '2024-12-14'
 
 
 def test_scan_ignores_the_metadata_folders(tmp_path):
     # an index or collection file is not a downloaded work and carries no date by design
-    make_file(tmp_path, os.path.join(strings.INDEXING_FOLDER_NAME, '34816549 A.json'))
+    make_file(tmp_path, os.path.join(strings.INDEXING_FOLDER_NAME, '1234567 A.json'))
     make_file(tmp_path, os.path.join(strings.COLLECTIONS_FOLDER_NAME, '111 c.json'))
-    make_file(tmp_path, os.path.join(strings.IMAGE_FOLDER_NAME, '34816549 A img000.png'))
+    make_file(tmp_path, os.path.join(strings.IMAGE_FOLDER_NAME, '1234567 A img000.png'))
     # the run history lives here too now, and a record is json like an index entry is
     make_file(tmp_path, os.path.join(strings.RUNS_FOLDER_NAME, '2026-09-13T120000-ab.json'))
-    make_file(tmp_path, '34816549 A 2024-12-14.html')
+    make_file(tmp_path, '1234567 A 2024-12-14.html')
 
     found = shared.scan_downloaded_works(str(tmp_path), ['HTML', 'JSON', 'PNG'])
 
-    assert list(found) == ['34816549']
-    assert list(found['34816549']) == ['HTML']
+    assert list(found) == ['1234567']
+    assert list(found['1234567']) == ['HTML']
 
 
 def test_scan_ignores_files_that_do_not_start_with_a_work_number(tmp_path):
-    make_file(tmp_path, 'No Paths Are Bound.html')
+    make_file(tmp_path, 'The Trees Are Burning.html')
     make_file(tmp_path, '99Red Balloons.html')
 
     assert shared.scan_downloaded_works(str(tmp_path), ['HTML']) == {}

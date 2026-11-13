@@ -83,11 +83,11 @@ async function type(name: string, value: string) {
 }
 
 const LIBRARY = [
-  work({ id: '1', title: 'No Paths Are Bound', authors: ['Cataclysmic_Cal'],
+  work({ id: '1', title: 'The Trees Are Burning', authors: ['library_of_alexandria'],
          updated: '14 Dec 2024', bookmarked: '01 Mar 2025' }),
   work({ id: '2', title: 'Catch and Release', authors: ['Like_a_Hurricane'],
          updated: '02 Aug 2026', bookmarked: '10 Sep 2026' }),
-  work({ id: '3', title: 'The Dating Game', authors: ['inukagome15', 'Cataclysmic_Cal'],
+  work({ id: '3', title: 'The Dating Game', authors: ['inukagome15', 'library_of_alexandria'],
          updated: '2026-01-15', bookmarked: '05 Jan 2026' }),
 ];
 
@@ -114,10 +114,10 @@ describe('WorkList filtering', () => {
   it('matches part of an author name, including a second author', async () => {
     await listing(LIBRARY);
 
-    await type('authorQuery', 'cataclysmic');
+    await type('authorQuery', 'library_of');
 
     // work 3 lists two authors, and the second one is the match
-    expect(shownTitles().sort()).toEqual(['No Paths Are Bound', 'The Dating Game']);
+    expect(shownTitles().sort()).toEqual(['The Dating Game', 'The Trees Are Burning']);
   });
 
   it('narrows by when AO3 last updated the work, counting both ends', async () => {
@@ -127,7 +127,7 @@ describe('WorkList filtering', () => {
     await type('updatedTo', '2026-01-15');
 
     // the two on the boundaries are kept; the 2026-08 one is outside
-    expect(shownTitles().sort()).toEqual(['No Paths Are Bound', 'The Dating Game']);
+    expect(shownTitles().sort()).toEqual(['The Dating Game', 'The Trees Are Burning']);
   });
 
   it('narrows by when the work was bookmarked', async () => {
@@ -151,10 +151,10 @@ describe('WorkList filtering', () => {
   it('makes every filter that was filled in have to match', async () => {
     await listing(LIBRARY);
 
-    await type('authorQuery', 'cataclysmic');
+    await type('authorQuery', 'library_of');
     await type('updatedFrom', '2026-01-01');
 
-    // both authored by Cal, but only one updated this year
+    // both authored by library_of_alexandria, but only one updated this year
     expect(shownTitles()).toEqual(['The Dating Game']);
   });
 
@@ -230,7 +230,7 @@ describe('WorkList filtering', () => {
     await sortBy('bookmarked-desc');
 
     // 10 Sep 2026, 05 Jan 2026, 01 Mar 2025
-    expect(shownTitles()).toEqual(['Catch and Release', 'The Dating Game', 'No Paths Are Bound']);
+    expect(shownTitles()).toEqual(['Catch and Release', 'The Dating Game', 'The Trees Are Burning']);
   });
 
   it('sorts by date bookmarked, oldest first', async () => {
@@ -238,7 +238,7 @@ describe('WorkList filtering', () => {
 
     await sortBy('bookmarked-asc');
 
-    expect(shownTitles()).toEqual(['No Paths Are Bound', 'The Dating Game', 'Catch and Release']);
+    expect(shownTitles()).toEqual(['The Trees Are Burning', 'The Dating Game', 'Catch and Release']);
   });
 
   it('sorts by date created when works have one', async () => {
@@ -292,7 +292,7 @@ describe('WorkList filtering', () => {
     await sortBy('created-desc');
 
     expect(element.querySelector('.sort-empty')?.textContent).toContain('leaves the order unchanged');
-    expect(shownTitles()).toEqual(['No Paths Are Bound', 'Catch and Release', 'The Dating Game']);
+    expect(shownTitles()).toEqual(['The Trees Are Burning', 'Catch and Release', 'The Dating Game']);
 
     await sortBy('bookmarked-desc');
     expect(element.querySelector('.sort-empty')).toBeNull();
@@ -317,7 +317,7 @@ describe('WorkList filtering', () => {
     await fixture.whenStable();
 
     // back to the default: most recently bookmarked first
-    expect(shownTitles()).toEqual(['Catch and Release', 'The Dating Game', 'No Paths Are Bound']);
+    expect(shownTitles()).toEqual(['Catch and Release', 'The Dating Game', 'The Trees Are Burning']);
     expect(element.querySelector<HTMLSelectElement>('select[name="sortBy"]')!.value).toBe(
       'bookmarked-desc',
     );
@@ -327,7 +327,7 @@ describe('WorkList filtering', () => {
     // the index keeps no listing order of its own any more
     await listing(LIBRARY);
 
-    expect(shownTitles()).toEqual(['Catch and Release', 'The Dating Game', 'No Paths Are Bound']);
+    expect(shownTitles()).toEqual(['Catch and Release', 'The Dating Game', 'The Trees Are Burning']);
     expect(element.querySelector('.sort-empty')).toBeNull();
     // a default is not something to clear
     const clear = Array.from(element.querySelectorAll<HTMLButtonElement>('button')).find((b) =>

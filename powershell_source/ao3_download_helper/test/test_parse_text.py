@@ -463,11 +463,11 @@ def test_get_date_suffix_is_the_stamp_with_its_separator():
 
 
 @pytest.mark.parametrize('name,expected', [
-    ('34816549 No Paths Are Bound - Cal 2024-12-14.html', '2024-12-14'),
-    ('34816549 No Paths Are Bound - Cal 2024-12-14.epub', '2024-12-14'),
-    (r'downloads\sub\34816549 A 2024-12-14.pdf', '2024-12-14'),
-    ('34816549 No Paths Are Bound - Cal.html', None),
-    ('34816549 A Fic About 2024-12-14 Being A Date.html', None),
+    ('1234567 The Trees Are Burning - library_of_alexandria 2024-12-14.html', '2024-12-14'),
+    ('1234567 The Trees Are Burning - library_of_alexandria 2024-12-14.epub', '2024-12-14'),
+    (r'downloads\sub\1234567 A 2024-12-14.pdf', '2024-12-14'),
+    ('1234567 The Trees Are Burning - library_of_alexandria.html', None),
+    ('1234567 A Fic About 2024-12-14 Being A Date.html', None),
     ('', None),
 ])
 def test_get_date_from_filename_reads_only_a_trailing_stamp(name, expected):
@@ -475,13 +475,13 @@ def test_get_date_from_filename_reads_only_a_trailing_stamp(name, expected):
 
 
 @pytest.mark.parametrize('name,expected', [
-    ('34816549 No Paths - Cal 2024-12-14.html', '34816549'),
-    ('34816549.epub', '34816549'),
-    ('34816549_something.pdf', '34816549'),
+    ('1234567 The Trees - library_of_alexandria 2024-12-14.html', '1234567'),
+    ('1234567.epub', '1234567'),
+    ('1234567_something.pdf', '1234567'),
     ('99 Red Balloons.html', '99'),
     # deliberately not a work number: nothing separates the digits from the title
     ('99Red Balloons.html', None),
-    ('No Paths 34816549.html', None),
+    ('The Trees 1234567.html', None),
 ])
 def test_get_work_number_from_filename_matches_the_documented_rule(name, expected):
     assert parse_text.get_work_number_from_filename(name) == expected
@@ -496,26 +496,26 @@ SUFFIX = ' 2024-12-14'
 
 def test_the_date_survives_a_title_too_long_to_fit():
     name = parse_text.get_valid_filename(
-        ['34816549 No Paths Are Bound And Nothing Is Ever Simple - Cataclysmic_Cal'], 50, SUFFIX)
+        ['1234567 The Trees Are Burning And Nothing Is Ever Simple - library_of_alexandria'], 50, SUFFIX)
 
     assert len(name) == 50
     assert name.endswith(SUFFIX)
     # the work number still leads, so the file can still be matched to its index entry
-    assert parse_text.get_work_number_from_filename(name) == '34816549'
+    assert parse_text.get_work_number_from_filename(name) == '1234567'
 
 
 def test_a_short_title_keeps_all_of_itself_and_the_date():
-    assert parse_text.get_valid_filename(['34816549 Short - Cal'], 50, SUFFIX) == \
-        '34816549 Short - Cal 2024-12-14'
+    assert parse_text.get_valid_filename(['1234567 Short - library_of_alexandria'], 50, SUFFIX) == \
+        '1234567 Short - library_of_alexandria 2024-12-14'
 
 
 def test_no_suffix_leaves_names_exactly_as_they_were():
-    assert parse_text.get_valid_filename(['34816549 Short - Cal'], 50) == '34816549 Short - Cal'
+    assert parse_text.get_valid_filename(['1234567 Short - library_of_alexandria'], 50) == '1234567 Short - library_of_alexandria'
 
 
 def test_only_the_file_name_is_dated_not_the_folders_above_it():
     name = parse_text.get_valid_filename(
-        ['A Fandom', '34816549 Some Very Long Title Indeed Here - Cal'], 50, SUFFIX)
+        ['A Fandom', '1234567 Some Very Long Title Indeed Here - library_of_alexandria'], 50, SUFFIX)
 
     folder, _, filename = name.rpartition(os.sep)
     assert folder == 'A Fandom'
@@ -528,14 +528,14 @@ def test_a_title_that_sanitises_away_still_gets_a_dated_name():
 
 
 def test_no_length_limit_means_the_whole_title_and_the_date():
-    name = parse_text.get_valid_filename(['34816549 A Very Long Title Indeed - Cal'], 0, SUFFIX)
+    name = parse_text.get_valid_filename(['1234567 A Very Long Title Indeed - library_of_alexandria'], 0, SUFFIX)
 
-    assert name == '34816549 A Very Long Title Indeed - Cal 2024-12-14'
+    assert name == '1234567 A Very Long Title Indeed - library_of_alexandria 2024-12-14'
 
 
 def test_the_date_is_never_the_thing_that_gets_cut():
     # a limit shorter than the stamp itself still keeps the stamp whole
-    name = parse_text.get_valid_filename(['34816549 Something'], 5, SUFFIX)
+    name = parse_text.get_valid_filename(['1234567 Something'], 5, SUFFIX)
 
     assert name.endswith('2024-12-14')
 
