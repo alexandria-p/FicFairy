@@ -564,10 +564,14 @@
             What happened in each run. These logs can be downloaded from the History tab at any time.
           </p>
           <label class="field run-log-lines">
-            <span>Lines a run's log keeps before its oldest give way</span>
+            <span>Maximum length of each log file (in lines)</span>
             <input type="number" name="runLogMaxLines" [min]="runLogMin" [max]="runLogMax" step="500"
-                   [value]="runLogLinesNow()" (change)="setRunLogLines($any($event.target))" />
-            <span class="hint">{{ runLogMin.toLocaleString() }} to {{ runLogMax.toLocaleString() }}; the default is {{ runLogDefault.toLocaleString() }}. Applies from the next run.</span>
+                   [value]="runLogLinesNow()" (input)="checkRunLogLines($any($event.target))"
+                   (change)="setRunLogLines($any($event.target))" />
+            <span class="hint">Applies from the next run. The default is {{ runLogDefault.toLocaleString() }}.</span>
+            @if (runLogLinesWarning(); as warning) {
+              <span class="run-log-lines-warning">{{ warning }}</span>
+            }
           </label>
           <label class="check">
             <input type="checkbox" name="trimOldRunLogs" [checked]="trimOldRunLogsNow()"

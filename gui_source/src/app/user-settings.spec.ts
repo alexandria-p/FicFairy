@@ -252,7 +252,19 @@ describe('UserSettings', () => {
     await open();
     expect(element.querySelector('.advanced-part.run-logs .saved-to')?.textContent?.trim()).toBe('Saved to this browser');
 
+    const box = element.querySelector<HTMLInputElement>('input[name="runLogMaxLines"]')!;
+    const warning = () => element.querySelector('.run-log-lines-warning')?.textContent?.trim() ?? null;
+    box.value = '99999';
+    box.dispatchEvent(new Event('input'));
+    await settle();
+    expect(warning()).toBe('(cannot be larger than 50,000)');
+    box.value = '7000';
+    box.dispatchEvent(new Event('input'));
+    await settle();
+    expect(warning()).toBeNull();
+
     await leave('input[name="runLogMaxLines"]', '99');
+    expect(warning()).toBe('(cannot be smaller than 500)');
     expect(localStorage.getItem(RUN_LOG_LINES_KEY)).toBe(String(RUN_LOG_LINES_MIN));
     tick('trimOldRunLogs', false);
     await settle();

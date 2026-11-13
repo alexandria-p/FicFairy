@@ -294,8 +294,22 @@ export class UserSettings implements OnDestroy {
     return this.savedTrimLogs() ?? true;
   });
 
+  /** said as the length is typed, and kept once a value out of range is moved to the limit */
+  protected readonly runLogLinesWarning = signal('');
+  private runLogLinesProblem(raw: string): string {
+    const n = Number(raw.trim());
+    if (raw.trim() === '' || !Number.isFinite(n)) return '';
+    if (n < RUN_LOG_LINES_MIN) return `(cannot be smaller than ${RUN_LOG_LINES_MIN.toLocaleString()})`;
+    if (n > RUN_LOG_LINES_MAX) return `(cannot be larger than ${RUN_LOG_LINES_MAX.toLocaleString()})`;
+    return '';
+  }
+  protected checkRunLogLines(box: HTMLInputElement): void {
+    this.runLogLinesWarning.set(this.runLogLinesProblem(box.value));
+  }
+
   protected async setRunLogLines(box: HTMLInputElement): Promise<void> {
     if (this.guestRefused()) return;
+    this.runLogLinesWarning.set(this.runLogLinesProblem(box.value));
     const raw = box.value.trim();
     const lines = raw === '' ? RUN_LOG_LINES_DEFAULT : runLogLines(raw);
     box.value = String(lines);
@@ -637,7 +651,7 @@ export class UserSettings implements OnDestroy {
       }
     }
     if (!this.local && this.savedLogLines() !== null) {
-      changes.push({ group: 'Run logs', name: "Lines a run's log keeps", current: this.runLogLinesNow().toLocaleString(),
+      changes.push({ group: 'Run logs', name: 'Maximum length of each log file (in lines)', current: this.runLogLinesNow().toLocaleString(),
                      default: RUN_LOG_LINES_DEFAULT.toLocaleString() });
     }
     if (!this.local && this.savedTrimLogs() === false) {
