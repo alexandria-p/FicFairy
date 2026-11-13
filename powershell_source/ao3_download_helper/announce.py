@@ -26,6 +26,12 @@ same as the release before it - a push straight to main that did not write one -
     python announce.py check                      # does the committed note fit?
     python announce.py preview [--version 1.2.3]  # both posts, and the link to post on X
     python announce.py post --version 1.2.3 [--previous-note-file path]
+    python announce.py release-notes --version 1.2.3  # the GitHub release's description
+
+**The GitHub release's description** (`release_body`) is the same for every release - how to
+install the app on each system - with the note Bluesky was given at the bottom, under "What's
+new". A release that is not announced (`SKIP_NOTE`) has no "What's new". The three app builds
+write it with `release-notes`, whichever of them makes the release first.
 """
 
 from __future__ import annotations
@@ -154,6 +160,64 @@ LONGEST_VERSION = '9999.9999.9999'
 
 # endregion
 
+# region the github release
+
+INSTALL_NOTES = '''\
+**Windows:**
+
+* Download the zip, extract the files, and double-click ficfairy.exe.
+* Windows may warn that the app is not signed: choose More info, then Run anyway.
+
+**Mac (M1 or later):**
+
+* Download ficfairy-ao3downloader-macos-apple-silicon.zip
+
+**Mac (Intel):**
+
+* Download ficfairy-ao3downloader-macos-intel.zip
+
+* Open the zip, and double-click Start FicFairy.command.
+* The first time, macOS may say it cannot check the app. Click Done, then System Settings > Privacy & Security > Open Anyway.
+
+**Linux (64-bit Intel or AMD):**
+
+* Download the zip, extract the files, and run Start FicFairy.sh.
+
+**Remember: If you wish to read & write files to your local filesystem, you must use a Chromium browser.** (Chrome, Opera, Edge, Brave, Arc) Disregard if you plan to use Dropbox instead as your file-management solution.
+
+If you are stuck, a README inside each zip has more details.'''
+
+
+def release_body(note: str) -> str:
+    """The GitHub release's description: `INSTALL_NOTES`, then the note Bluesky is given (as
+    `note_for` chose it) under "What's new" - or nothing more for a release not announced."""
+
+    if skipped(note) or not note.strip():
+        return INSTALL_NOTES + '\n'
+    return f"{INSTALL_NOTES}\n\n**What's new:**\n\n{note.strip()}\n"
+
+
+def previous_note(version: str, root: Path = ROOT) -> str:
+    """The release note as the release before `version` had it, or '' when there is none - read
+    from the tags, as the deploy's `announce` job does."""
+
+    try:
+        subprocess.run(['git', 'fetch', '--tags', '--force', '--quiet'], cwd=root, capture_output=True, timeout=120)
+        tags = subprocess.run(['git', 'tag', '-l', 'v*', '--sort=-v:refname'], cwd=root,
+                              capture_output=True, text=True, timeout=60).stdout.split()
+        if f'v{version}' not in tags:
+            return ''
+        older = tags[tags.index(f'v{version}') + 1:]
+        if not older:
+            return ''
+        shown = subprocess.run(['git', 'show', f'{older[0]}:.github/release-note.txt'], cwd=root,
+                               capture_output=True, text=True, timeout=60)
+        return shown.stdout if shown.returncode == 0 else ''
+    except Exception:
+        return ''
+
+# endregion
+
 # region posting
 
 def post_bluesky(session, text: str, handle: str, password: str, service: str = BLUESKY_SERVICE) -> str:
@@ -269,7 +333,16 @@ def main(argv: list[str] | None = None) -> int:
     post.add_argument('--version', required=True)
     post.add_argument('--previous-note-file', default='',
                       help="the release note as the release before this one had it, if any")
+    notes = commands.add_parser('release-notes', help="the GitHub release's description, written to a file")
+    notes.add_argument('--version', required=True)
+    notes.add_argument('--out', required=True)
     args = parser.parse_args(argv)
+
+    if args.command == 'release-notes':
+        note = note_for(read_note(), previous_note(args.version))
+        Path(args.out).write_text(release_body(note), encoding='utf-8')
+        print(release_body(note))
+        return 0
 
     if args.command == 'check':
         found = problems(LONGEST_VERSION, read_note())

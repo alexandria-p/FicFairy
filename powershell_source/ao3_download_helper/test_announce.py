@@ -201,3 +201,27 @@ def test_the_preview_shows_the_version_the_next_deploy_will_give(tmp_path):
     # a VERSION above every release is the next version as it is, as the deploy takes it
     (tmp_path / 'VERSION').write_text('2.0.0\n', encoding='utf-8')
     assert announce.coming_version(tmp_path) == '2.0.0'
+
+
+def test_the_release_description_ends_with_the_note_bluesky_was_given():
+    body = announce.release_body('Faster Dropbox.\n')
+    assert body.startswith(announce.INSTALL_NOTES)
+    assert body.rstrip().endswith("**What's new:**\n\nFaster Dropbox.")
+
+
+def test_a_release_not_announced_has_no_whats_new():
+    for note in ('no-post', 'No-Post\n', ''):
+        body = announce.release_body(note)
+        assert "What's new" not in body
+        assert body.strip() == announce.INSTALL_NOTES.strip()
+
+
+def test_release_notes_writes_the_description(tmp_path, monkeypatch):
+    note_file = tmp_path / 'release-note.txt'
+    note_file.write_text('Faster Dropbox.\n', encoding='utf-8')
+    monkeypatch.setattr(announce, 'NOTE_FILE', note_file)
+    monkeypatch.setattr(announce, 'read_note', lambda path=note_file: note_file.read_text().strip())
+    monkeypatch.setattr(announce, 'previous_note', lambda version: '')
+    out = tmp_path / 'notes.md'
+    assert announce.main(['release-notes', '--version', '1.2.3', '--out', str(out)]) == 0
+    assert out.read_text(encoding='utf-8') == announce.release_body('Faster Dropbox.')
