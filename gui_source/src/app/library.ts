@@ -419,6 +419,9 @@ export class Library {
         note({ stage: 'listing', found }),
       );
       if (generation !== this.generation) return;
+      // files this browser kept were named by no listing this visit: what the copy says of when
+      // each last changed is what Resolve issues shows for a duplicate (a listing notes its own)
+      if (fromCopy) this.dropbox.noteChanged(files);
 
       const inside = (file: DropboxFile) =>
         file.path.slice(folder.path.length).split('/').filter(Boolean);

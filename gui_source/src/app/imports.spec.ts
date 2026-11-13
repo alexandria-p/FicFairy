@@ -273,6 +273,19 @@ describe('duplicates', () => {
     });
   });
 
+  it('hands every lookup that fails to the caller, so it can say why rather than leave files quietly unknown', async () => {
+    const store = new MemoryStore(['works/1 a.html', 'works/1 b.html']);
+    (store as LibraryStore).modified = async (path: string) => {
+      if (path.endsWith('b.html')) throw new Error('refused');
+      return 42;
+    };
+    const failed: unknown[] = [];
+    expect(await modifiedTimes(store, ['works/1 a.html', 'works/1 b.html'], (e) => failed.push(e))).toEqual({
+      'works/1 a.html': 42,
+    });
+    expect(failed.map((e) => (e as Error).message)).toEqual(['refused']);
+  });
+
   it('counts roughly the requests an import makes: lookups, other formats per work updated, copies it may replace', () => {
     const base = { links: '', count: 10, filetypes: ['JSON', 'EPUB', 'PDF'], replaceOutdated: false,
                    indexOnly: ['1', '2'], lookups: 4, scope: 'all' as const, files: 30 };

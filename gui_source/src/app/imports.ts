@@ -327,9 +327,14 @@ export function bestGuessOf(group: DuplicateGroup, modified: ModifiedTimes = {})
 /**
  * When each of these files was last changed, as far as the library can say - read a few at a
  * time, so a Dropbox library is not asked about hundreds at once. A file it cannot say for is
- * left out, and counts as unknown.
+ * left out, and counts as unknown; one whose asking failed is also handed to `failed`, so the
+ * caller can say why rather than leave every file quietly unknown.
  */
-export async function modifiedTimes(store: LibraryStore, paths: readonly string[]): Promise<Record<string, number>> {
+export async function modifiedTimes(
+  store: LibraryStore,
+  paths: readonly string[],
+  failed: (error: unknown) => void = () => {},
+): Promise<Record<string, number>> {
   const times: Record<string, number> = {};
   if (!store.modified) return times;
   const queue = [...paths];
@@ -338,8 +343,9 @@ export async function modifiedTimes(store: LibraryStore, paths: readonly string[
       try {
         const at = await store.modified!(path);
         if (at) times[path] = at;
-      } catch {
-        // unknown, which only means it cannot break a tie
+      } catch (error) {
+        // unknown, which only means it cannot break a tie - but said, through `failed`
+        failed(error);
       }
     }
   };
