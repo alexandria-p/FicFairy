@@ -909,7 +909,7 @@ def test_get_metadata_names_files_the_one_fixed_way() -> None:
 
 def _record(work: str, title: str = 'A Fic', updated: str = '14 Dec 2024') -> dict:
     return {'id': work, 'link': f'https://archiveofourown.org/works/{work}',
-            'title': title, 'authors': ['Cal'], 'date_updated': updated}
+            'title': title, 'authors': ['library_of_alexandria'], 'date_updated': updated}
 
 
 def test_downloading_from_the_index_never_reads_a_listing_or_a_work_page():
@@ -937,12 +937,14 @@ def test_downloading_from_the_index_goes_straight_to_the_download_host():
 def test_downloading_from_the_index_names_files_the_usual_way():
     ao3, repo, fileops = make_ao3(filetypes=['EPUB'])
     repo.download_file.return_value = b'epub bytes'
+    # room for the whole name: this is about the usual naming, not about shortening
+    fileops.get_ini_value_integer.return_value = 100
 
-    ao3.download_indexed([_record('111', title='No Paths Are Bound')])
+    ao3.download_indexed([_record('111', title='The Trees Are Burning')])
 
     written = fileops.save_bytes.call_args.args[0]
     assert written == os.path.join(strings.WORKS_FOLDER_NAME,
-                                   '111 No Paths Are Bound - Cal 2024-12-14.epub')
+                                   '111 The Trees Are Burning - library_of_alexandria 2024-12-14.epub')
 
 
 def test_downloading_from_the_index_skips_what_is_already_downloaded():
@@ -978,7 +980,7 @@ def test_downloading_from_the_index_records_what_a_later_run_needs():
     ao3.download_indexed([_record('111')])
 
     logged = fileops.write_log.call_args.args[0]
-    assert logged['title'] == ['111 A Fic - Cal']
+    assert logged['title'] == ['111 A Fic - library_of_alexandria']
     assert logged['updated'] == '14 Dec 2024'
     assert logged['success'] is True
 
@@ -986,15 +988,15 @@ def test_downloading_from_the_index_records_what_a_later_run_needs():
 def test_downloading_from_the_index_replaces_the_copy_it_supersedes():
     ao3, repo, fileops = make_ao3(filetypes=['EPUB'])
     repo.download_file.return_value = b'epub bytes'
-    fileops.save_bytes.return_value = r'C:\d\111 A Fic - Cal 2024-12-14.epub'
+    fileops.save_bytes.return_value = r'C:\d\111 A Fic - library_of_alexandria 2024-12-14.epub'
     fileops.saved_intact.return_value = True
     fileops.delete_file.return_value = True
     ao3.superseded = {'https://archiveofourown.org/works/111':
-                      {'EPUB': r'C:\d\111 A Fic - Cal 2020-01-01.epub'}}
+                      {'EPUB': r'C:\d\111 A Fic - library_of_alexandria 2020-01-01.epub'}}
 
     ao3.download_indexed([_record('111')])
 
-    fileops.delete_file.assert_called_once_with(r'C:\d\111 A Fic - Cal 2020-01-01.epub')
+    fileops.delete_file.assert_called_once_with(r'C:\d\111 A Fic - library_of_alexandria 2020-01-01.epub')
 
 
 def test_one_work_that_will_not_download_does_not_end_the_run():
@@ -1075,7 +1077,7 @@ def test_copies_replaced_at_your_request_are_not_called_out_of_date():
 
 def _unfinished(work: str = '111', published: int = 3) -> dict:
     return {'id': work, 'link': f'https://archiveofourown.org/works/{work}',
-            'title': 'A Fic', 'authors': ['Cal'], 'summary': 'unchanged',
+            'title': 'A Fic', 'authors': ['library_of_alexandria'], 'summary': 'unchanged',
             'chapters_published': published, 'chapters_total': None,
             'date_updated': '01 Jan 2020', 'kudos': 10}
 
@@ -1130,7 +1132,7 @@ def test_re_reading_leaves_alone_the_fields_a_work_page_says_differently():
         fresh = ao3.refresh_one(_unfinished())
 
     assert fresh['summary'] == 'unchanged'
-    assert fresh['authors'] == ['Cal']
+    assert fresh['authors'] == ['library_of_alexandria']
 
 
 @pytest.mark.parametrize('known, page, expected', [
@@ -1692,7 +1694,7 @@ def test_a_floor_nothing_is_older_than_stops_on_a_listing_of_one_page() -> None:
 def _work_page_soup() -> BeautifulSoup:
     return BeautifulSoup(
         '<div class="preface"><h2 class="title">A Fic</h2>'
-        '<h3 class="byline">Cal</h3></div>'
+        '<h3 class="byline">library_of_alexandria</h3></div>'
         '<dl class="stats"><dd class="chapters">3/?</dd><dd class="words">500</dd>'
         '<dd class="status">2024-12-14</dd></dl>', 'html.parser')
 
@@ -1706,7 +1708,7 @@ def test_a_fic_never_indexed_gets_an_entry_from_its_own_page() -> None:
 
     assert record['id'] == '111'
     assert record['title'] == 'A Fic'
-    assert record['authors'] == ['Cal']
+    assert record['authors'] == ['library_of_alexandria']
     assert record['chapters_published'] == 3
     fileops.save_json.assert_called_once()
 
@@ -1717,7 +1719,7 @@ def test_a_fic_already_indexed_keeps_what_the_listing_gave_it() -> None:
     ao3, repo, _ = make_ao3()
     repo.get_soup.return_value = _work_page_soup()
     existing = {'id': '111', 'link': 'https://archiveofourown.org/works/111',
-                'title': 'A Fic', 'authors': ['Cal'], 'summary': 'from the listing',
+                'title': 'A Fic', 'authors': ['library_of_alexandria'], 'summary': 'from the listing',
                 'bookmark_notes': 'mine', 'chapters_published': 1}
 
     with patch.object(Ao3, 'proceed', side_effect=lambda soup: soup):
@@ -1756,7 +1758,7 @@ def test_a_fic_fetched_by_link_is_marked_so_unless_it_is_your_bookmark(existing,
     repo.get_soup.return_value = _work_page_soup()
     if existing is not None:
         existing = {'id': '111', 'link': 'https://archiveofourown.org/works/111',
-                    'title': 'A Fic', 'authors': ['Cal'], **existing}
+                    'title': 'A Fic', 'authors': ['library_of_alexandria'], **existing}
 
     with patch.object(Ao3, 'proceed', side_effect=lambda soup: soup), \
          patch('source_code.ao3.bookmark_state', return_value=page):
@@ -1779,7 +1781,7 @@ def test_the_existing_entry_is_looked_for_only_once_ao3_has_shown_the_work() -> 
     repo.get_soup.side_effect = None
     repo.get_soup.return_value = _work_page_soup()
     find.return_value = {'id': '111', 'link': 'https://archiveofourown.org/works/111',
-                         'title': 'A Fic', 'authors': ['Cal'], 'summary': 'from the listing'}
+                         'title': 'A Fic', 'authors': ['library_of_alexandria'], 'summary': 'from the listing'}
     with patch.object(Ao3, 'proceed', side_effect=lambda soup: soup):
         record = ao3.index_one_work('https://archiveofourown.org/works/111', find_existing=find)
     find.assert_called_once()

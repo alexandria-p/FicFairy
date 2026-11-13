@@ -65,7 +65,7 @@ describe('pageItems', () => {
 
 describe('workIdFromFilename', () => {
   it("reads the work number off ao3downloader's default file name", () => {
-    expect(workIdFromFilename('34816549 No Paths Are Bound - Author.html')).toBe('34816549');
+    expect(workIdFromFilename('1234567 The Trees Are Burning - Author.html')).toBe('1234567');
   });
 
   it('reads it out of a nested path', () => {

@@ -33,14 +33,14 @@ describe('the FAQ on file names', () => {
     it(`gives an example name the app matches to its work, for ${pattern}`, async () => {
       useNamePattern(pattern);
       const { element } = await faq();
-      expect(workNumber(element.querySelector('.example-name code')?.textContent ?? '')).toBe('34816549');
+      expect(workNumber(element.querySelector('.example-name code')?.textContent ?? '')).toBe('1234567');
     });
   }
 
   it('words the default the way it always was', async () => {
     const { element } = await faq();
     expect(element.querySelector('.pattern-words')?.textContent).toBe('{work number} {title} - {author} {date updated}');
-    expect(element.querySelector('.example-name')?.textContent).toBe('34816549 No Paths Are Bound - Cataclys 2026-08-23.html');
+    expect(element.querySelector('.example-name')?.textContent).toBe('1234567 The Trees Are Burning - library_of_alexandria 2026-08-23.html');
   });
 
   it('follows a pattern that changes while it is open', async () => {
@@ -49,7 +49,7 @@ describe('the FAQ on file names', () => {
     await fixture.whenStable();
 
     expect(element.querySelector('.pattern-words')?.textContent).toBe('{title} - {author} - {work number} {date updated}');
-    expect(element.querySelector('.example-name')?.textContent).toBe('No Paths Are Bound - Cataclys - 34816549 2026-08-23.html');
+    expect(element.querySelector('.example-name')?.textContent).toBe('The Trees Are Burning - library_of_alexandria - 1234567 2026-08-23.html');
   });
 });
 

@@ -315,11 +315,11 @@ describe('History', () => {
   });
 
   it('links each work number to the work on AO3', async () => {
-    await show([aRun({ downloaded: ['34816549'] })]);
+    await show([aRun({ downloaded: ['1234567'] })]);
     await openFold(element.querySelector<HTMLDetailsElement>('details.ids')!);
 
     expect(element.querySelector('.id-list a')?.getAttribute('href')).toBe(
-      'https://archiveofourown.org/works/34816549',
+      'https://archiveofourown.org/works/1234567',
     );
   });
 

@@ -32,7 +32,7 @@ const CONFIG: ServerConfig = {
     extraWaitTime: 15,
     fileNamePattern: '{worknum} {title} - {author} {date updated}',
     fileNameLength: 50,
-    fileNameExample: '34816549 No Paths Are Bound - Cataclys 2026-08-23.html',
+    fileNameExample: '1234567 The Trees Are Burning - library_of_alexandria 2026-08-23.html',
     maxRetries: 0,
     maxTimeouts: 3,
     debugLogging: false,
@@ -224,9 +224,9 @@ async function advanceTo(target: 'options' | 'filetypes' | 'credentials' | 'runn
       )!;
       field.value =
         field.name === 'work'
-          ? 'https://archiveofourown.org/works/34816549'
+          ? 'https://archiveofourown.org/works/1234567'
           : field.name === 'works'
-            ? '34816549\n75354806'
+            ? '1234567\n75354806'
             : 'https://archiveofourown.org/collections/yuletide2024';
       field.dispatchEvent(new Event('input'));
       await fixture.whenStable();
@@ -2064,7 +2064,7 @@ describe('DownloadDialog', () => {
     await advanceTo('running');
 
     const shown = element.querySelector('.settings')?.textContent ?? '';
-    expect(shown).toContain('34816549 No Paths Are Bound - Cataclys 2026-08-23.html');
+    expect(shown).toContain('1234567 The Trees Are Burning - library_of_alexandria 2026-08-23.html');
     expect(shown).toContain('may be shortened to fit');
   });
 
@@ -2699,7 +2699,7 @@ describe('DownloadDialog', () => {
     expect(input).toBeTruthy();
     expect(button('Continue')?.disabled).toBe(true);
 
-    input.value = '34816549';
+    input.value = '1234567';
     input.dispatchEvent(new Event('input'));
     await fixture.whenStable();
     expect(button('Continue')?.disabled).toBe(false);
@@ -2721,7 +2721,7 @@ describe('DownloadDialog', () => {
     await open('work');
     const input = element.querySelector<HTMLInputElement>('input[name="work"]')!;
 
-    input.value = 'https://archiveofourown.org/works/34816549/chapters/86677150';
+    input.value = 'https://archiveofourown.org/works/1234567/chapters/86677150';
     input.dispatchEvent(new Event('input'));
     await fixture.whenStable();
 
@@ -2739,14 +2739,14 @@ describe('DownloadDialog', () => {
 
     await open('works');
     const box = element.querySelector<HTMLTextAreaElement>('textarea[name="works"]')!;
-    box.value = '34816549\n75354806, 34816549';
+    box.value = '1234567\n75354806, 1234567';
     box.dispatchEvent(new Event('input'));
     await fixture.whenStable();
 
     expect(element.querySelector('.work-count')?.textContent).toContain('2 fics');
     expect(button('Continue')?.disabled).toBe(false);
 
-    box.value = '34816549 not-a-fic';
+    box.value = '1234567 not-a-fic';
     box.dispatchEvent(new Event('input'));
     await fixture.whenStable();
     expect(button('Continue')?.disabled).toBe(true);
@@ -2933,7 +2933,7 @@ describe('DownloadDialog', () => {
     await open('works');
     await advanceTo('running');
     expect(jobs.started[0].action).toBe('works');
-    expect(jobs.started[0].url).toBe('34816549\n75354806');
+    expect(jobs.started[0].url).toBe('1234567\n75354806');
     expect(jobs.started[0].options.skipLogin).toBe(false);
   });
 

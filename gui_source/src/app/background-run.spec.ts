@@ -151,7 +151,7 @@ async function toCredentials(): Promise<void> {
     if (currentStep() === 'link') {
       const field = element.querySelector<HTMLInputElement>('input[name="work"], input[name="collection"]')!;
       field.value = field.name === 'work'
-        ? 'https://archiveofourown.org/works/34816549'
+        ? 'https://archiveofourown.org/works/1234567'
         : 'https://archiveofourown.org/collections/yuletide2024';
       field.dispatchEvent(new Event('input'));
       await fixture.whenStable();

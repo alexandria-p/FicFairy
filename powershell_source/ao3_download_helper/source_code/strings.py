@@ -143,7 +143,7 @@ FILE_NAME_PATTERN = '{worknum} {title} - {author}'
 # how the date on the end is described when the naming is shown back to the user, and an
 # example of the whole thing, so the rule can be read rather than deduced
 DATE_STAMP_PLACEHOLDER = '{date updated}'
-FILE_NAME_EXAMPLE_PARTS = ['34816549', 'No Paths Are Bound', 'Cataclysmic_Cal', '2026-08-23']
+FILE_NAME_EXAMPLE_PARTS = ['1234567', 'The Trees Are Burning', 'library_of_alexandria', '2026-08-23']
 
 SETTING_USERNAME = 'username'
 SETTING_PASSWORD = 'password'
@@ -849,11 +849,11 @@ ERROR_RUN_DURING_UPDATE = 'The app is updating itself, and will restart in a mom
 ERROR_RUN_IN_PROGRESS = 'A run is already in progress. Wait until it is complete to start a new one - the History tab shows it.'
 ERROR_BACKGROUND_NEEDS_DROPBOX = 'A background run needs a library in Dropbox, and this request came without a Dropbox sign-in. Sign in to Dropbox and try again.'
 ERROR_NOT_WORK_LINKS = ('These are not AO3 works: {}. Paste work links like '
-                        'https://archiveofourown.org/works/34816549, or work numbers, separated by '
+                        'https://archiveofourown.org/works/1234567, or work numbers, separated by '
                         'new lines, commas, spaces or semicolons.')
 ERROR_NO_WORK_LINKS = 'Paste at least one AO3 work link or work number.'
 ERROR_TOO_MANY_WORK_LINKS = 'That is {} fics - one run takes at most {}. Split them into smaller runs.'
-ERROR_NOT_A_WORK_LINK = 'That is not an ao3 work. Paste a link like https://archiveofourown.org/works/34816549, or just the work number.'
+ERROR_NOT_A_WORK_LINK = 'That is not an ao3 work. Paste a link like https://archiveofourown.org/works/1234567, or just the work number.'
 ERROR_COLLECTION_PROFILE = 'Problem reading a collection profile page'
 ERROR_COLLECTION_ITEMS = 'Problem reading the items in a collection'
 ERROR_COLLECTION_SAVE = 'Problem saving collection file'

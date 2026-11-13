@@ -84,7 +84,7 @@
             <textarea
               name="works"
               rows="6"
-              placeholder="https://archiveofourown.org/works/34816549&#10;75354806, 123456; 7890"
+              placeholder="https://archiveofourown.org/works/1234567&#10;75354806, 123456; 7890"
               [value]="collectionUrl()"
               [class.ghost-typing]="ghostTyping()"
               (input)="setCollectionUrl($any($event.target).value)"
@@ -96,7 +96,7 @@
             <p class="error">
               {{ workList().unknown.length === 1 ? 'This is not an AO3 work' : 'These are not AO3 works' }}:
               <code>{{ workList().unknown.slice(0, 10).join(', ') }}</code>@if (workList().unknown.length > 10) { and {{ workList().unknown.length - 10 }} more}.
-              Each should be a work link like <code>https://archiveofourown.org/works/34816549</code>,
+              Each should be a work link like <code>https://archiveofourown.org/works/1234567</code>,
               or just the number.
             </p>
           } @else if (workList().ids.length > maxWorks) {
@@ -128,7 +128,7 @@
             <input
               type="text"
               name="work"
-              placeholder="https://archiveofourown.org/works/34816549 or 34816549"
+              placeholder="https://archiveofourown.org/works/1234567 or 1234567"
               [value]="collectionUrl()"
               [class.ghost-typing]="ghostTyping()"
               (input)="setCollectionUrl($any($event.target).value)"
@@ -138,7 +138,7 @@
           @if (collectionUrl().trim() && !linkIsValid() && !ghostTyping()) {
             <p class="error">
               That is not an AO3 work. It should look like
-              <code>https://archiveofourown.org/works/34816549</code>, or just the number.
+              <code>https://archiveofourown.org/works/1234567</code>, or just the number.
             </p>
           }
 

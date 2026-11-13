@@ -298,10 +298,10 @@ def test_the_index_read_as_works_leaves_series_and_external_entries_out(library)
 def test_a_work_says_which_series_it_is_part_of():
     # checked against real markup: a blurb and a work's own page say it the same way
     blurb = next(b for b in parse_soup.get_blurbs(soup('bookmarks'))
-                 if parse_soup.get_blurb_kind(b)[1] == '34816549')
+                 if parse_soup.get_blurb_kind(b)[1] == '1234567')
     assert parse_soup.get_series_memberships(blurb) == [
         {'id': '2627935', 'title': 'MXTX - Retellings', 'part': 1},
-        {'id': '3108957', 'title': 'No Paths Are Bound + Extras', 'part': 1},
+        {'id': '3108957', 'title': 'The Trees Are Burning + Extras', 'part': 1},
     ]
     page = parse_soup.get_series_memberships(soup('multipleSeries'))
     assert page[0] == {'id': '3078150', 'title': 'AO3 Skins', 'part': 1}

@@ -423,8 +423,7 @@ input[type='date'] {
   color: var(--text-dim);
 }
 
-.undecided-note,
-.clash-note {
+.undecided-note {
   display: block;
   margin: 4px 0 0;
   color: var(--warn-text);
@@ -662,12 +661,6 @@ footer.with-bulk {
 }
 .format-examples .becomes .file-name { color: var(--text); }
 
-/* a file the rename step held back: the name it wanted is taken */
-.choose-list li.clash-note {
-  list-style: none;
-  margin-top: 8px;
-}
-
 .rename-clashes {
   margin: 12px 0 0;
   padding: 8px 10px;
@@ -675,8 +668,3 @@ footer.with-bulk {
   background: var(--warn-bg);
 }
 
-.clash-file {
-  margin-right: 6px;
-  color: var(--warn-text);
-  font-size: 0.82rem;
-}

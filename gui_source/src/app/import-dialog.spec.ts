@@ -1560,12 +1560,13 @@ describe('ImportDialog', () => {
         expect(element.querySelector('.rename-clashes')?.textContent).toContain('probably a second copy');
       });
 
-      it('puts the file with the one already there as duplicates, said so in its row', async () => {
+      it('puts the file with the one already there as duplicates, with no note about the rename', async () => {
         await renameFirstFormat();
         await click('Continue');
         expect(step()).toBe('duplicates');
-        expect(element.querySelector('tr[data-group="12345:epub"] .clash-note')?.textContent).toContain('so it was not renamed');
-        expect(element.querySelector('tr[data-group="12345:epub"] .clash-file')).not.toBeNull();
+        expect(element.querySelector('tr[data-group="12345:epub"]')).not.toBeNull();
+        expect(element.querySelector('tr[data-group="12345:epub"]')?.textContent).not.toContain('same name as another');
+        expect(element.querySelector('tr[data-group="12345:epub"]')?.textContent).not.toContain('Not yet renamed');
       });
 
       it('can be skipped like any other set: both files kept, nothing renamed', async () => {
@@ -1630,7 +1631,7 @@ describe('ImportDialog', () => {
         expect(store.renamed).toEqual([]);
       });
 
-      it('offers the skips when sorting the set by hand, saying what skipping keeps', async () => {
+      it('offers the skips when sorting the set by hand, with no note about the rename', async () => {
         await renameFirstFormat();
         await click('Continue');
         choiceBox().value = 'choose';
@@ -1639,7 +1640,7 @@ describe('ImportDialog', () => {
         await click('Choose which to keep');
         expect(step()).toBe('choose');
         expect(element.querySelector('.choose-list input[aria-label="Skip for now"]')).not.toBeNull();
-        expect(element.querySelector('.choose-list .clash-note')?.textContent).toContain('skipping keeps both');
+        expect(element.querySelector('.choose-list')?.textContent).not.toContain('same name as another');
       });
 
       it('holds back two files that would both take one name, though nothing has it yet', async () => {

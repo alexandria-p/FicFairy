@@ -69,4 +69,4 @@ const PART_WORDS: Record<NameToken, string> = {
   date: 'date updated',
 };
 
-const EXAMPLE = { worknum: '34816549', title: 'No Paths Are Bound', author: 'Cataclys', date: '2026-08-23' };
+const EXAMPLE = { worknum: '1234567', title: 'The Trees Are Burning', author: 'library_of_alexandria', date: '2026-08-23' };

@@ -157,12 +157,12 @@ def test_a_run_indexes_unless_it_was_actually_told_not_to():
 
 def test_a_work_link_is_accepted_as_a_link_or_as_a_bare_number():
     # pasting the number off the address bar is as natural as pasting the whole url
-    assert server.work_link('34816549') == 'https://archiveofourown.org/works/34816549'
-    assert server.work_link('https://archiveofourown.org/works/34816549') == \
-        'https://archiveofourown.org/works/34816549'
+    assert server.work_link('1234567') == 'https://archiveofourown.org/works/1234567'
+    assert server.work_link('https://archiveofourown.org/works/1234567') == \
+        'https://archiveofourown.org/works/1234567'
     # a chapter link, or anything else with the work number in it, still names one work
-    assert server.work_link('https://archiveofourown.org/works/34816549/chapters/86677150') \
-        == 'https://archiveofourown.org/works/34816549'
+    assert server.work_link('https://archiveofourown.org/works/1234567/chapters/86677150') \
+        == 'https://archiveofourown.org/works/1234567'
 
 
 @pytest.mark.parametrize('value', [
@@ -170,7 +170,7 @@ def test_a_work_link_is_accepted_as_a_link_or_as_a_bare_number():
     'https://archiveofourown.org/series/12345',
     'https://archiveofourown.org/collections/somename',
     'https://archiveofourown.org/users/Someone/bookmarks',
-    'https://example.com/works/34816549',
+    'https://example.com/works/1234567',
     'not a link at all',
 ])
 def test_anything_that_is_not_one_work_is_refused(value):
@@ -822,7 +822,7 @@ def test_read_settings_shows_the_naming_as_a_real_example(tmp_path):
 
     example = server.read_settings(fileops)['fileNameExample']
 
-    assert parse_text.get_work_number_from_filename(example) == '34816549'
+    assert parse_text.get_work_number_from_filename(example) == '1234567'
     assert parse_text.get_date_from_filename(example) == '2026-08-23'
 
 
