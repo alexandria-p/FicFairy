@@ -937,12 +937,14 @@ def test_downloading_from_the_index_goes_straight_to_the_download_host():
 def test_downloading_from_the_index_names_files_the_usual_way():
     ao3, repo, fileops = make_ao3(filetypes=['EPUB'])
     repo.download_file.return_value = b'epub bytes'
+    # room for the whole name: this is about the usual naming, not about shortening
+    fileops.get_ini_value_integer.return_value = 100
 
-    ao3.download_indexed([_record('111', title='The Trees')])
+    ao3.download_indexed([_record('111', title='The Trees Are Burning')])
 
     written = fileops.save_bytes.call_args.args[0]
     assert written == os.path.join(strings.WORKS_FOLDER_NAME,
-                                   '111 The Trees - library_of_alexandria 2024-12-14.epub')
+                                   '111 The Trees Are Burning - library_of_alexandria 2024-12-14.epub')
 
 
 def test_downloading_from_the_index_skips_what_is_already_downloaded():

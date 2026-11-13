@@ -475,13 +475,13 @@ def test_get_date_from_filename_reads_only_a_trailing_stamp(name, expected):
 
 
 @pytest.mark.parametrize('name,expected', [
-    ('1234567 The Trees - library_of_alexandria 2024-12-14.html', '1234567'),
+    ('1234567 The Trees Are Burning - library_of_alexandria 2024-12-14.html', '1234567'),
     ('1234567.epub', '1234567'),
     ('1234567_something.pdf', '1234567'),
     ('99 Red Balloons.html', '99'),
     # deliberately not a work number: nothing separates the digits from the title
     ('99Red Balloons.html', None),
-    ('The Trees 1234567.html', None),
+    ('The Trees Are Burning 1234567.html', None),
 ])
 def test_get_work_number_from_filename_matches_the_documented_rule(name, expected):
     assert parse_text.get_work_number_from_filename(name) == expected

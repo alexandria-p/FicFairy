@@ -461,7 +461,7 @@ def with_folder(tmp_path):
 
 
 def test_the_works_already_indexed_are_read_from_the_index_file_names(tmp_path):
-    indexing_folder = os.path.join(strings.INDEXING_FOLDER_NAME, '1234567 The Trees - library_of_alexandria.json')
+    indexing_folder = os.path.join(strings.INDEXING_FOLDER_NAME, '1234567 The Trees Are Burning - library_of_alexandria.json')
     make_file(tmp_path, indexing_folder)
 
     assert shared.indexed_work_ids(with_folder(tmp_path)) == {'1234567'}
@@ -528,7 +528,7 @@ def test_nothing_indexed_yet_is_not_an_error(tmp_path):
 
 
 def test_scan_finds_works_by_the_number_their_name_starts_with(tmp_path):
-    make_file(tmp_path, '1234567 The Trees - library_of_alexandria 2024-12-14.html')
+    make_file(tmp_path, '1234567 The Trees Are Burning - library_of_alexandria 2024-12-14.html')
     make_file(tmp_path, '99 Red Balloons 2020-01-02.epub')
 
     found = shared.scan_downloaded_works(str(tmp_path), ['HTML', 'EPUB'])
@@ -551,7 +551,7 @@ def test_the_pages_list_of_hidden_works_is_never_taken_for_a_work(tmp_path):
 
 
 def test_scan_reports_an_undated_file_as_having_no_date(tmp_path):
-    make_file(tmp_path, '1234567 The Trees - library_of_alexandria.html')
+    make_file(tmp_path, '1234567 The Trees Are Burning - library_of_alexandria.html')
 
     found = shared.scan_downloaded_works(str(tmp_path), ['HTML'])
 
