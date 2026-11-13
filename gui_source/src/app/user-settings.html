@@ -540,10 +540,14 @@
           started and settings changed. It is deleted every time you close or reload the page.
         </p>
         <label class="field visit-log-limit">
-          <span>Entries kept before the oldest start to be replaced</span>
+          <span>Maximum length of the visit log (in lines)</span>
           <input type="number" name="visitLogLimit" [min]="visitLogMin" [max]="visitLogMax" step="100"
-                 [value]="visitLimit()" (change)="setVisitLogLimit($any($event.target))" />
-          <span class="hint">{{ visitLogMin.toLocaleString() }} to {{ visitLogMax.toLocaleString() }}; the default is {{ visitLogDefault.toLocaleString() }}. It holds {{ visitSize().toLocaleString() }} now.</span>
+                 [value]="visitLimit()" (input)="checkVisitLogLimit($any($event.target))"
+                 (change)="setVisitLogLimit($any($event.target))" />
+          <span class="hint">The default is {{ visitLogDefault.toLocaleString() }}. It holds {{ visitSize().toLocaleString() }} now.</span>
+          @if (visitLogLimitWarning(); as warning) {
+            <span class="limit-warning visit-log-limit-warning">{{ warning }}</span>
+          }
         </label>
         <button type="button" class="button download-visit-log" (click)="downloadVisitLog()">Download the full visit log for this session</button>
       </div>
@@ -568,7 +572,7 @@
                    (change)="setRunLogLines($any($event.target))" />
             <span class="hint">Applies from the next run. The default is {{ runLogDefault.toLocaleString() }}.</span>
             @if (runLogLinesWarning(); as warning) {
-              <span class="run-log-lines-warning">{{ warning }}</span>
+              <span class="limit-warning run-log-lines-warning">{{ warning }}</span>
             }
           </label>
           <label class="check">

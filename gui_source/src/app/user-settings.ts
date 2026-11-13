@@ -239,8 +239,15 @@ export class UserSettings implements OnDestroy {
   protected readonly visitLimit = computed(() => this.visit.limit());
   protected readonly visitSize = computed(() => this.visit.count());
 
+  /** said as the length is typed, and kept once a value out of range is moved to the limit */
+  protected readonly visitLogLimitWarning = signal('');
+  protected checkVisitLogLimit(box: HTMLInputElement): void {
+    this.visitLogLimitWarning.set(outOfRange(box.value, VISIT_LOG_MIN, VISIT_LOG_MAX));
+  }
+
   protected setVisitLogLimit(box: HTMLInputElement): void {
     if (this.guestRefused()) return;
+    this.visitLogLimitWarning.set(outOfRange(box.value, VISIT_LOG_MIN, VISIT_LOG_MAX));
     const raw = box.value.trim();
     const limit = this.visit.setLimit(raw === '' ? null : Number(raw));
     box.value = String(limit);
@@ -297,11 +304,7 @@ export class UserSettings implements OnDestroy {
   /** said as the length is typed, and kept once a value out of range is moved to the limit */
   protected readonly runLogLinesWarning = signal('');
   private runLogLinesProblem(raw: string): string {
-    const n = Number(raw.trim());
-    if (raw.trim() === '' || !Number.isFinite(n)) return '';
-    if (n < RUN_LOG_LINES_MIN) return `(cannot be smaller than ${RUN_LOG_LINES_MIN.toLocaleString()})`;
-    if (n > RUN_LOG_LINES_MAX) return `(cannot be larger than ${RUN_LOG_LINES_MAX.toLocaleString()})`;
-    return '';
+    return outOfRange(raw, RUN_LOG_LINES_MIN, RUN_LOG_LINES_MAX);
   }
   protected checkRunLogLines(box: HTMLInputElement): void {
     this.runLogLinesWarning.set(this.runLogLinesProblem(box.value));
@@ -658,7 +661,7 @@ export class UserSettings implements OnDestroy {
       changes.push({ group: 'Run logs', name: `Only keep logs of the last ${RECENT_RUN_LOGS} runs`, current: 'Off', default: 'On' });
     }
     if (this.visitLimit() !== VISIT_LOG_LIMIT) {
-      changes.push({ group: 'Visit log', name: 'Entries kept', current: this.visitLimit().toLocaleString(),
+      changes.push({ group: 'Visit log', name: 'Maximum length of the visit log (in lines)', current: this.visitLimit().toLocaleString(),
                      default: VISIT_LOG_LIMIT.toLocaleString() });
     }
     const always = this.alwaysAnswers();
@@ -926,4 +929,13 @@ export class UserSettings implements OnDestroy {
       this.say(`Not saved: ${e instanceof Error ? e.message : String(e)}`, 'problem');
     }
   }
+}
+
+/** the warning under a length box whose typed number is outside what it takes; '' when it is not */
+function outOfRange(raw: string, min: number, max: number): string {
+  const n = Number(raw.trim());
+  if (raw.trim() === '' || !Number.isFinite(n)) return '';
+  if (n < min) return `(cannot be smaller than ${min.toLocaleString()})`;
+  if (n > max) return `(cannot be larger than ${max.toLocaleString()})`;
+  return '';
 }
