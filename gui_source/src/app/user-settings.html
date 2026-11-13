@@ -416,13 +416,12 @@
       <span class="saved-to">Saved to this browser</span>
     </div>
     <p class="hint">
-      This browser keeps a copy of your Dropbox library's index, so opening it downloads only the
-      index files that changed since last time. The copy is shown while Dropbox is checked, and
-      Dropbox always has the last word. Clearing it changes nothing in Dropbox - the next time the
-      library opens, its whole index is downloaded again. Signing out of Dropbox clears it too.
+      This browser caches information from Dropbox to speed up its page load. This means that
+      FicFairy only needs to download the index files that changed since last time.
       @if (cachedFiles() !== null) {
         It holds {{ cachedFiles() }} index file{{ cachedFiles() === 1 ? '' : 's' }} now.
       }
+      Signing out of Dropbox also clears this cache.
     </p>
     <button type="button" class="button clear-cache" [disabled]="clearingCache()" (click)="clearCache()">
       Clear cache
