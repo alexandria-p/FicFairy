@@ -120,9 +120,15 @@ class FakeDropbox {
     this.listFilesCalls.push(path);
     const files = Object.keys(this.files)
       .filter((p) => p.toLowerCase().startsWith(path.toLowerCase() + '/'))
-      .map((p, i) => ({ name: p.split('/').pop()!, path: p, modified: i }));
+      .map((p, i) => ({ name: p.split('/').pop()!, path: p, modified: i, changed: 1000 + i }));
     found?.(files.length);
     return files;
+  }
+
+  /** the files whose change times the library handed over, by path */
+  noted = new Map<string, number | undefined>();
+  noteChanged(files: readonly DropboxFile[]): void {
+    for (const file of files) this.noted.set(file.path, file.changed);
   }
 
   /** the parallel listing, which the fake answers as one; with `hashes`, as Dropbox's content_hash */
@@ -390,6 +396,20 @@ describe('Library, reading a Dropbox folder', () => {
 
     expect(dropbox.changeRequests).toBe(0);
     expect(dropbox.listings).toBe(2);
+  });
+
+  it('hands the session the change times of files it kept, which no listing this visit named', async () => {
+    dropbox.hashes = true;
+    dropbox.files = { '/indexing/111 One.json': record('111', 1), '/works/111 One 2024-01-01.html': '<p>x</p>' };
+    await library.showDropbox();
+    const kept = dropbox.noted;
+    // a full listing notes its own times in the real session - the library hands over nothing
+    expect(kept.size).toBe(0);
+    await TestBed.inject(IndexCache).listing('|');
+
+    await library.showDropbox();
+    expect(dropbox.listings).toBe(1);
+    expect(dropbox.noted.get('/works/111 One 2024-01-01.html')).toBeGreaterThanOrEqual(1000);
   });
 
   it('shows the cached copy at once while Dropbox is checked, holding it as not yet checked', async () => {

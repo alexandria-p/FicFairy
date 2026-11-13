@@ -13,6 +13,8 @@ import {
   untracked,
 } from '@angular/core';
 import { WorkLink } from './work-link';
+import { Chime } from './chime';
+
 import { DecimalPipe } from '@angular/common';
 import {
   ActiveRun,
@@ -188,6 +190,7 @@ export class DownloadDialog implements OnDestroy {
   private readonly jobs = inject(Jobs);
   private readonly library = inject(Library);
   private readonly visit = inject(VisitLog);
+  private readonly chime = inject(Chime);
   /**
    * What the window opened with - its file types and every option as it would send them - so
    * the visit log can say which were left as they were and which were changed (`noteStart`).
@@ -2275,9 +2278,13 @@ export class DownloadDialog implements OnDestroy {
           ),
         );
         break;
-      case 'question':
+      case 'question': {
         // the run is blocked until this is answered, so it takes over from the progress
-        this.question.set(event.name ?? '');
+        const asked = event.name ?? '';
+        this.question.set(asked);
+        // only a run with a page waits on a question (a background run takes its defaults and
+        // sends none), so whoever is here is told: they may be in another tab
+        if (asked) this.chime.waiting();
         this.askedDate.set(event.date ?? '');
         this.asking.set(event.count ?? 0);
         this.askedFiles.set(event.files ?? 0);
@@ -2299,6 +2306,7 @@ export class DownloadDialog implements OnDestroy {
         this.askedTimeout.set(event.timeoutMinutes ?? 0);
             this.answering.set(false);
         break;
+      }
       case 'message':
         if (event.text) this.append(event.text, event.at);
         break;

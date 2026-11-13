@@ -72,6 +72,13 @@ export interface DropboxFile {
   path: string;
   /** when Dropbox last saw it change, in ms; picks the newest of two copies of one work */
   modified: number;
+  /**
+   * When the file itself last changed, in ms: the time it carried when it was uploaded
+   * (`client_modified`), which a sync keeps, else `modified`. What Resolve issues shows for a
+   * duplicate - taken from the listing, so it costs no request of its own. Missing from a copy
+   * this browser kept before it was recorded.
+   */
+  changed?: number;
   /** Dropbox's `content_hash`: changes whenever the file does - what the index cache keys on */
   hash?: string;
 }
@@ -91,15 +98,19 @@ interface ListedEntry {
   name: string;
   path_display: string;
   path_lower?: string;
+  client_modified?: string;
   server_modified?: string;
   content_hash?: string;
 }
 
+/** a listed file as the library keeps it - every listing reads its entries through this */
 function listedFile(entry: ListedEntry): DropboxFile {
+  const changed = Date.parse(entry.client_modified ?? entry.server_modified ?? '');
   return {
     name: entry.name,
     path: entry.path_display,
     modified: Date.parse(entry.server_modified ?? '') || 0,
+    ...(changed ? { changed } : {}),
     ...(entry.content_hash ? { hash: entry.content_hash } : {}),
   };
 }
@@ -280,6 +291,12 @@ export class DropboxSession {
   private expiresAt = 0;
   /** one refresh at a time; calls that find a refresh under way wait for the same one */
   private refreshing: Promise<string> | null = null;
+  /**
+   * When each file last changed (`DropboxFile.changed`), by lower-cased path, as this visit's
+   * listings said - so Resolve issues reads a duplicate's time from the listing that found it,
+   * rather than asking Dropbox about every file again (`fileModified`).
+   */
+  private readonly changedAt = new Map<string, number>();
 
   /**
    * Called at startup. Finishes a sign-in if this load is the way back from dropbox.com,
@@ -362,6 +379,7 @@ export class DropboxSession {
     this.refreshToken = '';
     this.accessToken = '';
     this.expiresAt = 0;
+    this.changedAt.clear();
     this.account.set(null);
     this.status.set(this.appKey ? 'signed-out' : 'unconfigured');
   }
@@ -443,6 +461,16 @@ export class DropboxSession {
   // region reading the library
 
   /**
+   * Remember when these files last changed, for `fileModified`. Every listing notes its own;
+   * the library notes the files it took from this browser's cache, which no listing named.
+   */
+  noteChanged(files: readonly DropboxFile[]): void {
+    for (const file of files) {
+      if (file.changed) this.changedAt.set(file.path.toLowerCase(), file.changed);
+    }
+  }
+
+  /**
    * Every file below `path`, in one recursive listing - a page per 2,000 entries rather
    * than a call per folder - or only those directly in it. A folder that is not there is
    * an empty library, not an error.
@@ -456,14 +484,7 @@ export class DropboxSession {
     recursive = true,
     found?: (count: number) => void,
   ): Promise<DropboxFile[]> {
-    type Entry = {
-      '.tag': string;
-      name: string;
-      path_display: string;
-      server_modified?: string;
-      content_hash?: string;
-    };
-    type Page = { entries: Entry[]; cursor: string; has_more: boolean };
+    type Page = { entries: ListedEntry[]; cursor: string; has_more: boolean };
 
     const files: DropboxFile[] = [];
     let page: Page;
@@ -476,17 +497,13 @@ export class DropboxSession {
     for (;;) {
       for (const entry of page.entries) {
         if (entry['.tag'] !== 'file') continue;
-        files.push({
-          name: entry.name,
-          path: entry.path_display,
-          modified: Date.parse(entry.server_modified ?? '') || 0,
-          ...(entry.content_hash ? { hash: entry.content_hash } : {}),
-        });
+        files.push(listedFile(entry));
       }
       found?.(files.length);
       if (!page.has_more) break;
       page = await this.call<Page>('files/list_folder/continue', { cursor: page.cursor });
     }
+    this.noteChanged(files);
     return files;
   }
 
@@ -497,8 +514,7 @@ export class DropboxSession {
    * side by side take about as long as the biggest of them. `found` hears the running total.
    */
   async listLibrary(root: string, found?: (count: number) => void): Promise<DropboxFile[]> {
-    type Entry = { '.tag': string; name: string; path_display: string; server_modified?: string; content_hash?: string };
-    type Page = { entries: Entry[]; cursor: string; has_more: boolean };
+    type Page = { entries: ListedEntry[]; cursor: string; has_more: boolean };
     const top: DropboxFile[] = [];
     const folders: string[] = [];
     let page: Page;
@@ -511,18 +527,12 @@ export class DropboxSession {
     for (;;) {
       for (const entry of page.entries) {
         if (entry['.tag'] === 'folder') folders.push(entry.path_display);
-        else if (entry['.tag'] === 'file') {
-          top.push({
-            name: entry.name,
-            path: entry.path_display,
-            modified: Date.parse(entry.server_modified ?? '') || 0,
-            ...(entry.content_hash ? { hash: entry.content_hash } : {}),
-          });
-        }
+        else if (entry['.tag'] === 'file') top.push(listedFile(entry));
       }
       if (!page.has_more) break;
       page = await this.call<Page>('files/list_folder/continue', { cursor: page.cursor });
     }
+    this.noteChanged(top);
     const counts = new Map<string, number>();
     const say = () => found?.(top.length + [...counts.values()].reduce((a, b) => a + b, 0));
     say();
@@ -568,7 +578,9 @@ export class DropboxSession {
           if (entry['.tag'] === 'deleted') {
             changes.push({ removed: (entry.path_lower ?? entry.path_display).toLowerCase() });
           } else if (entry['.tag'] === 'file') {
-            changes.push({ file: listedFile(entry) });
+            const file = listedFile(entry);
+            this.noteChanged([file]);
+            changes.push({ file });
           }
         }
         if (!page.has_more) return { changes, cursor: page.cursor };
@@ -671,6 +683,8 @@ export class DropboxSession {
       },
       body: content,
     }));
+    // written just now: whatever a listing said of the file before is out of date
+    this.changedAt.delete(path.toLowerCase());
     const meta = (await response.json()) as { size?: number };
     return meta.size ?? content.size;
   }
@@ -691,13 +705,18 @@ export class DropboxSession {
    * (`client_modified`), which a sync keeps, or else when Dropbox received it.
    */
   async fileModified(path: string): Promise<number | null> {
+    // a listing this visit has already said - most often the very read that found the duplicates
+    const listed = this.changedAt.get(path.toLowerCase());
+    if (listed) return listed;
     try {
       const meta = await this.call<{ '.tag': string; client_modified?: string; server_modified?: string }>(
         'files/get_metadata',
         { path },
       );
       if (meta['.tag'] !== 'file') return null;
-      return Date.parse(meta.client_modified ?? meta.server_modified ?? '') || null;
+      const at = Date.parse(meta.client_modified ?? meta.server_modified ?? '') || null;
+      if (at) this.changedAt.set(path.toLowerCase(), at);
+      return at;
     } catch (error) {
       if (error instanceof DropboxError && /not_found/.test(error.summary)) return null;
       throw error;
@@ -706,6 +725,7 @@ export class DropboxSession {
 
   /** Move a file to the Dropbox trash, where it can still be restored. One already gone is fine. */
   async deleteFile(path: string): Promise<void> {
+    this.changedAt.delete(path.toLowerCase());
     try {
       await this.call('files/delete_v2', { path });
     } catch (error) {
@@ -717,6 +737,10 @@ export class DropboxSession {
   /** Rename a file. A name already taken is refused - nothing is written over. */
   async moveFile(from: string, to: string): Promise<void> {
     await this.call('files/move_v2', { from_path: from, to_path: to, autorename: false });
+    // a rename keeps the file as it was, and so when it last changed
+    const at = this.changedAt.get(from.toLowerCase());
+    this.changedAt.delete(from.toLowerCase());
+    if (at) this.changedAt.set(to.toLowerCase(), at);
   }
 
   // endregion

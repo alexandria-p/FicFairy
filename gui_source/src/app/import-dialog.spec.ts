@@ -7,6 +7,7 @@ import { Library } from './library';
 import { DuplicateGroup, IMPORT_EXCLUDED_FILE, LibraryImports, duplicateGroups } from './imports';
 import { Bookmark } from './bookmarks';
 import { LibraryStore } from './library-store';
+import { ChimePlayer } from './chime';
 
 class MemoryStore implements LibraryStore {
   readonly label = 'memory';
@@ -403,6 +404,23 @@ describe('ImportDialog', () => {
     await answerUndecided('Keep all of them');
     expect(store.deleted).toEqual([]);
     expect(element.querySelector('details.undecided summary')?.textContent).toContain('could not tell which file is most recent');
+  });
+
+  it('dings when the removing page stops to ask, and only then', async () => {
+    const played: string[] = [];
+    TestBed.inject(ChimePlayer).play = () => played.push('ding');
+    await open([], false, [], DUPES);
+    await click('Continue');
+    await chooseIn('7:html', 'skip');
+    await chooseIn('8:epub', 'skip');
+    expect(played).toEqual([]);
+
+    await click('Continue');
+    await settle();
+    expect(element.querySelector('.undecided-ask')).not.toBeNull();
+    expect(played).toEqual(['ding']);
+    await answerUndecided('Keep all of them');
+    expect(played).toEqual(['ding']);
   });
 
   it('says Skip this step with every row skipped, Choose which to keep with one to choose, else Continue', async () => {

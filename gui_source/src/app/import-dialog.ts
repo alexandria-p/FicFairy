@@ -32,6 +32,9 @@ import { Misnamed, MisnamedFile, NameFormat } from './renames';
 import { Jobs } from './jobs';
 import { Library } from './library';
 import { LibraryStore } from './library-store';
+import { DropboxError } from './dropbox';
+import { VisitLog } from './visit-log';
+import { Chime } from './chime';
 import { inAo3Zone, writtenDate } from './preferences';
 
 type Step = 'overview' | 'rename' | 'renaming' | 'duplicates' | 'choose' | 'removing' | 'dates' | 'dating' | 'index' | 'formats';
@@ -86,6 +89,8 @@ export class ImportDialog {
   private readonly jobs = inject(Jobs);
   private readonly library = inject(Library);
   private readonly imports = inject(LibraryImports);
+  private readonly visit = inject(VisitLog);
+  private readonly chime = inject(Chime);
 
   readonly worksFound = input.required<FoundWork[]>({ alias: 'works' });
   /** undated files of works the index does have - offered for dating beside the rest */
@@ -398,8 +403,17 @@ export class ImportDialog {
     const known = untracked(this.modifiedAt);
     const wanted = paths.filter((p) => known[p] === undefined);
     if (!store || !wanted.length) return;
-    void modifiedTimes(store, wanted).then((times) => {
+    const errors: unknown[] = [];
+    void modifiedTimes(store, wanted, (error) => errors.push(error)).then((times) => {
       if (Object.keys(times).length) this.modifiedAt.update((m) => ({ ...m, ...times }));
+      // each shows as 'unknown' under its radio; the visit log says why (a count and the first
+      // reason, never a file's name)
+      if (errors.length) {
+        this.visit.note(
+          `Resolve issues: could not read when ${errors.length} of ${wanted.length} duplicate files last changed ` +
+            `(first: ${changeTimeProblem(errors[0])}) - shown as unknown`,
+        );
+      }
     });
   });
 
@@ -804,6 +818,8 @@ export class ImportDialog {
     if (standing === 'keep' || (standing === 'guess' && guess)) return Promise.resolve({ how: standing });
     return new Promise((resolve) => {
       this.asking.set(group);
+      // the bar has stopped until this is answered
+      this.chime.waiting();
       // a best guess is picked to begin with - or choosing, when none can be made, or a
       // standing choose, which shows the files straight away
       this.askHow.set(standing === 'choose' || !guess ? 'choose' : 'guess');
@@ -1239,4 +1255,13 @@ export class ImportDialog {
   }
 
   // endregion
+}
+
+/**
+ * Why a file's change time could not be read, for the visit log: Dropbox's status and its short
+ * error code, or only the error's kind otherwise - never its message, which could name a file.
+ */
+export function changeTimeProblem(error: unknown): string {
+  if (error instanceof DropboxError) return `Dropbox ${error.status}${error.summary ? ` ${error.summary}` : ''}`;
+  return error instanceof Error ? error.name : 'unknown error';
 }

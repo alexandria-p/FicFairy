@@ -121,6 +121,8 @@ A repair started from *Resolve issues* asks none of these questions about your f
 
 When a run met any of these files, it says so at the end and offers **Refresh library and resolve issues**: the library is read again and *Resolve issues* opens, where you can date them - so the next run judges them by their date instead of asking.
 
+**A ding when it asks.** The page plays a short sound whenever a run stops to ask you something, and when *Resolve issues* stops to ask which copy to keep, so you know to come back to the tab. Turn it off, or hear it, under User settings > Appearance; it is this browser's own choice.
+
 **How long a question waits.** Each question says, above it, how long it waits and what the run carries on with if nobody answers - in the words of the button that does it. The waits are settings: one for the questions asked once a run (30 minutes), and one each for the questions that can come up for every work - a file whose date we can't be sure of (1 minute), a newer copy, and a copy of a work your index didn't have (30 minutes each). Change them in User settings (settings.ini on a downloaded app; *Defaults used during a run* on the hosted copy). `0` takes the default without asking.
 
 **When nobody answers, don't wait on the rest** (on unless you turn it off). Once a question goes unanswered, the rest of the same kind in that run take their default straight away, so a run you walked away from doesn't wait out every work. Off, every question is asked and waits its time. An answer you chose to always use is taken without asking either way. History's *Questions asked* says which were answered which way.

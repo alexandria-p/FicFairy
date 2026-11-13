@@ -205,6 +205,14 @@
       }
       }
     </fieldset>
+    <div class="sound-choice">
+      <label class="check">
+        <input type="checkbox" name="waitChime" [checked]="chime.on()" (change)="setChime($any($event.target).checked)" />
+        Play a sound when the page is waiting for you
+      </label>
+      <button type="button" class="button subtle play-chime" (click)="chime.sample()">Play it</button>
+      <p class="hint">A short ding when a run asks you a question, or Resolve issues stops to ask which copy to keep - so you know to come back to this tab.</p>
+    </div>
   </details>
 
   @if (!local) {

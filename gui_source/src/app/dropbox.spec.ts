@@ -378,7 +378,9 @@ describe('DropboxSession', () => {
     await dropbox.restore();
 
     expect(await dropbox.listFiles('')).toEqual([
-      { name: '1.json', path: '/indexing/1.json', modified: Date.parse('2026-01-02T03:04:05Z') },
+      // with no time from the file itself, when it last changed is when Dropbox received it
+      { name: '1.json', path: '/indexing/1.json', modified: Date.parse('2026-01-02T03:04:05Z'),
+        changed: Date.parse('2026-01-02T03:04:05Z') },
     ]);
   });
 
@@ -644,6 +646,76 @@ describe('DropboxSession', () => {
     await dropbox.listFiles('', true, (n) => found.push(n));
 
     expect(found).toEqual([1, 2, 3]);
+  });
+
+  // endregion
+
+  // region when a file last changed
+
+  /** a signed-in session whose listing of works/ holds one file, with Dropbox's two times */
+  async function listedOnce(entry: Record<string, unknown>): Promise<DropboxSession> {
+    remembered();
+    browser.handlers.push(
+      on('oauth2/token', () => tokens()),
+      on('files/list_folder', () =>
+        json({ entries: [{ '.tag': 'file', name: '1 A.html', path_display: '/works/1 A.html', ...entry }],
+               cursor: 'c', has_more: false })),
+      on('files/get_metadata', () =>
+        json({ '.tag': 'file', name: '1 A.html', client_modified: '2001-01-01T00:00:00Z', server_modified: '2001-01-01T00:00:00Z' })),
+    );
+    const dropbox = session();
+    await dropbox.restore();
+    await dropbox.listFiles('/works', false);
+    return dropbox;
+  }
+
+  it('says when a listed file last changed from the listing itself, asking Dropbox nothing more', async () => {
+    const dropbox = await listedOnce({ client_modified: '2024-03-02T10:00:00Z', server_modified: '2025-01-01T00:00:00Z' });
+
+    // the time the file carried when uploaded, which a sync keeps - not when Dropbox received it
+    expect(await dropbox.fileModified('/works/1 a.html')).toBe(Date.parse('2024-03-02T10:00:00Z'));
+    expect(browser.endpoints()).not.toContain('files/get_metadata');
+  });
+
+  it('takes when Dropbox received a listed file when the listing has no other time', async () => {
+    const dropbox = await listedOnce({ server_modified: '2025-01-01T00:00:00Z' });
+
+    expect(await dropbox.fileModified('/works/1 A.html')).toBe(Date.parse('2025-01-01T00:00:00Z'));
+    expect(browser.endpoints()).not.toContain('files/get_metadata');
+  });
+
+  it('asks Dropbox about a file no listing has named', async () => {
+    const dropbox = await listedOnce({ client_modified: '2024-03-02T10:00:00Z' });
+
+    expect(await dropbox.fileModified('/works/2 B.html')).toBe(Date.parse('2001-01-01T00:00:00Z'));
+    expect(browser.endpoints()).toContain('files/get_metadata');
+  });
+
+  it('keeps a renamed file\'s time, and forgets a rewritten one\'s', async () => {
+    const dropbox = await listedOnce({ client_modified: '2024-03-02T10:00:00Z' });
+    browser.handlers.unshift(
+      on('files/move_v2', () => json({})),
+      (url) => (url.endsWith('files/upload') ? json({ size: 1 }) : undefined),
+    );
+
+    await dropbox.moveFile('/works/1 A.html', '/works/1 A 2024-03-02.html');
+    expect(await dropbox.fileModified('/works/1 A 2024-03-02.html')).toBe(Date.parse('2024-03-02T10:00:00Z'));
+    expect(browser.endpoints()).not.toContain('files/get_metadata');
+
+    await dropbox.upload('/works/1 A 2024-03-02.html', new Blob(['x']));
+    // written just now: the listing's time is out of date, so Dropbox is asked
+    expect(await dropbox.fileModified('/works/1 A 2024-03-02.html')).toBe(Date.parse('2001-01-01T00:00:00Z'));
+    expect(browser.endpoints()).toContain('files/get_metadata');
+  });
+
+  it('takes the times of files this browser kept, which no listing this visit named', async () => {
+    remembered();
+    const dropbox = session();
+    await dropbox.restore();
+
+    dropbox.noteChanged([{ name: '1 A.html', path: '/works/1 A.html', modified: 5, changed: 7 }]);
+    expect(await dropbox.fileModified('/works/1 A.html')).toBe(7);
+    expect(browser.endpoints()).not.toContain('files/get_metadata');
   });
 
   // endregion
