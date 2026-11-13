@@ -1003,17 +1003,13 @@ describe('UserSettings', () => {
     expect(element.querySelector('.confirm-clear')?.textContent?.trim()).toBe('Clear 4 items');
   });
 
-  it('on a hosted copy, offers to forget the passcode', async () => {
+  it('offers neither the passcode nor debug mode, even on a hosted copy that has both', async () => {
     const helper = TestBed.inject(HelperConnection);
     helper.settings.set({ ...DEFAULT_PAGE_CONFIG, helperUrl: 'https://helper.example.com' });
-    const forgot = vi.spyOn(helper, 'forgetPasscode');
     await open();
     await openClear();
-    expect(clearBox('passcode')).not.toBeNull();
-    await untick('settings', 'username', 'visitLog', 'dropboxCache', 'library');
-    element.querySelector<HTMLButtonElement>('.confirm-clear')!.click();
-    await settle();
-    expect(forgot).toHaveBeenCalled();
+    const ids = [...element.querySelectorAll('[data-clear]')].map((x) => x.getAttribute('data-clear'));
+    expect(ids).toEqual(['settings', 'username', 'visitLog', 'dropboxCache', 'library']);
   });
 
   // endregion

@@ -32,7 +32,9 @@
                          (change)="tickClear(option.id, $any($event.target).checked)" />
                   <span>
                     {{ option.label }}
-                    <span class="hint">{{ option.held || option.hint }}</span>
+                    @if (option.held || option.hint) {
+                      <span class="hint">{{ option.held || option.hint }}</span>
+                    }
                   </span>
                 </label>
               </li>
