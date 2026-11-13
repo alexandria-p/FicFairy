@@ -162,7 +162,7 @@ describe('Feedback', () => {
     const note = element.querySelector('.hint.privacy')?.textContent ?? '';
     expect(note).toContain('AO3');
     expect(note).toContain('username');
-    expect(note).toContain('stripped out');
+    expect(note).toContain('password');
     expect(note).toContain('IP address');
   });
 
