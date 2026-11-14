@@ -1319,7 +1319,7 @@ describe('ImportDialog', () => {
     await click('Continue');
     expect(step()).toBe('formats');
     expect(element.textContent).toContain('Also download them in other formats?');
-    expect(element.textContent).toContain('Replace a copy you have when AO3 has a newer version');
+    expect(element.textContent).toContain('Replace a copy you have when AO3 or FicHub has a newer version');
   });
 
   function radio(name: string, value: string): HTMLInputElement | null {
