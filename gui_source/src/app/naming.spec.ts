@@ -34,6 +34,15 @@ describe('the file name pattern', () => {
     expect(workIdFromFilename('99Red Balloons.html')).toBeNull();
   });
 
+  it("reads a name with no author before its date as dated, not as an author called the date, as the helper does", () => {
+    // an anonymous work's file, its author left empty with the separator kept
+    const name = '11418339 Luke Skywalker 19 Full human - 2026-08-02.html';
+    expect(dateFromFilename(name)).toBe('2026-08-02');
+    expect(readName(name)).toEqual({ worknum: '11418339', title: 'Luke Skywalker 19 Full human', author: '', date: '2026-08-02' });
+    expect(dateFromFilename('1 A - 2026-02-31.html')).toBe('');
+    expect(readName('1 A - Author.html')?.author).toBe('Author');
+  });
+
   it('reads them wherever another pattern puts them', () => {
     useNamePattern(AO3_ORDER);
     const name = 'My Fic - Author - 12345678 2026-05-10.epub';

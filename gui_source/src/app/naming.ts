@@ -139,9 +139,31 @@ export function readName(name: string, pattern: NamePattern = active): NameParts
     if (!match?.groups) continue;
     const date = match.groups['date'] ?? '';
     if (date && !real(date)) continue;
-    return { worknum: match.groups['worknum'], title: match.groups['title'], author: match.groups['author'], date };
+    const parts: NameParts = { worknum: match.groups['worknum'], title: match.groups['title'], author: match.groups['author'], date };
+    if (!dated) emptyPartBeforeDate(parts, pattern);
+    return parts;
   }
   return null;
+}
+
+/**
+ * A name with an empty part beside the date - an anonymous work's, `1 Title - 2026-08-02` - reads
+ * as the pattern without a date, its date taken for the author. When the part next to where the
+ * date goes is itself a real YYYY-MM-DD, it is the date, and the part is empty. The helper's
+ * `_empty_part_before_date`.
+ */
+function emptyPartBeforeDate(parts: NameParts, pattern: NamePattern): void {
+  const at = pattern.order.indexOf('date');
+  for (const side of [at - 1, at + 1]) {
+    if (side < 0 || side >= pattern.order.length) continue;
+    const token = pattern.order[side] as Exclude<NameToken, 'date'>;
+    const value = parts[token] ?? '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value) && real(value)) {
+      parts.date = value;
+      parts[token] = '';
+      return;
+    }
+  }
 }
 
 function sepRegex(sep: string): string {

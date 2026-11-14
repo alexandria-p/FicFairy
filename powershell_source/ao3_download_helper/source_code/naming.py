@@ -208,8 +208,25 @@ def read(name: str, pattern: Pattern | None = None) -> dict | None:
             parts = match.groupdict()
             parts.setdefault('date', '')
             if parts['date'] and not _real(parts['date']): continue
+            if not dated: _empty_part_before_date(parts, pattern)
             return parts
     return None
+
+
+def _empty_part_before_date(parts: dict, pattern: Pattern) -> None:
+    """A name with an empty part beside the date - an anonymous work's, `1 Title - 2026-08-02` -
+    reads as the pattern without a date, its date taken for the author. When the part next to
+    where the date goes is itself a real YYYY-MM-DD, it is the date, and the part is empty."""
+
+    at = pattern.order.index('date')
+    for side in (at - 1, at + 1):
+        if 0 <= side < len(pattern.order):
+            token = pattern.order[side]
+            value = parts.get(token) or ''
+            if re.fullmatch(_DATE, value) and _real(value):
+                parts['date'] = value
+                parts[token] = ''
+                return
 
 
 def _real(stamp: str) -> bool:
