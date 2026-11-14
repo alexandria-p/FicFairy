@@ -200,17 +200,21 @@ export function nameFrom(pattern: NamePattern, parts: NameParts, dated = true): 
 
 /** the version a work's file holds - the date where the pattern puts it - or '' */
 export function fileDate(name: string, pattern: NamePattern = active): string {
-  const parts = readName(name, pattern);
-  if (parts) return parts.date;
   const b = base(name);
-  // a name not wholly the pattern (an anonymous work, say) still has its date at the start or end
+  // the number and the date are what a run needs - the entry to find, and which version the file
+  // holds - so where the pattern puts the date at the start or the end it is read there alone,
+  // whatever the title and author look like (the helper's `file_date`)
   let match: RegExpExecArray | null = null;
   if (pattern.order[pattern.order.length - 1] === 'date') {
     match = new RegExp(`(?:^|${sepRegex(separatorBefore(pattern, 'date'))})(${DATE})$`).exec(b);
-  } else if (pattern.order[0] === 'date') {
-    match = new RegExp(`^(${DATE})(?:${sepRegex(separatorAfter(pattern, 'date'))}|$)`).exec(b);
+    return match && real(match[1]) ? match[1] : '';
   }
-  return match && real(match[1]) ? match[1] : '';
+  if (pattern.order[0] === 'date') {
+    match = new RegExp(`^(${DATE})(?:${sepRegex(separatorAfter(pattern, 'date'))}|$)`).exec(b);
+    return match && real(match[1]) ? match[1] : '';
+  }
+  // a date in the middle can only be found by reading the whole name
+  return readName(name, pattern)?.date ?? '';
 }
 
 /** where the work number sits in a name's base (no folder, no extension), or null */

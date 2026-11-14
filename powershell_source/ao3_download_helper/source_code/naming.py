@@ -248,20 +248,21 @@ def file_date(name: str, pattern: Pattern | None = None) -> str | None:
     a guess (`parse_text.infer_date_from_filename`)."""
 
     pattern = pattern or _active
-    parts = read(name, pattern)
-    if parts is not None:
-        return parts['date'] or None
     base = _base(name)
     order = pattern.order
-    # a name that is not wholly the pattern - an anonymous work with no author, say - still
-    # has its date where the pattern puts one: at the start or the end
+    # the number and the date are what a run needs - the entry to find, and which version the
+    # file holds - so where the pattern puts the date at the start or the end, it is read there
+    # alone, whatever the title and author look like: an empty author, or a title with the
+    # pattern's own separators in it, can never hide it or be taken for it
     if order[-1] == 'date':
         match = re.search(rf'(?:^|{_sep_regex(pattern.separator_before("date"))})({_DATE})$', base)
-    elif order[0] == 'date':
+        return match.group(1) if match and _real(match.group(1)) else None
+    if order[0] == 'date':
         match = re.match(rf'^({_DATE})(?:{_sep_regex(pattern.separator_after("date"))}|$)', base)
-    else:
-        match = None
-    return match.group(1) if match and _real(match.group(1)) else None
+        return match.group(1) if match and _real(match.group(1)) else None
+    # a date in the middle can only be found by reading the whole name
+    parts = read(name, pattern)
+    return (parts['date'] or None) if parts is not None else None
 
 
 def number_span(name: str, pattern: Pattern | None = None) -> tuple[int, int] | None:

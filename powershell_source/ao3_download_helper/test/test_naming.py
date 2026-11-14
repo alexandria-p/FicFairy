@@ -130,6 +130,19 @@ def test_a_name_with_no_author_before_its_date_has_that_date_not_an_author_calle
     assert naming.read('1 A - Author.html')['author'] == 'Author'
 
 
+@pytest.mark.parametrize('name', [
+    '7 Title only 2026-08-02.html',
+    '7 Title - With - Dashes - 2026-08-02.html',
+    '7 Title - Author - Someone Else 2026-08-02.epub',
+    '7 - 2026-08-02.html',
+])
+def test_the_number_and_the_date_are_read_whatever_the_title_and_author_look_like(name):
+    # the number finds the entry and the date says which version the file holds - the title and
+    # author never decide whether either is read
+    assert parse_text.get_work_file_number(name) == '7'
+    assert parse_text.get_date_from_filename(name) == '2026-08-02'
+
+
 def test_a_name_in_another_order_is_not_a_work_until_renamed():
     naming.use(AO3_ORDER)
     # named the old way: the number leads, where this pattern does not put it
