@@ -878,8 +878,14 @@ export class ImportDialog {
    * never over another file (`rename`).
    */
   protected readonly repairFallback = signal<'keep' | 'replace' | 'rename'>('keep');
-  /** replacing, agreed to as well when no date can be guessed from the file's name at all */
+  /** FicHub's renaming, only where its date is not older than the date guessed from the name */
+  protected readonly renameCheck = signal(true);
+  /** FicHub's replacing, only where its copy is not older than the date guessed from the name */
+  protected readonly replaceCheck = signal(true);
+  /** replacing so, agreed to as well when no date can be guessed from the file's name at all */
   protected readonly repairFicHubUndated = signal(false);
+  /** where AO3 has the work: overwrite and rename (to begin with), or only rename the file */
+  protected readonly repairAo3 = signal<'overwrite' | 'rename'>('overwrite');
   /** the files whose date `Infer date` set, and has not been changed by hand since */
   protected readonly inferred = signal<Record<string, boolean>>({});
   /** the rows' order, by path - by name, until `Infer date` moves what it dated to the top */
@@ -1313,8 +1319,12 @@ export class ImportDialog {
         repair: this.toRepair().map((f) => f.name),
         repairFicHub: this.toRepair().length > 0 && this.repairFallback() === 'replace',
         repairFicHubUndated: this.toRepair().length > 0 && this.repairFallback() === 'replace' &&
-          this.repairFicHubUndated(),
+          this.replaceCheck() && this.repairFicHubUndated(),
         repairFicHubRename: this.toRepair().length > 0 && this.repairFallback() === 'rename',
+        // the guessed-date rule for whichever FicHub choice was made
+        repairFicHubCheck: this.repairFallback() === 'rename' ? this.renameCheck()
+          : this.repairFallback() === 'replace' ? this.replaceCheck() : true,
+        repairRenameOnly: this.toRepair().length > 0 && this.repairAo3() === 'rename',
       },
       dated: this.dated(),
     });

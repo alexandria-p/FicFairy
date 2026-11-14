@@ -138,6 +138,10 @@ export interface JobOptions {
   repairFicHubUndated?: boolean;
   /** an import: instead, keep such a file and name it with FicHub's date, never over another */
   repairFicHubRename?: boolean;
+  /** an import: FicHub's choice keeps to the date guessed from each file's name */
+  repairFicHubCheck?: boolean;
+  /** an import: where AO3 has the work, only name the file with AO3's date */
+  repairRenameOnly?: boolean;
   /**
    * Check every non-bookmark in the index for updates too - the works it holds only because
    * something else led a run to them, such as another work's series. Not narrowed by a date

@@ -810,6 +810,33 @@ def test_an_imports_file_to_repair_can_instead_be_named_with_fichubs_date_keepin
 
 
 @pytest.mark.fichub
+@pytest.mark.parametrize('name, check, renamed', [
+    # FicHub's copy (27 April 2026) is not older than the guess: named with it
+    ('75354806 Wolfbird (1 May 2025).epub', True, True),
+    # older than the guess: kept as it is, with the rule on
+    ('75354806 Wolfbird (1 May 2027).epub', True, False),
+    # ...and named all the same with the rule off
+    ('75354806 Wolfbird (1 May 2027).epub', False, True),
+    # no date to guess: named, rule or not
+    ('75354806 Wolfbird.epub', True, True),
+])
+def test_naming_with_fichubs_date_keeps_to_the_guessed_date_only_when_asked(
+        library, monkeypatch, name, check, renamed):
+    a_copy(library, name)
+    fetched = fichub_serving(monkeypatch)
+    job, ao3 = an_import(library, ['JSON'], repair=[name], repairFicHubRename=True,
+                         repairFicHubCheck=check)
+
+    server.rescue_with_fichub(job, library, ao3, MagicMock())
+
+    assert fetched == []
+    if renamed:
+        assert work_files(library) == ['75354806 Wolfbird - OpalApparition 2026-04-27.epub']
+    else:
+        assert work_files(library) == ['75354806 Wolfbird - OpalApparition.epub']
+
+
+@pytest.mark.fichub
 def test_naming_a_file_with_fichubs_date_never_renames_over_another(library, monkeypatch, capsys):
     a_copy(library, '75354806 Wolfbird - OpalApparition 2026-04-27.epub')
     a_copy(library, '75354806 Wolfbird.epub')

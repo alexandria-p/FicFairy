@@ -110,7 +110,7 @@ def test_resolve_options_defaults_match_the_console_defaults():
         'collectionWorks': False, 'subcollections': False, 'parentCollections': False,
         'replaceOutdated': False, 'indexOnly': [],
         'repair': [], 'repairFicHub': False, 'repairFicHubUndated': False,
-        'repairFicHubRename': False,
+        'repairFicHubRename': False, 'repairFicHubCheck': True, 'repairRenameOnly': False,
     }
 
 
@@ -128,7 +128,8 @@ def test_resolve_options_reads_what_was_asked_for():
                       'resume': '', 'retryMode': '', 'collectionWorks': True, 'subcollections': True,
                       'parentCollections': True, 'replaceOutdated': False, 'indexOnly': [],
                       'repair': [], 'repairFicHub': False, 'repairFicHubUndated': False,
-                      'repairFicHubRename': False}
+                      'repairFicHubRename': False, 'repairFicHubCheck': True,
+                      'repairRenameOnly': False}
 
 
 def test_a_date_that_cannot_be_read_is_no_date_at_all():

@@ -34,7 +34,7 @@ def a_copy(library, name: str) -> None:
 
 
 def importing(library, monkeypatch, filetypes, replace=False, updated='2026-05-01',
-              index_only=(), repair=(), replacing=None):
+              index_only=(), repair=(), replacing=None, **options):
     """Run an import over works 1 and 2, AO3 saying each was last updated on `updated`;
     answers what was fetched, by work."""
 
@@ -61,7 +61,7 @@ def importing(library, monkeypatch, filetypes, replace=False, updated='2026-05-0
     job = server.Job(server.ACTION_IMPORT, filetypes, '',
                      server.resolve_options({'replaceOutdated': replace,
                                              'indexOnly': list(index_only),
-                                             'repair': list(repair)}),
+                                             'repair': list(repair), **options}),
                      url=f'{link(1)}\n{link(2)}')
     job.ask = MagicMock(side_effect=AssertionError('an import asked a question'))
     server.run_import(job, library, MagicMock(), MagicMock())
@@ -553,5 +553,57 @@ def test_an_import_keeping_your_copies_still_asks_ficHub_for_a_format_to_repair(
     have = {'1': {'HTML': {'path': 'x', 'date': None}, 'EPUB': {'path': 'y', 'date': None}}}
     assert server.fichub_formats_for('1', ['HTML', 'EPUB'], have, set(), True,
                                      repairing={'HTML'}) == ['HTML']
+
+# endregion
+
+
+# region repairing by name alone
+
+def works_files(library) -> list[str]:
+    return sorted(os.listdir(os.path.join(library.downloadfolder, strings.WORKS_FOLDER_NAME)))
+
+
+def test_only_renaming_names_the_file_with_ao3s_date_and_downloads_nothing_for_it(
+        library, monkeypatch, capsys):
+    a_copy(library, '1 Fic 1 - Someone.html')
+
+    _, fetched = importing(library, monkeypatch, ['JSON'], repair=['1 Fic 1 - Someone.html'],
+                           repairRenameOnly=True)
+
+    assert not fetched.get('1')
+    assert works_files(library) == ['1 Fic 1 - Someone 2026-05-01.html']
+    out = capsys.readouterr().out
+    assert strings.AO3_INFO_IMPORT_RENAMING.format(1) in out
+    assert "with AO3's date (1 May 2026)" in out
+
+
+def test_only_renaming_never_renames_over_another_file(library, monkeypatch, capsys):
+    a_copy(library, '1 Fic 1 - Someone.html')
+    a_copy(library, '1 Fic 1 - Someone 2026-05-01.html')
+
+    importing(library, monkeypatch, ['JSON'], repair=['1 Fic 1 - Someone.html'],
+              repairRenameOnly=True)
+
+    assert works_files(library) == ['1 Fic 1 - Someone 2026-05-01.html', '1 Fic 1 - Someone.html']
+    assert 'is already there' in capsys.readouterr().out
+
+
+def test_only_renaming_is_a_repairs_alone():
+    _, [job], _ = start_request(server.ACTION_IMPORT, '1', repairRenameOnly=True)
+    assert job.options['repairRenameOnly'] is False
+    _, [job], _ = start_request(server.ACTION_IMPORT, '1', repair=['1 Fic.html'], repairRenameOnly=True)
+    assert job.options['repairRenameOnly'] is True
+
+
+def test_the_guessed_date_rule_for_fichub_is_on_unless_the_page_turns_it_off():
+    assert server.resolve_options({})['repairFicHubCheck'] is True
+    assert server.resolve_options({'repairFicHubCheck': False})['repairFicHubCheck'] is False
+
+
+def test_ficHub_without_the_guessed_date_rule_replaces_every_file_to_repair(capsys):
+    job = repair_job(repair=['1 Fic (3 March 2030).html'], repairFicHub=True, repairFicHubCheck=False)
+    allowed = server.fichub_repairs(job, '1', UNDATED, {'date_updated': '2024-01-01'}, ['HTML'])
+    assert allowed == {'HTML': '/lib/works/1 Fic.html'}
+    assert 'as you chose for every file' in capsys.readouterr().out
 
 # endregion

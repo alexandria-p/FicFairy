@@ -731,13 +731,21 @@ export class DownloadDialog implements OnDestroy {
     }
     const repairs = importing.repair?.length ?? 0;
     if (repairs) {
-      lines.push(`Repair ${repairs.toLocaleString()} ${repairs === 1 ? 'file' : 'files'} with no date from AO3, replacing ${repairs === 1 ? 'it' : 'each'} with the latest version`);
+      const files = `${repairs.toLocaleString()} ${repairs === 1 ? 'file' : 'files'} with no date`;
+      lines.push(importing.repairRenameOnly
+        ? `Name ${files} with AO3's date for the work - nothing downloaded`
+        : `Repair ${files} from AO3, replacing ${repairs === 1 ? 'it' : 'each'} with the latest version`);
+      const checked = importing.repairFicHubCheck !== false;
       if (importing.repairFicHub) {
-        lines.push(importing.repairFicHubUndated
-          ? "Where AO3 can't, use FicHub's copy - when it is as new as the date guessed from the file's name, or no date can be guessed"
-          : "Where AO3 can't, use FicHub's copy - only when it is as new as the date guessed from the file's name");
+        lines.push(!checked
+          ? "Where AO3 can't, overwrite with FicHub's copy - for every file"
+          : importing.repairFicHubUndated
+            ? "Where AO3 can't, use FicHub's copy - when it is as new as the date guessed from the file's name, or no date can be guessed"
+            : "Where AO3 can't, use FicHub's copy - only when it is as new as the date guessed from the file's name");
       } else if (importing.repairFicHubRename) {
-        lines.push("Where AO3 can't, keep the file and name it with FicHub's date - never over another file");
+        lines.push(checked
+          ? "Where AO3 can't, name the file with FicHub's date - unless the date guessed from its name is later"
+          : "Where AO3 can't, name the file with FicHub's date - never over another file");
       }
     }
     return lines;
@@ -2139,6 +2147,8 @@ export class DownloadDialog implements OnDestroy {
               repairFicHub: !!this.importing()?.repairFicHub,
               repairFicHubUndated: !!this.importing()?.repairFicHubUndated,
               repairFicHubRename: !!this.importing()?.repairFicHubRename,
+              repairFicHubCheck: this.importing()?.repairFicHubCheck !== false,
+              repairRenameOnly: !!this.importing()?.repairRenameOnly,
             }
           : {}),
       } satisfies JobOptions,

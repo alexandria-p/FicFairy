@@ -283,6 +283,18 @@ input[type='date'] {
   border: 0;
 }
 
+.repair-fichub .deeper {
+  margin-left: 48px;
+}
+
+.repair-ao3 {
+  margin-bottom: 14px;
+}
+
+.repair-fallback .repair-warning {
+  margin: 4px 0 10px;
+}
+
 .repair-fallback legend {
   margin-bottom: 4px;
   padding: 0;

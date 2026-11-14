@@ -508,6 +508,12 @@ def resolve_options(requested) -> dict:
         # or, instead: keep the file's contents and only name it with FicHub's date for the work,
         # never over another file (`rename_with_fichub_date`) - nothing downloaded from FicHub
         'repairFicHubRename': bool(given.get('repairFicHubRename')),
+        # whether FicHub's part keeps to the guessed date (`fichub_repairs`, `rename_with_date`):
+        # on unless the page says otherwise, so a page from before keeps the rule it had
+        'repairFicHubCheck': given.get('repairFicHubCheck') is not False,
+        # where AO3 has the work: only name the file with AO3's date, nothing downloaded, rather
+        # than replace it (`rename_with_date`)
+        'repairRenameOnly': bool(given.get('repairRenameOnly')),
         # check every non-bookmark in the index for updates too. a listing of your bookmarks
         # never shows them, so without this they are only read again when something else
         # brings the run to them. not narrowed by a date range or a floor: see
@@ -3116,6 +3122,30 @@ def repair_names(given) -> list[str]:
     return names
 
 
+def targets_named(job: 'Job', work: str) -> dict[str, str]:
+    """One work's files to repair: the name each was chosen under, by format."""
+
+    return repair_targets(job).get(work) or {}
+
+
+def rename_from_ao3(fileops: FileOps, records: list[dict], repair: dict[str, dict[str, str]]) -> None:
+    """Each indexed work's files to repair, named with the date AO3 gave its entry - the
+    import's *Only rename the file* where AO3 has the work (`rename_with_date`)."""
+
+    formats = sorted({x for names in repair.values() for x in names})
+    maximum = fileops.get_ini_value_integer(strings.INI_NAME_LENGTH, strings.INI_DEFAULT_NAME_LENGTH)
+    try:
+        existing = shared.scan_downloaded_works(fileops.worksfolder, formats, storage=fileops.storage)
+    except Exception as e:
+        print(strings.AO3_INFO_IMPORT_NAMES_UNREADABLE.format(e))
+        return
+    for record in records:
+        work = str(record.get('id') or '')
+        if work in repair:
+            rename_with_date(fileops, work, existing, record, list(repair[work]), maximum,
+                             strings.SOURCE_AO3)
+
+
 def repair_targets(job: 'Job') -> dict[str, dict[str, str]]:
     """An import's files to repair, by work and then format: the name each had when it was
     chosen. By work and format, never by name, because the import names its works' files from
@@ -3204,6 +3234,12 @@ def fichub_repairs(job: 'Job | None', work: str, existing: dict, record: dict,
         if not fichub_date:
             print(strings.AO3_INFO_REPAIR_FICHUB_UNDATED.format(kind, work, file))
             continue
+        if not job.options.get('repairFicHubCheck', True):
+            # chosen for every file, whatever its name suggests
+            print(strings.AO3_INFO_REPAIR_FICHUB_ANY.format(
+                kind, work, parse_text.written_date(fichub_date), file))
+            allowed[filetype] = copy['path']
+            continue
         guess = parse_text.infer_date_from_filename(name)
         if guess and fichub_date >= guess:
             print(strings.AO3_INFO_REPAIR_FICHUB_TAKE.format(
@@ -3220,32 +3256,46 @@ def fichub_repairs(job: 'Job | None', work: str, existing: dict, record: dict,
     return allowed
 
 
-def rename_with_fichub_date(job: 'Job | None', ao3, work: str, existing: dict, record: dict,
-                            filetypes: list[str], maximum: int) -> None:
-    """An import's files to repair, for a work AO3 did not give, when the person chose before
-    the run to have them **named with FicHub's date rather than replaced** (`repairFicHubRename`):
-    each keeps its contents and is renamed as its FicHub entry names it, with FicHub's date - and
-    never over another file. Nothing is downloaded. FicHub giving no date leaves it as it is."""
+def rename_with_date(fileops, work: str, existing: dict, record: dict, filetypes: list[str],
+                     maximum: int, site: str, guesses: dict[str, str] | None = None) -> None:
+    """An import's files to repair, **named with the site's date rather than replaced**, as the
+    person chose before the run: from AO3 where it has the work (`repairRenameOnly`), or from
+    FicHub where AO3 did not give it (`repairFicHubRename`). Each keeps its contents and is
+    renamed as the site's entry names the work, with the site's date - never over another file.
+    Nothing is downloaded. The site giving no date leaves it as it is.
 
-    fichub_date = parse_text.get_date_stamp(record.get('date_updated') or '')
+    `guesses` (FicHub with `repairFicHubCheck`): the name each was chosen under, by format - a file
+    is then renamed only when no date can be guessed from it, or the guess is the same as or older
+    than FicHub's, so a name never claims an older version than the file's own name suggested.
+    The guessed date decides here because the person chose this rule, knowing it is a guess
+    (`test_guessed_dates_never_decide.py`)."""
+
+    date = parse_text.get_date_stamp(record.get('date_updated') or '')
     names: dict[str, str] = {}
     for filetype in filetypes:
         copy = undated_copy((existing.get(work) or {}).get(filetype.upper()))
         if copy is None: continue
         path = str(copy['path'])
         name = os.path.basename(path.replace('\\', '/'))
-        if not fichub_date:
-            print(strings.AO3_INFO_REPAIR_FICHUB_UNDATED.format(filetype.upper(), work, name))
+        kind = filetype.upper()
+        if not date:
+            print(strings.AO3_INFO_REPAIR_RENAME_UNDATED.format(kind, work, site, name))
             continue
-        wanted = indexed_file_name(record, fichub_date, os.path.splitext(name)[1], maximum)
+        if guesses is not None:
+            guess = parse_text.infer_date_from_filename(guesses.get(kind) or '')
+            if guess and guess > date:
+                print(strings.AO3_INFO_REPAIR_RENAME_OLDER.format(
+                    kind, work, parse_text.written_date(date), parse_text.written_date(guess), name))
+                continue
+        wanted = indexed_file_name(record, date, os.path.splitext(name)[1], maximum)
         new = os.path.join(os.path.dirname(path), wanted)
-        if wanted == name or ao3.fileops.exists(new) or not ao3.fileops.rename_file(path, new):
-            print(strings.AO3_INFO_REPAIR_FICHUB_RENAME_TAKEN.format(filetype.upper(), work, wanted, name))
+        if wanted == name or fileops.exists(new) or not fileops.rename_file(path, new):
+            print(strings.AO3_INFO_REPAIR_RENAME_TAKEN.format(kind, work, site, wanted, name))
             continue
-        print(strings.AO3_INFO_REPAIR_FICHUB_RENAMED.format(
-            filetype.upper(), work, parse_text.written_date(fichub_date), name, wanted))
+        print(strings.AO3_INFO_REPAIR_RENAMED.format(
+            kind, work, site, parse_text.written_date(date), name, wanted))
         names[name] = wanted
-    if names: follow_renames_in_exclusions(ao3.fileops, names)
+    if names: follow_renames_in_exclusions(fileops, names)
 
 
 def work_numbers(given) -> list[str]:
@@ -3351,6 +3401,12 @@ def run_fic_list(job: Job, fileops: FileOps, repo: Repository, report, importing
         name_files_from_index(fileops, records)
         replace = bool(job.options.get('replaceOutdated'))
         repair = repair_targets(job)
+        if repair and job.options.get('repairRenameOnly'):
+            # where AO3 gave the work, its files to repair are only named with AO3's date - so
+            # nothing is downloaded for them; one AO3 did not give goes to FicHub at the end
+            print(strings.AO3_INFO_IMPORT_RENAMING.format(sum(len(x) for x in repair.values())))
+            rename_from_ao3(fileops, records, repair)
+            repair = {}
         # a work with a file to repair is downloaded for it - only for it, if it was otherwise
         # only looked up (`repair_copies`)
         repair_only = set(job.options.get('indexOnly') or []) & set(repair)
@@ -4578,7 +4634,10 @@ def rescue_one(ao3, failure: dict, entry: dict | None, existing: dict, filetypes
         considered = [x for x in filetypes if x.upper() in targets
                       and undated_copy((existing.get(work) or {}).get(x.upper()))]
         if considered and job is not None and job.options.get('repairFicHubRename'):
-            rename_with_fichub_date(job, ao3, work, existing, record, considered, maximum)
+            rename_with_date(ao3.fileops, work, existing, record, considered, maximum,
+                             strings.SOURCE_FICHUB,
+                             targets_named(job, work) if job.options.get('repairFicHubCheck', True)
+                             else None)
             repairing = {}
         else:
             repairing = fichub_repairs(job, work, existing, record, considered) if considered else {}
@@ -6226,6 +6285,7 @@ class Handler(BaseHTTPRequestHandler):
         if not options.get('repair'):
             options['repairFicHub'] = False
             options['repairFicHubRename'] = False
+            options['repairRenameOnly'] = False
         if not options.get('repairFicHub'): options['repairFicHubUndated'] = False
         # one answer to AO3 failing: FicHub's copy replacing the file, or its date naming it
         if options.get('repairFicHub'): options['repairFicHubRename'] = False

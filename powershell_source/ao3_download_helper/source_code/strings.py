@@ -565,6 +565,7 @@ AO3_INFO_IMPORT_KEEPING = 'not replacing outdated copies: only formats you do no
 AO3_INFO_IMPORT_INDEX_ONLY = '{} of these works are only indexed: no format is fetched for them'
 # Resolve issues' *Repair from AO3*: files with no date in their names, chosen on the dating
 # page to be replaced with AO3's latest version, named with its date - see `repair_copies`
+AO3_INFO_IMPORT_RENAMING = "naming {} files with no date in their names with AO3's date for each work, as you chose - nothing downloaded for them"
 AO3_INFO_IMPORT_REPAIRING = 'repairing {} files with no date in their names: each is replaced with the latest version from AO3, named with its date'
 AO3_INFO_REPAIR_FILE = '  repairing the {} of work {}: replacing {}'
 AO3_INFO_REPAIR_NOTHING = '  nothing to repair for the {} of work {}: no file of it without a date is left'
@@ -573,8 +574,11 @@ AO3_INFO_REPAIR_FICHUB_OLDER = "  not repairing the {} of work {} from FicHub: i
 AO3_INFO_REPAIR_FICHUB_NO_GUESS_TAKE = "  repairing the {} of work {} from FicHub: no date can be guessed from your file's name, and you agreed to use FicHub's copy then (it may be an older cached copy) - replacing {}"
 AO3_INFO_REPAIR_FICHUB_NO_GUESS_KEEP = "  not repairing the {} of work {} from FicHub: no date can be guessed from your file's name to compare its copy with - keeping {}"
 AO3_INFO_REPAIR_FICHUB_UNDATED = "  not repairing the {} of work {} from FicHub: FicHub gives no date for its copy - keeping {}"
-AO3_INFO_REPAIR_FICHUB_RENAMED = "  naming the {} of work {} with FicHub's date ({}), as you chose - its contents kept: {} -> {}"
-AO3_INFO_REPAIR_FICHUB_RENAME_TAKEN = "  could not name the {} of work {} with FicHub's date: {} is already there, or the rename was refused - keeping {} as it is"
+AO3_INFO_REPAIR_RENAMED = "  naming the {} of work {} with {}'s date ({}), as you chose - its contents kept: {} -> {}"
+AO3_INFO_REPAIR_RENAME_TAKEN = "  could not name the {} of work {} with {}'s date: {} is already there, or the rename was refused - keeping {} as it is"
+AO3_INFO_REPAIR_RENAME_UNDATED = "  not naming the {} of work {}: {} gives no date for the work - keeping {} as it is"
+AO3_INFO_REPAIR_RENAME_OLDER = "  not naming the {} of work {} with FicHub's date: FicHub's copy is dated {}, older than the date guessed from your file's name ({}) - keeping {} as it is"
+AO3_INFO_REPAIR_FICHUB_ANY = "  repairing the {} of work {} from FicHub, as you chose for every file (FicHub's copy is dated {}; it may be an older cached copy) - replacing {}"
 AO3_INFO_REPAIR_FICHUB_OFF = "  not repairing the {} of work {} from FicHub, as you chose - keeping {}"
 ERROR_NO_IMPORT_WORKS = 'There are no works to import.'
 AO3_INFO_REPLACING_NEWER = '  replacing your newer {} of work {} with the older version, as asked'

@@ -1092,75 +1092,75 @@ describe('ImportDialog', () => {
     expect(primary().textContent?.trim()).toBe('Continue');
   });
 
-  it('warns that repairing overwrites each file with the newest from AO3, and points at the FicHub choice', async () => {
+  it('asks how to repair on a page of its own: where AO3 has the work, overwrite and rename to begin with', async () => {
     await open();
     await click('Continue');
     await click('Repair remaining from AO3');
-    // asked on a page of its own, after the dates
-    expect(element.querySelector('.repair-warning')).toBeNull();
+    expect(element.querySelector('input[name="repairAo3"]')).toBeNull();
     await click('Continue');
     expect(step()).toBe('repair');
-    const warning = element.querySelector('.repair-warning')?.textContent?.replace(/\s+/g, ' ') ?? '';
-    expect(warning).toContain('Repair from AO3 overwrites all 3 files');
-    expect(warning).toContain('newest version on AO3');
-    expect(warning).toContain("If AO3 can't give a file, choose below what happens");
-  });
-
-  it('unticks Skip on every row at once, leaving dates and repairs, and is held with none ticked', async () => {
-    await open();
-    await click('Continue');
-    expect(button('Untick Skip on all')!.disabled).toBe(true);
-    await type(dateBox('works/2 C - D.html'), '2024-05-06');
-    repairBox('works/2 C - D.pdf').click();
-    skipBox('works/3 E - F.epub').click();
-    await fixture.whenStable();
-    await click('Untick Skip on all');
-    expect(skipBox('works/3 E - F.epub').checked).toBe(false);
-    expect(dateBox('works/2 C - D.html').value).toBe('2024-05-06');
-    expect(repairBox('works/2 C - D.pdf').checked).toBe(true);
-    expect(button('Untick Skip on all')!.disabled).toBe(true);
-  });
-
-  it('goes back from the repair page to the dates, and from the formats to the repair page', async () => {
-    await open([], false, INDEXED_UNDATED);
-    await click('Continue');
-    await click('Repair remaining from AO3');
-    await click('Continue');
-    expect(step()).toBe('repair');
-    await click('Back');
-    expect(step()).toBe('dates');
-    expect(repairBox('works/7 old name.html').checked).toBe(true);
-    await click('Continue');
-    await click('Continue');
-    expect(step()).toBe('formats');
-    await click('Back');
-    expect(step()).toBe('repair');
+    const ao3 = (value: string) => element.querySelector<HTMLInputElement>(`input[name="repairAo3"][value="${value}"]`)!;
+    expect(ao3('overwrite').checked).toBe(true);
+    expect(ao3('rename').closest('label')!.textContent).toContain('Only rename the file');
+    expect(ao3('rename').closest('label')!.textContent).toContain('Nothing is downloaded');
+    expect(ao3('overwrite').closest('label')!.textContent).toContain('Overwrite and rename the file');
   });
 
   function fallback(value: string): HTMLInputElement {
     return element.querySelector<HTMLInputElement>(`input[name="repairFallback"][value="${value}"]`)!;
   }
 
-  it('asks what happens when AO3 cannot give a file, keeping it to begin with', async () => {
+  function tickBox(name: string): HTMLInputElement {
+    return element.querySelector<HTMLInputElement>(`input[name="${name}"]`)!;
+  }
+
+  it("warns of FicHub's cache, leaves the file as it is to begin with, and offers each choice's own condition", async () => {
     await open();
     await click('Continue');
     await click('Repair remaining from AO3');
-    expect(element.querySelector('input[name="repairFallback"]')).toBeNull();
     await click('Continue');
 
+    expect(element.querySelector('.repair-warning')?.textContent).toContain('cached copies');
     expect(fallback('keep').checked).toBe(true);
-    expect(fallback('replace').closest('label')!.textContent).toContain('cached');
-    expect(fallback('rename').closest('label')!.textContent).toContain("name it with FicHub's date");
-    expect(fallback('rename').closest('label')!.textContent).toContain('never over another file');
-    const undated = element.querySelector<HTMLInputElement>('input[name="repairFicHubUndated"]')!;
-    expect(undated.checked).toBe(false);
-    expect(undated.disabled).toBe(true);
-    fallback('replace').click();
-    await fixture.whenStable();
-    expect(undated.disabled).toBe(false);
+    expect(fallback('rename').closest('label')!.textContent).toContain('Only rename the file');
+    expect(fallback('replace').closest('label')!.textContent).toContain('Overwrite and rename the file');
+    // each condition is ticked, and usable only under its own choice
+    expect(tickBox('renameCheck').checked).toBe(true);
+    expect(tickBox('renameCheck').disabled).toBe(true);
+    expect(tickBox('replaceCheck').checked).toBe(true);
+    expect(tickBox('replaceCheck').disabled).toBe(true);
+    expect(tickBox('repairFicHubUndated').disabled).toBe(true);
     fallback('rename').click();
     await fixture.whenStable();
-    expect(undated.disabled).toBe(true);
+    expect(tickBox('renameCheck').disabled).toBe(false);
+    fallback('replace').click();
+    await fixture.whenStable();
+    expect(tickBox('replaceCheck').disabled).toBe(false);
+    expect(tickBox('repairFicHubUndated').disabled).toBe(false);
+    // the third is only under the second
+    tickBox('replaceCheck').click();
+    await fixture.whenStable();
+    expect(tickBox('repairFicHubUndated').disabled).toBe(true);
+  });
+
+  it('hands the run only renaming where AO3 has the work, and FicHub overwriting every file when its condition is off', async () => {
+    await open([], false, INDEXED_UNDATED);
+    await click('Continue');
+    await click('Repair remaining from AO3');
+    await click('Continue');
+    element.querySelector<HTMLInputElement>('input[name="repairAo3"][value="rename"]')!.click();
+    fallback('replace').click();
+    await fixture.whenStable();
+    tickBox('replaceCheck').click();
+    await fixture.whenStable();
+    await click('Continue');
+    element.querySelector<HTMLInputElement>('input[name="updateScope"][value="skip"]')?.click();
+    await fixture.whenStable();
+    await click('Continue');
+
+    expect(started[0].request).toMatchObject({
+      repairRenameOnly: true, repairFicHub: true, repairFicHubCheck: false, repairFicHubUndated: false,
+    });
   });
 
   it("hands the run the files to repair by name, and their works only for that when they are not updated", async () => {
@@ -1573,6 +1573,8 @@ describe('ImportDialog', () => {
       repairFicHub: false,
       repairFicHubUndated: false,
       repairFicHubRename: false,
+      repairFicHubCheck: true,
+      repairRenameOnly: false,
     });
   });
 
