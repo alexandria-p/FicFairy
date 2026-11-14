@@ -1018,15 +1018,19 @@ describe('ImportDialog', () => {
     expect(element.querySelector('.long-run-note')).toBeNull();
   });
 
-  it('lists the undated files by name, with Skip this step while none has a date', async () => {
+  it('lists the undated files by name; its button says Skip this step only with every file skipped, else Continue', async () => {
     await open();
     await click('Continue');
     expect(rowOrder()).toEqual(['works/2 C - D.html', 'works/2 C - D.pdf', 'works/3 E - F.epub']);
+    expect(primary().textContent?.trim()).toBe('Continue');
+    await click('Skip remaining');
     expect(primary().textContent?.trim()).toBe('Skip this step');
+    await click('Untick Skip on all');
+    expect(primary().textContent?.trim()).toBe('Continue');
     expect(row('works/2 C - D.html').querySelector('td.file-name')!.getAttribute('title')).toBe('2 C - D.html');
 
     await type(dateBox('works/2 C - D.html'), '2024-05-06');
-    expect(primary().textContent?.trim()).toBe('Date 1 file and continue');
+    expect(primary().textContent?.trim()).toBe('Continue');
   });
 
   it('renames a dated file on the index list as soon as it is renamed, so its work is not asked about again', async () => {
@@ -1038,7 +1042,7 @@ describe('ImportDialog', () => {
     TestBed.inject(Library).store.set(store);
     await click('Continue');
     await type(dateBox('works/9 x.html'), '2024-02-03');
-    await click('Date 1 file and continue');
+    await click('Continue');
     await settle();
 
     // written before the window is closed or anything else is chosen
@@ -1085,18 +1089,52 @@ describe('ImportDialog', () => {
     expect(repairBox('works/2 C - D.pdf').checked).toBe(true);
     expect(repairBox('works/3 E - F.epub').checked).toBe(true);
     expect(primary().disabled).toBe(false);
-    expect(primary().textContent).toContain('Date 1 file and continue');
+    expect(primary().textContent?.trim()).toBe('Continue');
   });
 
   it('warns that repairing overwrites each file with the newest from AO3, and points at the FicHub choice', async () => {
     await open();
     await click('Continue');
-    expect(element.querySelector('.repair-warning')).toBeNull();
     await click('Repair remaining from AO3');
+    // asked on a page of its own, after the dates
+    expect(element.querySelector('.repair-warning')).toBeNull();
+    await click('Continue');
+    expect(step()).toBe('repair');
     const warning = element.querySelector('.repair-warning')?.textContent?.replace(/\s+/g, ' ') ?? '';
     expect(warning).toContain('Repair from AO3 overwrites all 3 files');
     expect(warning).toContain('newest version on AO3');
     expect(warning).toContain("If AO3 can't give a file, choose below what happens");
+  });
+
+  it('unticks Skip on every row at once, leaving dates and repairs, and is held with none ticked', async () => {
+    await open();
+    await click('Continue');
+    expect(button('Untick Skip on all')!.disabled).toBe(true);
+    await type(dateBox('works/2 C - D.html'), '2024-05-06');
+    repairBox('works/2 C - D.pdf').click();
+    skipBox('works/3 E - F.epub').click();
+    await fixture.whenStable();
+    await click('Untick Skip on all');
+    expect(skipBox('works/3 E - F.epub').checked).toBe(false);
+    expect(dateBox('works/2 C - D.html').value).toBe('2024-05-06');
+    expect(repairBox('works/2 C - D.pdf').checked).toBe(true);
+    expect(button('Untick Skip on all')!.disabled).toBe(true);
+  });
+
+  it('goes back from the repair page to the dates, and from the formats to the repair page', async () => {
+    await open([], false, INDEXED_UNDATED);
+    await click('Continue');
+    await click('Repair remaining from AO3');
+    await click('Continue');
+    expect(step()).toBe('repair');
+    await click('Back');
+    expect(step()).toBe('dates');
+    expect(repairBox('works/7 old name.html').checked).toBe(true);
+    await click('Continue');
+    await click('Continue');
+    expect(step()).toBe('formats');
+    await click('Back');
+    expect(step()).toBe('repair');
   });
 
   function fallback(value: string): HTMLInputElement {
@@ -1106,8 +1144,9 @@ describe('ImportDialog', () => {
   it('asks what happens when AO3 cannot give a file, keeping it to begin with', async () => {
     await open();
     await click('Continue');
-    expect(element.querySelector('input[name="repairFallback"]')).toBeNull();
     await click('Repair remaining from AO3');
+    expect(element.querySelector('input[name="repairFallback"]')).toBeNull();
+    await click('Continue');
 
     expect(fallback('keep').checked).toBe(true);
     expect(fallback('replace').closest('label')!.textContent).toContain('cached');
@@ -1130,6 +1169,7 @@ describe('ImportDialog', () => {
     await click('Skip remaining');
     repairBox('works/2 C - D.html').click();
     await fixture.whenStable();
+    await click('Continue');
     fallback('replace').click();
     await fixture.whenStable();
     await click('Continue');
@@ -1152,6 +1192,7 @@ describe('ImportDialog', () => {
     await open([], false, INDEXED_UNDATED);
     await click('Continue');
     await click('Repair remaining from AO3');
+    await click('Continue');
     fallback('rename').click();
     await fixture.whenStable();
     await click('Continue');
@@ -1167,6 +1208,8 @@ describe('ImportDialog', () => {
     await click('Continue');
     repairBox('works/7 old name.html').click();
     await fixture.whenStable();
+    await click('Continue');
+    expect(step()).toBe('repair');
     await click('Continue');
     element.querySelector<HTMLInputElement>('input[name="updateScope"][value="skip"]')?.click();
     await fixture.whenStable();
@@ -1199,7 +1242,7 @@ describe('ImportDialog', () => {
     await type(dateBox('works/2 C - D.html'), '2024-05-06');
     box.click();
     await fixture.whenStable();
-    await click('Date 1 file and continue');
+    await click('Continue');
     await settle();
 
     const written = JSON.parse(store.written.get(IMPORT_EXCLUDED_FILE)!);
@@ -1223,7 +1266,7 @@ describe('ImportDialog', () => {
     await open();
     await click('Continue');
     expect(primary().disabled).toBe(true);
-    expect(primary().getAttribute('title')).toBe('Give every file a date, or tick Skip');
+    expect(primary().getAttribute('title')).toBe('Give every file a date, or tick Skip or Repair from AO3');
     expect(element.querySelectorAll('tr.needs-answer')).toHaveLength(3);
     expect(element.querySelector('.needs-answer-note')?.textContent).toContain('3 files have no date, Skip or Repair tick');
 
@@ -1241,7 +1284,7 @@ describe('ImportDialog', () => {
     expect(skipBox('works/3 E - F.epub').checked).toBe(true);
     expect(dateBox('works/2 C - D.html').value).toBe('2024-05-06');
     expect(primary().disabled).toBe(false);
-    expect(primary().textContent?.trim()).toBe('Date 1 file and continue');
+    expect(primary().textContent?.trim()).toBe('Continue');
   });
 
   it('greys a skipped row and its date, without striking it through', async () => {
@@ -1270,7 +1313,7 @@ describe('ImportDialog', () => {
     expect(dateBox('works/2 C - D.pdf').value).toBe('');
     expect(dateBox('works/3 E - F.epub').value).toBe('2023-03-03');
     expect(skipBox('works/2 C - D.pdf').checked).toBe(true);
-    expect(primary().textContent).toContain('Date 2 files');
+    expect(primary().textContent?.trim()).toBe('Continue');
   });
 
   it('keeps the bulk actions in a fold, says how many rows remain, and holds them once none do', async () => {
@@ -1372,7 +1415,7 @@ describe('ImportDialog', () => {
     expect(dateBox('works/20240304 Delta - W.html').value).toBe('');
     expect(row('works/10 Zeta 20230115 - W.html').classList).toContain('inferred');
     expect(element.querySelector('.infer-said')?.textContent).toContain('2 files were auto-dated');
-    expect(primary().textContent).toContain('Date 2 files');
+    expect(primary().textContent?.trim()).toBe('Continue');
   });
 
   it('leaves a date given by hand as it is when inferring the remaining rows', async () => {
@@ -1564,7 +1607,7 @@ describe('ImportDialog', () => {
     await click('Continue');
     expect(step()).toBe('dates');
     await type(row('works/7 old name.html').querySelector<HTMLInputElement>('input[type="date"]')!, '2024-02-03');
-    await click('Date 1 file and continue');
+    await click('Continue');
     expect(step()).toBe('dating');
     await click('Continue');
     expect(step()).toBe('formats');

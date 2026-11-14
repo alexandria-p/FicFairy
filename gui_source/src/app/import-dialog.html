@@ -540,6 +540,9 @@
           <button type="button" class="button repair-rest" [disabled]="!needsAnswer().length" (click)="repairRemaining()">
             Repair remaining from AO3
           </button>
+          <button type="button" class="button untick-skips" [disabled]="!anySkipped()" (click)="untickAllSkips()">
+            Untick Skip on all
+          </button>
           <button type="button" class="button choose-date" [disabled]="!needsAnswer().length"
                   [attr.aria-expanded]="pickingDate()" (click)="pickingDate.set(!pickingDate())">
             Choose my own date...
@@ -620,54 +623,6 @@
           </span>
         </div>
       }
-      @if (toRepair().length; as repairs) {
-        <div class="repair-fichub">
-          <p class="warning repair-warning" role="note">
-            <strong>Repair from AO3 overwrites {{ repairs === 1 ? 'the file' : 'all ' + (repairs | number) + ' files' }}</strong>
-            with the newest version on AO3, whatever {{ repairs === 1 ? 'it holds' : 'they hold' }},
-            named with AO3's date. If AO3 can't give a file, choose below what happens to it.
-          </p>
-          <fieldset class="repair-fallback">
-            <legend>If AO3 can't give a file</legend>
-            <label class="check">
-              <input type="radio" name="repairFallback" value="keep" [checked]="repairFallback() === 'keep'"
-                     (change)="repairFallback.set('keep')" />
-              <span>Keep my file as it is</span>
-            </label>
-            <label class="check">
-              <input type="radio" name="repairFallback" value="replace" [checked]="repairFallback() === 'replace'"
-                     (change)="repairFallback.set('replace')" />
-              <span>
-                Replace it with FicHub's copy
-                <span class="hint">
-                  Only when FicHub's copy is dated the same as or later than a date guessed from the
-                  file's name. FicHub keeps cached copies, which may be older than the latest on AO3.
-                </span>
-              </span>
-            </label>
-            <label class="check nested">
-              <input type="checkbox" name="repairFicHubUndated" [checked]="repairFicHubUndated()"
-                     [disabled]="repairFallback() !== 'replace'"
-                     (change)="repairFicHubUndated.set($any($event.target).checked)" />
-              <span>
-                Also replace it when no date can be guessed from the file's name
-                <span class="hint">There is nothing to compare it with, so FicHub's copy may be older than yours.</span>
-              </span>
-            </label>
-            <label class="check">
-              <input type="radio" name="repairFallback" value="rename" [checked]="repairFallback() === 'rename'"
-                     (change)="repairFallback.set('rename')" />
-              <span>
-                Keep my file, and name it with FicHub's date
-                <span class="hint">
-                  Nothing is downloaded: your file is renamed with the date FicHub has for the work,
-                  and never over another file. That date may not be the version your file holds.
-                </span>
-              </span>
-            </label>
-          </fieldset>
-        </div>
-      }
       <label class="check remember-skips">
         <input type="checkbox" name="rememberSkips" [checked]="rememberSkips()"
                (change)="rememberSkips.set($any($event.target).checked)" />
@@ -684,9 +639,65 @@
     <footer>
       <button type="button" class="button subtle" (click)="backFrom('dates')">Back</button>
       <button type="button" class="button primary" [disabled]="inferring() || busy() || needsAnswer().length > 0"
-              [attr.title]="needsAnswer().length ? 'Give every file a date, or tick Skip' : null" (click)="fromDates()">
-        {{ toDate().length ? 'Date ' + (toDate().length | number) + (toDate().length === 1 ? ' file' : ' files') + ' and continue' : toRepair().length ? 'Continue' : 'Skip this step' }}
+              [attr.title]="needsAnswer().length ? 'Give every file a date, or tick Skip or Repair from AO3' : null" (click)="fromDates()">
+        {{ allSkippedDates() ? 'Skip this step' : 'Continue' }}
       </button>
+    </footer>
+  }
+
+  <!-- 2b: the files to repair from AO3 - what happens to one AO3 cannot give -->
+  @if (step() === 'repair') {
+    <section class="body repair-fichub">
+      @if (toRepair().length; as repairs) {
+        <p class="warning repair-warning" role="note">
+          <strong>Repair from AO3 overwrites {{ repairs === 1 ? 'the file' : 'all ' + (repairs | number) + ' files' }}</strong>
+          with the newest version on AO3, whatever {{ repairs === 1 ? 'it holds' : 'they hold' }},
+          named with AO3's date. If AO3 can't give a file, choose below what happens to it.
+        </p>
+        <fieldset class="repair-fallback">
+          <legend>If AO3 can't give a file</legend>
+          <label class="check">
+            <input type="radio" name="repairFallback" value="keep" [checked]="repairFallback() === 'keep'"
+                   (change)="repairFallback.set('keep')" />
+            <span>Keep my file as it is</span>
+          </label>
+          <label class="check">
+            <input type="radio" name="repairFallback" value="replace" [checked]="repairFallback() === 'replace'"
+                   (change)="repairFallback.set('replace')" />
+            <span>
+              Replace it with FicHub's copy
+              <span class="hint">
+                Only when FicHub's copy is dated the same as or later than a date guessed from the
+                file's name. FicHub keeps cached copies, which may be older than the latest on AO3.
+              </span>
+            </span>
+          </label>
+          <label class="check nested">
+            <input type="checkbox" name="repairFicHubUndated" [checked]="repairFicHubUndated()"
+                   [disabled]="repairFallback() !== 'replace'"
+                   (change)="repairFicHubUndated.set($any($event.target).checked)" />
+            <span>
+              Also replace it when no date can be guessed from the file's name
+              <span class="hint">There is nothing to compare it with, so FicHub's copy may be older than yours.</span>
+            </span>
+          </label>
+          <label class="check">
+            <input type="radio" name="repairFallback" value="rename" [checked]="repairFallback() === 'rename'"
+                   (change)="repairFallback.set('rename')" />
+            <span>
+              Keep my file, and name it with FicHub's date
+              <span class="hint">
+                Nothing is downloaded: your file is renamed with the date FicHub has for the work,
+                and never over another file. That date may not be the version your file holds.
+              </span>
+            </span>
+          </label>
+        </fieldset>
+      }
+    </section>
+    <footer>
+      <button type="button" class="button subtle" (click)="backFrom('repair')">Back</button>
+      <button type="button" class="button primary" [disabled]="busy()" (click)="fromRepair()">Continue</button>
     </footer>
   }
 

@@ -37,7 +37,7 @@ import { VisitLog } from './visit-log';
 import { Chime } from './chime';
 import { inAo3Zone, writtenDate } from './preferences';
 
-type Step = 'overview' | 'rename' | 'renaming' | 'duplicates' | 'choose' | 'removing' | 'dates' | 'dating' | 'index' | 'formats';
+type Step = 'overview' | 'rename' | 'renaming' | 'duplicates' | 'choose' | 'removing' | 'dates' | 'repair' | 'dating' | 'index' | 'formats';
 
 /** what sifting by hand decided for one group: a file to keep, skipped, or its most recent */
 /** what *Sort any remaining in bulk* can do with the rest */
@@ -1004,6 +1004,15 @@ export class ImportDialog {
   );
   /** the files the run is to repair from AO3 */
   protected readonly toRepair = computed(() => this.undated().filter((f) => this.repairing()[f.path]));
+  /** every file ticked Skip: the page's button then says the step is skipped, else Continue */
+  protected readonly allSkippedDates = computed(() =>
+    this.undated().length > 0 && this.undated().every((f) => this.skipped()[f.path]));
+  protected readonly anySkipped = computed(() => this.undated().some((f) => this.skipped()[f.path]));
+
+  /** Skip unticked on every row, leaving dates and repairs as they are */
+  protected untickAllSkips(): void {
+    this.skipped.set({});
+  }
   protected readonly bulkValid = computed(() => isFileDate(this.bulkDate()));
   /**
    * Rows neither given a date nor ticked Skip. Continue waits on them, so a file is never left
@@ -1176,8 +1185,25 @@ export class ImportDialog {
     return this.works().length ? 'index' : 'formats';
   }
 
-  /** rename the files given a date, on a page of its own; none to rename goes straight on */
+  /**
+   * From the dates: with files to repair, their own page first - what happens to a file AO3
+   * cannot give is asked there, not on the dates page - then the dating
+   */
   protected async fromDates(): Promise<void> {
+    if (this.needsAnswer().length) return;
+    if (this.toRepair().length) {
+      this.step.set('repair');
+      return;
+    }
+    await this.dateChosen();
+  }
+
+  protected async fromRepair(): Promise<void> {
+    await this.dateChosen();
+  }
+
+  /** rename the files given a date, on a page of its own; none to rename goes straight on */
+  private async dateChosen(): Promise<void> {
     if (this.needsAnswer().length) return;
     const store = this.store();
     const chosen = this.toDate();
@@ -1240,10 +1266,13 @@ export class ImportDialog {
     else this.finish();
   }
 
-  protected backFrom(step: 'dates' | 'index' | 'formats'): void {
+  protected backFrom(step: 'dates' | 'repair' | 'index' | 'formats'): void {
+    // the page before the index or the formats, when nothing has been renamed yet
+    const datesEnd: Step = this.toRepair().length ? 'repair' : 'dates';
     if (step === 'dates') this.step.set(this.groups().length && !this.removed() ? 'duplicates' : 'overview');
-    else if (step === 'index') this.step.set(this.dated() ? 'overview' : this.undated().length ? 'dates' : 'overview');
-    else this.step.set(this.works().length ? 'index' : this.dated() ? 'overview' : this.undated().length ? 'dates' : 'overview');
+    else if (step === 'repair') this.step.set('dates');
+    else if (step === 'index') this.step.set(this.dated() ? 'overview' : this.undated().length ? datesEnd : 'overview');
+    else this.step.set(this.works().length ? 'index' : this.dated() ? 'overview' : this.undated().length ? datesEnd : 'overview');
   }
 
   /** no going back to the dates once files are renamed: they would be offered for dating again */
