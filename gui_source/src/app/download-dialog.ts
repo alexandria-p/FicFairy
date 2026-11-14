@@ -736,6 +736,8 @@ export class DownloadDialog implements OnDestroy {
         lines.push(importing.repairFicHubUndated
           ? "Where AO3 can't, use FicHub's copy - when it is as new as the date guessed from the file's name, or no date can be guessed"
           : "Where AO3 can't, use FicHub's copy - only when it is as new as the date guessed from the file's name");
+      } else if (importing.repairFicHubRename) {
+        lines.push("Where AO3 can't, keep the file and name it with FicHub's date - never over another file");
       }
     }
     return lines;
@@ -2136,6 +2138,7 @@ export class DownloadDialog implements OnDestroy {
               repair: this.importing()?.repair ?? [],
               repairFicHub: !!this.importing()?.repairFicHub,
               repairFicHubUndated: !!this.importing()?.repairFicHubUndated,
+              repairFicHubRename: !!this.importing()?.repairFicHubRename,
             }
           : {}),
       } satisfies JobOptions,

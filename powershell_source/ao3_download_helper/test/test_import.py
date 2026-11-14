@@ -436,6 +436,18 @@ def test_ficHubs_part_in_a_repair_needs_files_to_repair_and_the_first_agreement(
     assert (job.options['repairFicHub'], job.options['repairFicHubUndated']) == (True, True)
 
 
+def test_naming_with_fichubs_date_is_a_repairs_other_answer_to_ao3_failing():
+    _, [job], _ = start_request(server.ACTION_IMPORT, '1', repairFicHubRename=True)
+    assert job.options['repairFicHubRename'] is False
+    _, [job], _ = start_request(server.ACTION_IMPORT, '1', repair=['1 Fic.html'],
+                                repairFicHubRename=True)
+    assert job.options['repairFicHubRename'] is True
+    # FicHub's copy replacing the file wins over naming it: one answer, never both
+    _, [job], _ = start_request(server.ACTION_IMPORT, '1', repair=['1 Fic.html'],
+                                repairFicHub=True, repairFicHubRename=True)
+    assert (job.options['repairFicHub'], job.options['repairFicHubRename']) == (True, False)
+
+
 def test_an_import_that_repairs_files_downloads_even_with_no_format_asked_for():
     job = server.Job(server.ACTION_IMPORT, ['JSON'], '',
                      server.resolve_options({'repair': ['1 Fic.html']}))

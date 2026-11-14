@@ -872,12 +872,13 @@ export class ImportDialog {
    */
   protected readonly repairing = signal<Record<string, boolean>>({});
   /**
-   * When AO3 will not give a file to repair, FicHub may - only if the reader agrees here, before
-   * the run: its copy replaces the file when dated the same as or later than a date guessed from
-   * the file's name. Off to begin with.
+   * What happens to a file to repair that AO3 will not give - agreed here, before the run: kept
+   * (to begin with); replaced with FicHub's copy when dated the same as or later than a date
+   * guessed from the file's name (`replace`); or kept and named with FicHub's date for the work,
+   * never over another file (`rename`).
    */
-  protected readonly repairFicHub = signal(false);
-  /** and, agreed to as well, when no date can be guessed from the file's name at all */
+  protected readonly repairFallback = signal<'keep' | 'replace' | 'rename'>('keep');
+  /** replacing, agreed to as well when no date can be guessed from the file's name at all */
   protected readonly repairFicHubUndated = signal(false);
   /** the files whose date `Infer date` set, and has not been changed by hand since */
   protected readonly inferred = signal<Record<string, boolean>>({});
@@ -1278,8 +1279,10 @@ export class ImportDialog {
         scope: updates ? this.scopeChosen() : 'skip',
         files: this.filesOf(taken),
         repair: this.toRepair().map((f) => f.name),
-        repairFicHub: this.toRepair().length > 0 && this.repairFicHub(),
-        repairFicHubUndated: this.toRepair().length > 0 && this.repairFicHub() && this.repairFicHubUndated(),
+        repairFicHub: this.toRepair().length > 0 && this.repairFallback() === 'replace',
+        repairFicHubUndated: this.toRepair().length > 0 && this.repairFallback() === 'replace' &&
+          this.repairFicHubUndated(),
+        repairFicHubRename: this.toRepair().length > 0 && this.repairFallback() === 'rename',
       },
       dated: this.dated(),
     });

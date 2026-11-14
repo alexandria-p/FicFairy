@@ -2960,6 +2960,16 @@ describe('DownloadDialog', () => {
       expect(jobs.started[0].options.repair).toEqual(['1 A.html', '2 B.pdf']);
       expect(jobs.started[0].options.repairFicHub).toBe(true);
       expect(jobs.started[0].options.repairFicHubUndated).toBe(false);
+      expect(jobs.started[0].options.repairFicHubRename).toBe(false);
+    });
+
+    it("says, and sends, that a file AO3 can't give is named with FicHub's date instead", async () => {
+      await openImport({ ...IMPORT, filetypes: ['JSON'], replaceOutdated: false, scope: 'skip',
+                         repair: ['1 A.html'], repairFicHubRename: true });
+      const lines = [...element.querySelectorAll('.import-summary li')].map((li) => li.textContent?.trim());
+      expect(lines).toContain("Where AO3 can't, keep the file and name it with FicHub's date - never over another file");
+      await advanceTo('running');
+      expect(jobs.started[0].options.repairFicHubRename).toBe(true);
     });
 
     it('is the only run that sends whether to replace outdated copies', async () => {

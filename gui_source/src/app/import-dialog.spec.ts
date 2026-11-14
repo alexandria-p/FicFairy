@@ -1099,21 +1099,29 @@ describe('ImportDialog', () => {
     expect(warning).toContain("If AO3 can't give a file, choose below what happens");
   });
 
-  it('asks before FicHub may stand in for AO3, and the second agreement only after the first', async () => {
+  function fallback(value: string): HTMLInputElement {
+    return element.querySelector<HTMLInputElement>(`input[name="repairFallback"][value="${value}"]`)!;
+  }
+
+  it('asks what happens when AO3 cannot give a file, keeping it to begin with', async () => {
     await open();
     await click('Continue');
-    expect(element.querySelector('input[name="repairFicHub"]')).toBeNull();
+    expect(element.querySelector('input[name="repairFallback"]')).toBeNull();
     await click('Repair remaining from AO3');
 
-    const fichub = element.querySelector<HTMLInputElement>('input[name="repairFicHub"]')!;
+    expect(fallback('keep').checked).toBe(true);
+    expect(fallback('replace').closest('label')!.textContent).toContain('cached');
+    expect(fallback('rename').closest('label')!.textContent).toContain("name it with FicHub's date");
+    expect(fallback('rename').closest('label')!.textContent).toContain('never over another file');
     const undated = element.querySelector<HTMLInputElement>('input[name="repairFicHubUndated"]')!;
-    expect(fichub.checked).toBe(false);
-    expect(fichub.closest('label')!.textContent).toContain('cached');
     expect(undated.checked).toBe(false);
     expect(undated.disabled).toBe(true);
-    fichub.click();
+    fallback('replace').click();
     await fixture.whenStable();
     expect(undated.disabled).toBe(false);
+    fallback('rename').click();
+    await fixture.whenStable();
+    expect(undated.disabled).toBe(true);
   });
 
   it("hands the run the files to repair by name, and their works only for that when they are not updated", async () => {
@@ -1122,7 +1130,7 @@ describe('ImportDialog', () => {
     await click('Skip remaining');
     repairBox('works/2 C - D.html').click();
     await fixture.whenStable();
-    element.querySelector<HTMLInputElement>('input[name="repairFicHub"]')!.click();
+    fallback('replace').click();
     await fixture.whenStable();
     await click('Continue');
     // the index question, then the formats, skipped
@@ -1135,8 +1143,23 @@ describe('ImportDialog', () => {
     expect(request.repair).toEqual(['2 C - D.html']);
     expect(request.repairFicHub).toBe(true);
     expect(request.repairFicHubUndated).toBe(false);
+    expect(request.repairFicHubRename).toBe(false);
     expect(request.links.split('\n').map((l) => l.split('/').pop())).toContain('2');
     expect(request.indexOnly).toContain('2');
+  });
+
+  it("hands the run the choice to name a file with FicHub's date instead", async () => {
+    await open([], false, INDEXED_UNDATED);
+    await click('Continue');
+    await click('Repair remaining from AO3');
+    fallback('rename').click();
+    await fixture.whenStable();
+    await click('Continue');
+    element.querySelector<HTMLInputElement>('input[name="updateScope"][value="skip"]')?.click();
+    await fixture.whenStable();
+    await click('Continue');
+
+    expect(started[0].request).toMatchObject({ repairFicHub: false, repairFicHubRename: true });
   });
 
   it('runs for a file to repair even with nothing else for a run to do', async () => {
@@ -1488,6 +1511,7 @@ describe('ImportDialog', () => {
       repair: [],
       repairFicHub: false,
       repairFicHubUndated: false,
+      repairFicHubRename: false,
     });
   });
 

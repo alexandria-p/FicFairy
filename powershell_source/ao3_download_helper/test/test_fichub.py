@@ -791,6 +791,41 @@ def test_an_imports_file_to_repair_is_replaced_from_fichub_only_on_the_rule_agre
 
 
 @pytest.mark.fichub
+def test_an_imports_file_to_repair_can_instead_be_named_with_fichubs_date_keeping_its_contents(
+        library, monkeypatch, capsys):
+    a_copy(library, '75354806 Wolfbird.epub')
+    fetched = fichub_serving(monkeypatch)
+    job, ao3 = an_import(library, ['JSON'], repair=['75354806 Wolfbird.epub'],
+                         repairFicHubRename=True)
+
+    server.rescue_with_fichub(job, library, ao3, MagicMock())
+
+    # nothing downloaded: the same file, named as its entry names it with FicHub's date
+    assert fetched == []
+    assert work_files(library) == ['75354806 Wolfbird - OpalApparition 2026-04-27.epub']
+    with open(os.path.join(library.downloadfolder, strings.WORKS_FOLDER_NAME,
+                           '75354806 Wolfbird - OpalApparition 2026-04-27.epub'), 'rb') as f:
+        assert f.read() == b'what you had'
+    assert "with FicHub's date (27 April 2026)" in capsys.readouterr().out
+
+
+@pytest.mark.fichub
+def test_naming_a_file_with_fichubs_date_never_renames_over_another(library, monkeypatch, capsys):
+    a_copy(library, '75354806 Wolfbird - OpalApparition 2026-04-27.epub')
+    a_copy(library, '75354806 Wolfbird.epub')
+    fetched = fichub_serving(monkeypatch)
+    job, ao3 = an_import(library, ['JSON'], repair=['75354806 Wolfbird.epub'],
+                         repairFicHubRename=True)
+
+    server.rescue_with_fichub(job, library, ao3, MagicMock())
+
+    assert fetched == []
+    assert len(work_files(library)) == 2
+    assert '75354806 Wolfbird - OpalApparition 2026-04-27.epub' in work_files(library)
+    assert 'is already there' in capsys.readouterr().out
+
+
+@pytest.mark.fichub
 def test_a_work_only_looked_up_gets_nothing_from_fichub_but_its_file_to_repair(library, monkeypatch):
     a_copy(library, '75354806 Wolfbird.epub')
     fetched = fichub_serving(monkeypatch)

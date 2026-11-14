@@ -136,6 +136,8 @@ export interface JobOptions {
   repairFicHub?: boolean;
   /** an import: and when no date can be guessed from the file's name */
   repairFicHubUndated?: boolean;
+  /** an import: instead, keep such a file and name it with FicHub's date, never over another */
+  repairFicHubRename?: boolean;
   /**
    * Check every non-bookmark in the index for updates too - the works it holds only because
    * something else led a run to them, such as another work's series. Not narrowed by a date
