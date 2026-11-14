@@ -84,7 +84,7 @@ The index is updated with a new reading whenever AO3's details have changed - wh
 
 ### From FicHub
 
-FicHub is only asked at the end of a run, for works AO3 wouldn't give. What happens depends on how FicHub's copy compares with your **index**.
+FicHub is only asked at the end of a run, for works AO3 wouldn't give. If AO3 is down for maintenance when a fic run or a repair (*Resolve issues*) tries to log in, the run carries on without AO3: every work fails at once and is offered to FicHub at the end. A scan of your bookmarks or collections can't - it needs AO3's listing - so it stops at the login. What happens depends on how FicHub's copy compares with your **index**.
 
 **FicHub's copy is as new as your index, or newer** (or the work has no indexed date): the AO3 table above, with FicHub's date - except a file with **no readable date**, where keeping is recommended overwriting or not, since FicHub's copy may be an older cached one, not up to date with AO3's latest. If the run writes JSON, the index gets a new reading from FicHub, marked **From FicHub**.
 

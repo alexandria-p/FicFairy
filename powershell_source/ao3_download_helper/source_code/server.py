@@ -1402,11 +1402,23 @@ def run_job(job: Job, password: str) -> None:
                     begin_record(job, fileops)
                     job.steps.skip('login')
                 else:
-                    repo.login(job.username, password)
-                    print(strings.AO3_INFO_LOGGED_IN)
-                    begin_record(job, fileops)
-                    progress.report(report, progress.AUTHENTICATED, username=job.username)
-                    job.steps.done('login')
+                    try:
+                        repo.login(job.username, password)
+                    except exceptions.Ao3DownException:
+                        # the fic runs and an import name their works, so FicHub can still
+                        # be asked for each at the end: AO3's maintenance page ends the login,
+                        # never the run. a scan has nothing to ask FicHub for without AO3's
+                        # listing, so it still fails here
+                        if job.action not in FIC_ACTIONS: raise
+                        print(strings.AO3_INFO_LOGIN_AO3_DOWN)
+                        repo.logged_in = False
+                        begin_record(job, fileops)
+                        job.steps.fail('login')
+                    else:
+                        print(strings.AO3_INFO_LOGGED_IN)
+                        begin_record(job, fileops)
+                        progress.report(report, progress.AUTHENTICATED, username=job.username)
+                        job.steps.done('login')
 
                 runners()[job.action](job, fileops, repo, report)
                 # every runner ends by calling report_failures, so by the time it returns
@@ -4360,8 +4372,9 @@ def rescue_with_fichub(job: Job, fileops: FileOps, ao3, report) -> None:
                          - {x.upper() for x in filetypes})
     filetypes += repair_only
     indexes = strings.AO3_DOWNLOAD_TYPE_METADATA in job.filetypes
-    wanted = set(works)
-    entries = indexed_entries(ao3, fileops, wanted)
+    # each work's index entry is read as that work's turn comes (below), never all of them up
+    # front: in Dropbox each is a download, and with AO3 down every work of a long import is
+    # here - read first, they held the step silent, and past a stop, for as long as that took
     # every format, not only the run's: a format FicHub gives that there was no file of is
     # warned about when another of the work's files is dated later (`note_fichub_older`). one
     # listing, narrowed to the run's formats for everything else
@@ -4398,17 +4411,20 @@ def rescue_with_fichub(job: Job, fileops: FileOps, ao3, report) -> None:
         # work otherwise only looked up is asked for nothing but its files to repair
         types = [x for x in types if (x not in repair_only and work not in looked_up)
                  or x in repairing]
-        rescue_one(ao3, failure, entries.get(work), existing, types,
+        entry = indexed_entries(ao3, fileops, {work}).get(work)
+        if job.cancel.is_set(): break
+        rescue_one(ao3, failure, entry, existing, types,
                    indexes, maximum, overwrite, done, len(candidates), job=job,
                    every=every.get(work))
 
     # an import names each work's files from its entry once it has one - FicHub's entries
     # too, the same way its ao3 ones were (`name_files_from_index`: keeping each file's own
     # date, or none)
-    if importing and indexes:
+    if importing and indexes and not job.cancel.is_set():
         named = [x for x in candidates if str(x['id']) in ao3.reindexed]
         if named:
-            fresh = indexed_entries(ao3, fileops, {str(x['id']) for x in named})
+            fresh = indexed_entries(ao3, fileops, {str(x['id']) for x in named},
+                                    stop=job.cancel.is_set)
             name_files_from_index(fileops, list(fresh.values()))
 
     if job.cancel.is_set(): return
@@ -4463,8 +4479,9 @@ def say_entry_found(ao3, work: str, existing: dict | None) -> None:
     print(strings.AO3_INFO_INDEX_FOUND.format(work, name or existing.get('title') or ''))
 
 
-def indexed_entries(ao3, fileops: FileOps, works: set[str]) -> dict[str, dict]:
-    """The index entries of just these works, by number.
+def indexed_entries(ao3, fileops: FileOps, works: set[str], stop=None) -> dict[str, dict]:
+    """The index entries of just these works, by number - as far as it got, when `stop` says
+    the run was stopped.
 
     Found by the number their file names start with (`Ao3.entry_path`, one listing of the
     index folder) and read one file each - never the whole index, which in Dropbox is a
@@ -4474,6 +4491,7 @@ def indexed_entries(ao3, fileops: FileOps, works: set[str]) -> dict[str, dict]:
 
     entries: dict[str, dict] = {}
     for work in sorted(works):
+        if stop is not None and stop(): break
         try:
             record = indexing.flatten(fileops.load_json(ao3.entry_path({'id': work})))
         except Exception:

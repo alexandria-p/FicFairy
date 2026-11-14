@@ -299,7 +299,7 @@ def test_a_fichub_reading_keeps_the_bookmark_the_index_already_had(library, monk
     # FicHub reading is written into its file
     indexed_as(library, bookmark)
     if not read_first:
-        monkeypatch.setattr(server, 'indexed_entries', lambda ao3, fileops, works: {})
+        monkeypatch.setattr(server, 'indexed_entries', lambda ao3, fileops, works, stop=None: {})
     monkeypatch.setattr(server.fichub, 'lookup', lambda repo, link: wolfbird())
     monkeypatch.setattr(server.fichub, 'download', lambda repo, answer, filetype: b'from fichub')
     job, ao3, _ = a_run(library, ['JSON', 'HTML'], ao3_failed())
@@ -313,6 +313,32 @@ def test_a_fichub_reading_keeps_the_bookmark_the_index_already_had(library, monk
     for field in strings.BOOKMARK_OWN_FIELDS:
         if field in bookmark: assert entry[field] == bookmark[field], field
         else: assert field not in entry, field
+
+
+@pytest.mark.fichub
+def test_fichub_reads_each_works_entry_in_its_turn_and_a_stop_ends_it_between_works(
+        library, monkeypatch):
+    # with AO3 down every work of a long import is here: reading every entry up front held the
+    # step silent, and past a stop, for as long as that took
+    failures = [{'id': str(n), 'link': f'https://archiveofourown.org/works/{n}', 'error': 'down'}
+                for n in (1, 2, 3)]
+    job, ao3, _ = a_run(library, ['JSON', 'HTML'], failures)
+    read: list[set] = []
+    rescued: list[str] = []
+
+    def entries(ao3, fileops, works, stop=None):
+        read.append(set(works))
+        if len(read) == 2: job.cancel.set()
+        return {}
+
+    monkeypatch.setattr(server, 'indexed_entries', entries)
+    monkeypatch.setattr(server, 'rescue_one',
+                        lambda ao3, failure, *a, **k: rescued.append(failure['id']))
+
+    server.rescue_with_fichub(job, library, ao3, MagicMock())
+
+    assert read == [{'1'}, {'2'}]
+    assert rescued == ['1']
 
 
 def test_keep_own_bookmark_takes_the_files_bookmark_over_the_documents():

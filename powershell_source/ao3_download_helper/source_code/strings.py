@@ -735,6 +735,8 @@ AO3_DOWN_MARKER = 'the archive is down for maintenance'
 MESSAGE_AO3_DOWN_RETRY = 'AO3 says it is down for maintenance - checking again in {}s ({} of {})'
 ERROR_SETTINGS_NOT_EDITABLE = ('settings.ini can only be changed from the page on a helper running on '
                                'this computer. Edit a hosted copy\'s settings through its deployment.')
+AO3_INFO_LOGIN_AO3_DOWN = ('AO3 is down for maintenance, so the run could not log in. It carries on without '
+                           'AO3: every work it asks AO3 for fails at once, and is offered to FicHub at the end')
 ERROR_AO3_DOWN = ('AO3 is down for maintenance, so nothing more can be fetched from it on this run. '
                   'Try again once it is back - https://status.archiveofourown.org')
 MESSAGE_SUCCESS = 'Successful {} request with status code {}'
