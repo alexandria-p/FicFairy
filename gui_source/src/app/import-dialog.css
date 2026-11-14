@@ -196,7 +196,8 @@ code {
   margin: 0 0 12px;
 }
 
-.bulk label {
+.bulk label,
+.bulk-date label {
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -321,13 +322,28 @@ input[type='date'] {
   color: var(--warn-text-dim);
 }
 
-/* what the bulk row's buttons answer: the rows still unanswered */
-.bulk-what {
-  flex-basis: 100%;
-  font-size: 0.85rem;
+.bulk-actions {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+
+.bulk-actions summary {
+  cursor: pointer;
+  color: var(--text-dim);
+}
+
+.bulk-actions .bulk-what {
+  margin: 10px 0 8px;
+}
+
+.bulk-actions .bulk {
+  margin: 0;
 }
 
 .bulk-date {
+  margin-top: 10px;
   display: flex;
   flex-basis: 100%;
   flex-wrap: wrap;

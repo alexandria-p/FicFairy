@@ -885,6 +885,8 @@ export class ImportDialog {
   /** the rows' order, by path - by name, until `Infer date` moves what it dated to the top */
   protected readonly order = signal<string[] | null>(null);
   protected readonly bulkDate = signal('');
+  /** Bulk actions' *Choose my own date...* open: the date and its button, shown in place */
+  protected readonly pickingDate = signal(false);
   /** the skipped files go on the dates list, never to be offered for dating again */
   protected readonly rememberSkips = signal(false);
   protected readonly inferring = signal(false);
@@ -951,6 +953,7 @@ export class ImportDialog {
     const left = this.needsAnswer();
     this.dates.update((d) => ({ ...d, ...Object.fromEntries(left.map((f) => [f.path, date])) }));
     this.inferred.update((x) => ({ ...x, ...Object.fromEntries(left.map((f) => [f.path, false])) }));
+    this.pickingDate.set(false);
   }
 
   /** Skip ticked on every remaining row */

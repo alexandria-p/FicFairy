@@ -520,34 +520,45 @@
         Repair from AO3: the import replaces the file with the latest version from AO3, named with
         its date. Every file needs a date or a tick before you can continue.
       </p>
-      <div class="bulk" role="group" aria-label="For the remaining files">
-        <span class="bulk-what">
-          For the {{ needsAnswer().length | number }} remaining
-          {{ needsAnswer().length === 1 ? 'file' : 'files' }}
-          <span class="hint">with no date, Skip or Repair tick</span>
-        </span>
-        <button type="button" class="button infer" [disabled]="inferring() || !needsAnswer().length"
-                (click)="inferDates()" title="Read a date out of each remaining file's name, however it is written">
-          @if (inferring()) { <span class="spinner" aria-hidden="true"></span> }
-          Infer date for remaining
-        </button>
-        <button type="button" class="button" [disabled]="!needsAnswer().length" (click)="skipRemaining()">
-          Skip remaining
-        </button>
-        <button type="button" class="button repair-rest" [disabled]="!needsAnswer().length" (click)="repairRemaining()">
-          Repair remaining from AO3
-        </button>
-        <!-- one date for every remaining row, on a row of its own under the other buttons -->
-        <div class="bulk-date">
-          <label>
-            <span>Date</span>
-            <input type="date" name="bulkDate" [value]="bulkDate()"
-                   (input)="bulkDate.set($any($event.target).value)" />
-          </label>
-          <button type="button" class="button" [disabled]="!bulkValid() || !needsAnswer().length"
-                  (click)="dateRemaining()">Use date for remaining</button>
+      <!-- every button answers only the rows with no date, Skip or Repair tick yet -->
+      <details class="bulk-actions">
+        <summary>Bulk actions</summary>
+        <p class="bulk-what">
+          There {{ needsAnswer().length === 1 ? 'is' : 'are' }} {{ needsAnswer().length | number }}
+          remaining {{ needsAnswer().length === 1 ? 'file that still needs' : 'files that still need' }}
+          to be resolved.
+        </p>
+        <div class="bulk" role="group" aria-label="For the remaining files">
+          <button type="button" class="button infer" [disabled]="inferring() || !needsAnswer().length"
+                  (click)="inferDates()" title="Read a date out of each remaining file's name, however it is written">
+            @if (inferring()) { <span class="spinner" aria-hidden="true"></span> }
+            Infer date for remaining
+          </button>
+          <button type="button" class="button" [disabled]="!needsAnswer().length" (click)="skipRemaining()">
+            Skip remaining
+          </button>
+          <button type="button" class="button repair-rest" [disabled]="!needsAnswer().length" (click)="repairRemaining()">
+            Repair remaining from AO3
+          </button>
+          <button type="button" class="button choose-date" [disabled]="!needsAnswer().length"
+                  [attr.aria-expanded]="pickingDate()" (click)="pickingDate.set(!pickingDate())">
+            Choose my own date...
+          </button>
         </div>
-      </div>
+        <!-- shown in place, not as a window over this one -->
+        @if (pickingDate()) {
+          <div class="bulk-date">
+            <label>
+              <span>Date for the remaining files</span>
+              <input type="date" name="bulkDate" [value]="bulkDate()"
+                     (input)="bulkDate.set($any($event.target).value)" />
+            </label>
+            <button type="button" class="button" [disabled]="!bulkValid() || !needsAnswer().length"
+                    (click)="dateRemaining()">Use for remaining</button>
+            <button type="button" class="button subtle" (click)="pickingDate.set(false)">Cancel</button>
+          </div>
+        }
+      </details>
       @if (inferredCount() !== null) {
         <p class="infer-said" role="status">
           @if (inferredCount()) {
@@ -604,8 +615,8 @@
         <div class="needs-answer-note" role="alert">
           <span>
             {{ left | number }} {{ left === 1 ? 'file has' : 'files have' }} no date, Skip or Repair tick
-            (highlighted). Answer {{ left === 1 ? 'it' : 'each' }}, or use the buttons above for the
-            remaining, to continue.
+            (highlighted). Answer {{ left === 1 ? 'it' : 'each' }}, or use <strong>Bulk actions</strong>
+            above for the remaining, to continue.
           </span>
         </div>
       }

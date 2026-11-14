@@ -1259,8 +1259,12 @@ describe('ImportDialog', () => {
     await click('Continue');
     skipBox('works/2 C - D.pdf').click();
     await type(dateBox('works/3 E - F.epub'), '2023-03-03');
+    expect(element.querySelector('input[name="bulkDate"]')).toBeNull();
+    await click('Choose my own date...');
     await type(element.querySelector<HTMLInputElement>('input[name="bulkDate"]')!, '2024-01-31');
-    await click('Use date for remaining');
+    await click('Use for remaining');
+    // done, the date closes again
+    expect(element.querySelector('input[name="bulkDate"]')).toBeNull();
 
     expect(dateBox('works/2 C - D.html').value).toBe('2024-01-31');
     expect(dateBox('works/2 C - D.pdf').value).toBe('');
@@ -1269,15 +1273,29 @@ describe('ImportDialog', () => {
     expect(primary().textContent).toContain('Date 2 files');
   });
 
-  it('says how many rows remain, and holds every bulk action once none do', async () => {
+  it('keeps the bulk actions in a fold, says how many rows remain, and holds them once none do', async () => {
     await open();
     await click('Continue');
-    expect(element.querySelector('.bulk-what')?.textContent).toContain('For the 3 remaining files');
+    const fold = element.querySelector<HTMLDetailsElement>('details.bulk-actions')!;
+    expect(fold.open).toBe(false);
+    expect(fold.querySelector('summary')?.textContent?.trim()).toBe('Bulk actions');
+    const said = () => element.querySelector('.bulk-what')?.textContent?.replace(/\s+/g, ' ').trim();
+    expect(said()).toBe('There are 3 remaining files that still need to be resolved.');
     await click('Skip remaining');
-    expect(element.querySelector('.bulk-what')?.textContent).toContain('For the 0 remaining files');
-    for (const label of ['Infer date for remaining', 'Skip remaining', 'Repair remaining from AO3']) {
+    expect(said()).toBe('There are 0 remaining files that still need to be resolved.');
+    for (const label of ['Infer date for remaining', 'Skip remaining', 'Repair remaining from AO3', 'Choose my own date...']) {
       expect(button(label)!.disabled).toBe(true);
     }
+  });
+
+  it('chooses its own date in place, never in a window over this one, and Cancel closes it', async () => {
+    await open();
+    await click('Continue');
+    await click('Choose my own date...');
+    expect(element.querySelector('.bulk-actions .bulk-date input[name="bulkDate"]')).toBeTruthy();
+    expect(element.querySelectorAll('.dialog')).toHaveLength(1);
+    await click('Cancel');
+    expect(element.querySelector('input[name="bulkDate"]')).toBeNull();
   });
 
   it('ticks Skip on every remaining row with Skip remaining', async () => {
