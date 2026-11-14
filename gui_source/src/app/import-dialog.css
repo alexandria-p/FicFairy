@@ -251,6 +251,31 @@ input[type='date'] {
   text-align: center;
 }
 
+.dating th:nth-child(4),
+.dating td:nth-child(4) {
+  width: 92px;
+  text-align: center;
+}
+
+/* to be repaired from AO3: its date set aside, as a skipped one's is */
+.dating tr.repaired input[type='date'] {
+  opacity: 0.45;
+}
+
+.needs-answer-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.repair-fichub {
+  margin: 12px 0 0;
+}
+
+.repair-fichub .nested {
+  margin-left: 24px;
+}
+
 .dating td.file-name {
   overflow: hidden;
   text-overflow: ellipsis;

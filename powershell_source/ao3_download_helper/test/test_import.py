@@ -34,7 +34,7 @@ def a_copy(library, name: str) -> None:
 
 
 def importing(library, monkeypatch, filetypes, replace=False, updated='2026-05-01',
-              index_only=()):
+              index_only=(), repair=(), replacing=None):
     """Run an import over works 1 and 2, AO3 saying each was last updated on `updated`;
     answers what was fetched, by work."""
 
@@ -52,13 +52,16 @@ def importing(library, monkeypatch, filetypes, replace=False, updated='2026-05-0
         current = self.current_formats(record)
         fetched[record['id']] = [x for x in self.wanted_formats(record)
                                  if x.upper() not in kept and x.upper() not in current]
+        if replacing is not None:
+            replacing[record['id']] = dict(self.superseded.get(record['link']) or {})
 
     monkeypatch.setattr(Ao3, 'index_one_work', index_one_work)
     monkeypatch.setattr(Ao3, 'download_one_indexed', download_one_indexed)
     monkeypatch.setattr(server, 'finish_run', MagicMock())
     job = server.Job(server.ACTION_IMPORT, filetypes, '',
                      server.resolve_options({'replaceOutdated': replace,
-                                             'indexOnly': list(index_only)}),
+                                             'indexOnly': list(index_only),
+                                             'repair': list(repair)}),
                      url=f'{link(1)}\n{link(2)}')
     job.ask = MagicMock(side_effect=AssertionError('an import asked a question'))
     server.run_import(job, library, MagicMock(), MagicMock())
@@ -406,5 +409,137 @@ def test_a_work_already_indexed_is_not_marked_imported_by_an_import():
         record = ao3.index_one_work(link(111), existing)
 
     assert strings.FROM_IMPORT_FIELD not in record
+
+# endregion
+
+
+# region repairing files from AO3
+
+def test_only_an_import_may_name_files_to_repair_and_only_work_files_by_name():
+    sent, [job], _ = start_request(server.ACTION_IMPORT, '1 2', repair=[
+        '1 Fic.html', '2 Fic.pdf', 'works/1 Fic.html', 'no number.html', '1 Fic.txt', 5])
+    assert job.options['repair'] == ['1 Fic.html', '2 Fic.pdf']
+    sent, [job], _ = start_request(server.ACTION_WORKS, '1', repair=['1 Fic.html'])
+    assert job.options['repair'] == []
+
+
+def test_ficHubs_part_in_a_repair_needs_files_to_repair_and_the_first_agreement():
+    _, [job], _ = start_request(server.ACTION_IMPORT, '1', repairFicHub=True,
+                                repairFicHubUndated=True)
+    assert job.options['repairFicHub'] is False
+    assert job.options['repairFicHubUndated'] is False
+    _, [job], _ = start_request(server.ACTION_IMPORT, '1', repair=['1 Fic.html'],
+                                repairFicHubUndated=True)
+    assert job.options['repairFicHubUndated'] is False
+    _, [job], _ = start_request(server.ACTION_IMPORT, '1', repair=['1 Fic.html'],
+                                repairFicHub=True, repairFicHubUndated=True)
+    assert (job.options['repairFicHub'], job.options['repairFicHubUndated']) == (True, True)
+
+
+def test_an_import_that_repairs_files_downloads_even_with_no_format_asked_for():
+    job = server.Job(server.ACTION_IMPORT, ['JSON'], '',
+                     server.resolve_options({'repair': ['1 Fic.html']}))
+    assert 'download' in dict(server.step_plan(job))
+
+
+def test_a_file_chosen_to_repair_is_replaced_from_ao3_though_an_import_keeps_undated_copies(
+        library, monkeypatch, capsys):
+    a_copy(library, '1 Fic 1 - Someone.html')
+    replacing: dict = {}
+
+    _, fetched = importing(library, monkeypatch, ['JSON'], repair=['1 Fic 1 - Someone.html'],
+                           replacing=replacing)
+
+    assert fetched['1'] == ['HTML']
+    assert os.path.basename(replacing['1']['HTML']) == '1 Fic 1 - Someone.html'
+    # a work with no file of the format is not given one: the import asked for no HTML
+    assert not fetched.get('2')
+    out = capsys.readouterr().out
+    assert strings.AO3_INFO_IMPORT_REPAIRING.format(1) in out
+    assert strings.AO3_INFO_IMPORT_UNDATED_KEPT not in out
+
+
+def test_a_file_not_chosen_to_repair_is_kept_beside_one_that_is(library, monkeypatch, capsys):
+    a_copy(library, '1 Fic 1 - Someone.html')
+    a_copy(library, '2 Fic 2 - Someone.html')
+
+    _, fetched = importing(library, monkeypatch, ['JSON'], repair=['1 Fic 1 - Someone.html'])
+
+    assert fetched['1'] == ['HTML']
+    assert not fetched.get('2')
+    assert strings.AO3_INFO_IMPORT_UNDATED_KEPT in capsys.readouterr().out
+
+
+def test_a_work_only_looked_up_is_still_downloaded_for_a_file_to_repair(library, monkeypatch):
+    a_copy(library, '1 Fic 1 - Someone.pdf')
+
+    _, fetched = importing(library, monkeypatch, ['JSON', 'HTML'], index_only=['1', '2'],
+                           repair=['1 Fic 1 - Someone.pdf'])
+
+    assert fetched['1'] == ['PDF']
+    assert '2' not in fetched
+
+
+def test_repairing_one_format_leaves_the_works_other_copies_as_an_import_would(library, monkeypatch):
+    a_copy(library, '1 Fic 1 - Someone.html')
+    a_copy(library, '1 Fic 1 - Someone 2020-01-01.epub')
+
+    _, fetched = importing(library, monkeypatch, ['JSON', 'EPUB'], repair=['1 Fic 1 - Someone.html'])
+
+    # the outdated epub is kept - the import was not told to replace outdated copies
+    assert fetched['1'] == ['HTML']
+
+
+def test_a_file_already_dated_has_nothing_to_repair(library, monkeypatch, capsys):
+    a_copy(library, '1 Fic 1 - Someone 2026-05-01.html')
+
+    _, fetched = importing(library, monkeypatch, ['JSON'], repair=['1 Fic 1 - Someone.html'])
+
+    assert not fetched.get('1')
+    assert strings.AO3_INFO_REPAIR_NOTHING.format('HTML', '1') in capsys.readouterr().out
+
+
+def repair_job(**options) -> server.Job:
+    return server.Job(server.ACTION_IMPORT, ['JSON'], '', server.resolve_options(options))
+
+
+UNDATED = {'1': {'HTML': {'path': '/lib/works/1 Fic.html', 'date': None}}}
+
+
+@pytest.mark.parametrize('name, fichub_date, undated_too, taken', [
+    # FicHub's copy as new as, or newer than, the date guessed from the name: taken
+    ('1 Fic (3 March 2024).html', '2024-03-03', False, True),
+    ('1 Fic (3 March 2024).html', '2025-01-01', False, True),
+    # older than the guess: your file is kept
+    ('1 Fic (3 March 2024).html', '2024-03-02', False, False),
+    # no date to guess: only when the reader agreed to that too
+    ('1 Fic.html', '2024-03-02', False, False),
+    ('1 Fic.html', '2024-03-02', True, True),
+    # FicHub gives no date: nothing to compare, so kept
+    ('1 Fic (3 March 2024).html', '', True, False),
+])
+def test_ficHub_repairs_a_file_only_on_the_rule_agreed_to_before_the_run(
+        name, fichub_date, undated_too, taken):
+    job = repair_job(repair=[name], repairFicHub=True, repairFicHubUndated=undated_too)
+    allowed = server.fichub_repairs(job, '1', UNDATED, {'date_updated': fichub_date}, ['HTML'])
+    assert allowed == ({'HTML': '/lib/works/1 Fic.html'} if taken else {})
+
+
+def test_ficHub_repairs_nothing_unless_the_reader_agreed_to_it(capsys):
+    job = repair_job(repair=['1 Fic.html'])
+    assert server.fichub_repairs(job, '1', UNDATED, {'date_updated': '2030-01-01'}, ['HTML']) == {}
+    assert strings.AO3_INFO_REPAIR_FICHUB_OFF.format('HTML', '1', '1 Fic.html') in capsys.readouterr().out
+
+
+def test_ficHub_leaves_a_file_ao3_already_repaired():
+    job = repair_job(repair=['1 Fic.html'], repairFicHub=True, repairFicHubUndated=True)
+    dated = {'1': {'HTML': {'path': '/lib/works/1 Fic 2026-01-01.html', 'date': '2026-01-01'}}}
+    assert server.fichub_repairs(job, '1', dated, {'date_updated': '2030-01-01'}, ['HTML']) == {}
+
+
+def test_an_import_keeping_your_copies_still_asks_ficHub_for_a_format_to_repair():
+    have = {'1': {'HTML': {'path': 'x', 'date': None}, 'EPUB': {'path': 'y', 'date': None}}}
+    assert server.fichub_formats_for('1', ['HTML', 'EPUB'], have, set(), True,
+                                     repairing={'HTML'}) == ['HTML']
 
 # endregion

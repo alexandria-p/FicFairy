@@ -1048,6 +1048,106 @@ describe('ImportDialog', () => {
     expect(written.excluded[0].files).toEqual(['9 x 2024-02-03.html', '9 x 2024-01-01.pdf']);
   });
 
+  // region repairing from AO3
+
+  function repairBox(path: string): HTMLInputElement {
+    return row(path).querySelector<HTMLInputElement>('input[name="repair"]')!;
+  }
+
+  it('offers each undated file a third choice, Repair from AO3, which sets its date and Skip aside', async () => {
+    await open();
+    await click('Continue');
+    expect(element.querySelector('table.dating thead')!.textContent).toContain('Repair from AO3');
+    skipBox('works/2 C - D.html').click();
+    await fixture.whenStable();
+    repairBox('works/2 C - D.html').click();
+    await fixture.whenStable();
+
+    expect(repairBox('works/2 C - D.html').checked).toBe(true);
+    expect(skipBox('works/2 C - D.html').checked).toBe(false);
+    expect(dateBox('works/2 C - D.html').disabled).toBe(true);
+    expect(row('works/2 C - D.html').classList).toContain('repaired');
+    // a repaired row is answered: it is not among those still needing a date or a tick
+    expect(row('works/2 C - D.html').classList).not.toContain('needs-answer');
+
+    skipBox('works/2 C - D.html').click();
+    await fixture.whenStable();
+    expect(repairBox('works/2 C - D.html').checked).toBe(false);
+  });
+
+  it('repairs every row still without a date in one go, leaving the dated ones dated', async () => {
+    await open();
+    await click('Continue');
+    await type(dateBox('works/2 C - D.html'), '2024-05-06');
+    await click('Repair all 2 from AO3');
+
+    expect(repairBox('works/2 C - D.html').checked).toBe(false);
+    expect(repairBox('works/2 C - D.pdf').checked).toBe(true);
+    expect(repairBox('works/3 E - F.epub').checked).toBe(true);
+    expect(primary().disabled).toBe(false);
+    expect(primary().textContent).toContain('Date 1 file and continue');
+  });
+
+  it('asks before FicHub may stand in for AO3, and the second agreement only after the first', async () => {
+    await open();
+    await click('Continue');
+    expect(element.querySelector('input[name="repairFicHub"]')).toBeNull();
+    await click('Repair all from AO3');
+
+    const fichub = element.querySelector<HTMLInputElement>('input[name="repairFicHub"]')!;
+    const undated = element.querySelector<HTMLInputElement>('input[name="repairFicHubUndated"]')!;
+    expect(fichub.checked).toBe(false);
+    expect(fichub.closest('label')!.textContent).toContain('cached');
+    expect(undated.checked).toBe(false);
+    expect(undated.disabled).toBe(true);
+    fichub.click();
+    await fixture.whenStable();
+    expect(undated.disabled).toBe(false);
+  });
+
+  it("hands the run the files to repair by name, and their works only for that when they are not updated", async () => {
+    await open();
+    await click('Continue');
+    await click('Skip all');
+    repairBox('works/2 C - D.html').click();
+    await fixture.whenStable();
+    element.querySelector<HTMLInputElement>('input[name="repairFicHub"]')!.click();
+    await fixture.whenStable();
+    await click('Continue');
+    // the index question, then the formats, skipped
+    await click('Continue');
+    element.querySelector<HTMLInputElement>('input[name="updateScope"][value="skip"]')!.click();
+    await fixture.whenStable();
+    await click('Continue');
+
+    const request = started[0].request;
+    expect(request.repair).toEqual(['2 C - D.html']);
+    expect(request.repairFicHub).toBe(true);
+    expect(request.repairFicHubUndated).toBe(false);
+    expect(request.links.split('\n').map((l) => l.split('/').pop())).toContain('2');
+    expect(request.indexOnly).toContain('2');
+  });
+
+  it('runs for a file to repair even with nothing else for a run to do', async () => {
+    await open([], false, INDEXED_UNDATED);
+    await click('Continue');
+    repairBox('works/7 old name.html').click();
+    await fixture.whenStable();
+    await click('Continue');
+    element.querySelector<HTMLInputElement>('input[name="updateScope"][value="skip"]')?.click();
+    await fixture.whenStable();
+    await click('Continue');
+
+    expect(started[0].request).toMatchObject({
+      links: 'https://archiveofourown.org/works/7',
+      repair: ['7 old name.html'],
+      indexOnly: ['7'],
+      filetypes: ['JSON'],
+    });
+  });
+
+  // endregion
+
   it('puts only the skipped files on the dates list when told not to ask again', async () => {
     await open();
     TestBed.inject(Library).store.set(store);
@@ -1354,6 +1454,9 @@ describe('ImportDialog', () => {
       lookups: 1,
       scope: 'all',
       files: 1,
+      repair: [],
+      repairFicHub: false,
+      repairFicHubUndated: false,
     });
   });
 

@@ -109,6 +109,7 @@ def test_resolve_options_defaults_match_the_console_defaults():
         'overwrite': False, 'floorRun': '', 'nonBookmarks': False, 'resume': '', 'retryMode': '',
         'collectionWorks': False, 'subcollections': False, 'parentCollections': False,
         'replaceOutdated': False, 'indexOnly': [],
+        'repair': [], 'repairFicHub': False, 'repairFicHubUndated': False,
     }
 
 
@@ -124,7 +125,8 @@ def test_resolve_options_reads_what_was_asked_for():
                       'dateFrom': '2026-01-01', 'dateTo': '2026-06-30',
                       'overwrite': True, 'floorRun': '', 'nonBookmarks': True,
                       'resume': '', 'retryMode': '', 'collectionWorks': True, 'subcollections': True,
-                      'parentCollections': True, 'replaceOutdated': False, 'indexOnly': []}
+                      'parentCollections': True, 'replaceOutdated': False, 'indexOnly': [],
+                      'repair': [], 'repairFicHub': False, 'repairFicHubUndated': False}
 
 
 def test_a_date_that_cannot_be_read_is_no_date_at_all():

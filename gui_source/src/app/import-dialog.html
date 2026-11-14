@@ -516,8 +516,9 @@
         your copy is outdated.
       </p>
       <p class="hint">
-        Not sure? Tick Skip. A skipped file keeps its name, and the import leaves it alone.
-        Every file needs a date or a tick before you can continue.
+        Not sure? Tick Skip. A skipped file keeps its name, and the import leaves it alone. Or tick
+        Repair from AO3: the import replaces the file with the latest version from AO3, named with
+        its date. Every file needs a date or a tick before you can continue.
       </p>
       <div class="bulk">
         <label>
@@ -529,6 +530,7 @@
           Use for all
         </button>
         <button type="button" class="button" (click)="skipAll()">Skip all</button>
+        <button type="button" class="button repair-all" (click)="repairAll()">Repair all from AO3</button>
         <button type="button" class="button infer" [disabled]="inferring()" (click)="inferDates()"
                 title="Read a date out of each file's name, however it is written">
           @if (inferring()) { <span class="spinner" aria-hidden="true"></span> }
@@ -552,22 +554,28 @@
       <div class="dating-wrap" [class.scrolling]="!paged()">
         <table class="dating">
           <thead>
-            <tr><th>File</th><th>Date</th><th>Skip</th></tr>
+            <tr><th>File</th><th>Date</th><th>Skip</th><th>Repair from AO3</th></tr>
           </thead>
           <tbody>
             @for (file of shownRows(); track file.path) {
               <tr [attr.data-file]="file.path" [class.skipped]="isSkipped(file)"
+                  [class.repaired]="isRepaired(file)"
                   [class.inferred]="isInferred(file)" [class.needs-answer]="needsAnswerFor(file)">
                 <td class="file-name" [title]="file.name">{{ file.name }}</td>
                 <td>
                   <input type="date" [attr.aria-label]="'Date for ' + file.name"
-                         [value]="dateOf(file)" [disabled]="isSkipped(file)"
+                         [value]="dateOf(file)" [disabled]="isSkipped(file) || isRepaired(file)"
                          (input)="setDate(file, $any($event.target).value)" />
                 </td>
                 <td>
                   <input type="checkbox" [attr.aria-label]="'Skip ' + file.name"
                          [checked]="isSkipped(file)"
                          (change)="setSkipped(file, $any($event.target).checked)" />
+                </td>
+                <td>
+                  <input type="checkbox" name="repair" [attr.aria-label]="'Repair ' + file.name + ' from AO3'"
+                         [checked]="isRepaired(file)"
+                         (change)="setRepaired(file, $any($event.target).checked)" />
                 </td>
               </tr>
             }
@@ -587,9 +595,43 @@
             {{ left | number }} {{ left === 1 ? 'file has' : 'files have' }} no date and no Skip tick
             (highlighted). Give {{ left === 1 ? 'it' : 'each' }} a date or tick Skip to continue.
           </span>
-          <button type="button" class="button" (click)="skipUndatedRows()">
-            Skip {{ left === 1 ? 'it' : 'all ' + (left | number) }}
-          </button>
+          <span class="needs-answer-actions">
+            <button type="button" class="button" (click)="skipUndatedRows()">
+              Skip {{ left === 1 ? 'it' : 'all ' + (left | number) }}
+            </button>
+            <button type="button" class="button repair-rest" (click)="repairUndatedRows()">
+              Repair {{ left === 1 ? 'it' : 'all ' + (left | number) }} from AO3
+            </button>
+          </span>
+        </div>
+      }
+      @if (toRepair().length; as repairs) {
+        <div class="repair-fichub">
+          <p class="hint">
+            {{ repairs | number }} {{ repairs === 1 ? 'file' : 'files' }} will be replaced with the
+            latest version from AO3, whatever {{ repairs === 1 ? 'it holds' : 'they hold' }}, and named
+            with its date. A file AO3 will not give is kept as it is, unless you allow FicHub below.
+          </p>
+          <label class="check">
+            <input type="checkbox" name="repairFicHub" [checked]="repairFicHub()"
+                   (change)="repairFicHub.set($any($event.target).checked)" />
+            <span>
+              If AO3 can't give a file, use FicHub's copy
+              <span class="hint">
+                Only when FicHub's copy is dated the same as or later than a date guessed from the
+                file's name. FicHub keeps cached copies, which may be older than the latest on AO3.
+              </span>
+            </span>
+          </label>
+          <label class="check nested">
+            <input type="checkbox" name="repairFicHubUndated" [checked]="repairFicHubUndated()"
+                   [disabled]="!repairFicHub()"
+                   (change)="repairFicHubUndated.set($any($event.target).checked)" />
+            <span>
+              Also use FicHub's copy when no date can be guessed from the file's name
+              <span class="hint">There is nothing to compare it with, so FicHub's copy may be older than yours.</span>
+            </span>
+          </label>
         </div>
       }
       <label class="check remember-skips">
@@ -609,7 +651,7 @@
       <button type="button" class="button subtle" (click)="backFrom('dates')">Back</button>
       <button type="button" class="button primary" [disabled]="inferring() || busy() || needsAnswer().length > 0"
               [attr.title]="needsAnswer().length ? 'Give every file a date, or tick Skip' : null" (click)="fromDates()">
-        {{ toDate().length ? 'Date ' + (toDate().length | number) + (toDate().length === 1 ? ' file' : ' files') + ' and continue' : 'Skip this step' }}
+        {{ toDate().length ? 'Date ' + (toDate().length | number) + (toDate().length === 1 ? ' file' : ' files') + ' and continue' : toRepair().length ? 'Continue' : 'Skip this step' }}
       </button>
     </footer>
   }

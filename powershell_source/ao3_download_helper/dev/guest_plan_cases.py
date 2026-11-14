@@ -21,7 +21,12 @@ TARGET = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '.
 
 FILETYPES = (['JSON', 'HTML'], ['JSON'], ['HTML'])
 # the choices step_plan reads, each on and off
-CHOICES = ('collectionWorks', 'series', 'replaceOutdated', 'reindex', 'dates', 'images', 'nonBookmarks')
+# (repairing is put before replacing, so the case kept for an import's download step - the same
+# plan either way - stays the replacing one)
+CHOICES = ('collectionWorks', 'series', 'repair', 'replaceOutdated', 'reindex', 'dates', 'images',
+           'nonBookmarks')
+# a choice sent as a list rather than a flag: on is this, and the case records it as true
+LISTS = {'repair': ['1 Fic.html']}
 ACTIONS = ('bookmarks', 'quick', 'custom', 'new', 'sync', 'update', 'work', 'works',
            'import', 'collections', 'collection')
 
@@ -32,7 +37,8 @@ def cases() -> list[dict]:
         for filetypes in FILETYPES:
             for flags in itertools.product((False, True), repeat=len(CHOICES)):
                 options = {name: on for name, on in zip(CHOICES, flags) if on}
-                job = server.Job(action, list(filetypes), 'Someone', server.resolve_options(options))
+                sent = {name: LISTS.get(name, on) for name, on in options.items()}
+                job = server.Job(action, list(filetypes), 'Someone', server.resolve_options(sent))
                 found.append({'action': action, 'filetypes': filetypes, 'options': options,
                               'plan': [[step, label] for step, label in server.step_plan(job)]})
     # the same plan reached by several choice sets is one case: keep the first of each

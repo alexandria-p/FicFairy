@@ -574,6 +574,16 @@ export interface ImportRequest {
   scope: UpdateScope;
   /** how many files the works hold, as far as the window found - copies a replacing run may fetch again */
   files?: number;
+  /**
+   * Files with no date in their names to replace with AO3's latest version, by name - chosen on
+   * the dating page (*Repair from AO3*). The helper finds each by its work and format.
+   */
+  repair?: string[];
+  /** agreed before the run: FicHub may repair a file AO3 would not give, when its copy is as new
+   * as a date guessed from the file's name */
+  repairFicHub?: boolean;
+  /** agreed too: FicHub may repair one whose name has no date to guess */
+  repairFicHubUndated?: boolean;
 }
 
 /**
@@ -583,13 +593,15 @@ export interface ImportRequest {
 export const LONG_IMPORT_REQUESTS = 20;
 
 /**
- * A rough count of the requests an import makes: one per work looked up for its index entry,
+ * A rough count of the requests an import makes: one per work looked up for its index entry, one
+ * per file to repair,
  * one per other format per work updated, and - when replacing outdated copies - one per file
  * it holds, at most. Rough by design: a format already on disk, or a copy that is current, costs
  * nothing.
  */
 export function importRequests(request: ImportRequest): number {
-  const lookups = request.lookups ?? 0;
+  // a file to repair is one request of its own, beside its work's lookup
+  const lookups = (request.lookups ?? 0) + (request.repair?.length ?? 0);
   if (request.scope === 'skip') return lookups;
   const updated = Math.max(0, request.count - (request.indexOnly?.length ?? 0));
   const formats = (request.filetypes ?? []).filter((f) => f.toUpperCase() !== 'JSON').length;

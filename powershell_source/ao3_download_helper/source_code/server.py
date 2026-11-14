@@ -497,6 +497,14 @@ def resolve_options(requested) -> dict:
         # an import: the works among its links to index only, with no format fetched - looked
         # up for their missing index entry, and not among the works chosen to update
         'indexOnly': work_numbers(given.get('indexOnly')),
+        # an import: files with no date in their names, by name, to replace with AO3's latest
+        # version whatever they hold (Resolve issues' *Repair from AO3*) - see `repair_copies`.
+        # FicHub stands in for AO3 only when the person agreed to it before the run: by default
+        # when its copy is as new as a date guessed from the file's name, and with
+        # `repairFicHubUndated` also when no date can be guessed
+        'repair': repair_names(given.get('repair')),
+        'repairFicHub': bool(given.get('repairFicHub')),
+        'repairFicHubUndated': bool(given.get('repairFicHubUndated')),
         # check every non-bookmark in the index for updates too. a listing of your bookmarks
         # never shows them, so without this they are only read again when something else
         # brings the run to them. not narrowed by a date range or a floor: see
@@ -1169,8 +1177,9 @@ def step_plan(job: Job) -> list[tuple[str, str]]:
     elif job.action == ACTION_IMPORT:
         # no series walk: an import is about the files you already have
         plan.append(('index', strings.STEP_INDEX_IMPORT))
-        # replacing outdated copies downloads with no format added: those a work already has
-        if downloads or job.options.get('replaceOutdated'):
+        # replacing outdated copies downloads with no format added: those a work already has -
+        # and so does repairing files with no date in their names
+        if downloads or job.options.get('replaceOutdated') or job.options.get('repair'):
             plan.append(('check', strings.STEP_CHECK_FILES))
             plan.append(('download', strings.STEP_DOWNLOAD_IMPORT))
     elif job.action in (ACTION_WORK, ACTION_WORKS):
@@ -2736,7 +2745,9 @@ def index_new_bookmarks(job: Job, fileops: FileOps, ao3: Ao3, report) -> list[di
 
 def download_planned(job: Job, fileops: FileOps, ao3: Ao3, records: list[dict],
                      downloadtypes: list[str], report,
-                     overwrite: list[str] | None = None, keep_existing: bool = False) -> None:
+                     overwrite: list[str] | None = None, keep_existing: bool = False,
+                     repair: dict[str, dict[str, str]] | None = None,
+                     repair_only: set[str] | None = None) -> None:
     """Settle anything undated among these works, then download them.
 
     The same rule a full run downloads by, applied to whichever slice of the index the
@@ -2758,6 +2769,8 @@ def download_planned(job: Job, fileops: FileOps, ao3: Ao3, records: list[dict],
     if keep_existing:
         keep_existing_copies(records, plan, downloadtypes)
         ao3.keep_message = strings.AO3_INFO_KEEPING_YOURS
+    # after keeping: a file chosen to repair is replaced whatever an import keeps
+    if repair: repair_copies(records, plan, downloadtypes, repair, repair_only)
     # an out-of-date copy is not 'already downloaded', so it must not be skipped
     visited = shared.already_downloaded(plan['existing'], downloadtypes, records, plan['stale'])
     if ao3.held_only:
@@ -3072,6 +3085,126 @@ def run_works(job: Job, fileops: FileOps, repo: Repository, report) -> None:
     run_fic_list(job, fileops, repo, report, importing=False)
 
 
+def repair_names(given) -> list[str]:
+    """An import's files to repair, by name: a work file's own name, with a work number the
+    naming pattern can read and a format AO3 offers - anything else is dropped, and a path is
+    never taken (the files are found in the works folder by work and format)."""
+
+    if not isinstance(given, list): return []
+    names: list[str] = []
+    for name in given:
+        if not isinstance(name, str) or not name or '/' in name or '\\' in name: continue
+        extension = os.path.splitext(name)[1][1:].upper()
+        if extension not in strings.AO3_ACCEPTABLE_DOWNLOAD_TYPES: continue
+        if not parse_text.get_work_file_number(name): continue
+        if name not in names: names.append(name)
+    return names
+
+
+def repair_targets(job: 'Job') -> dict[str, dict[str, str]]:
+    """An import's files to repair, by work and then format: the name each had when it was
+    chosen. By work and format, never by name, because the import names its works' files from
+    their entries before it downloads anything (`name_files_from_index`) - so the name sent
+    is only what a date is guessed from."""
+
+    if job.action != ACTION_IMPORT: return {}
+    targets: dict[str, dict[str, str]] = {}
+    for name in job.options.get('repair') or []:
+        work = parse_text.get_work_file_number(name)
+        if not work: continue
+        targets.setdefault(str(work), {})[os.path.splitext(name)[1][1:].upper()] = name
+    return targets
+
+
+def undated_copy(copy: dict | None) -> dict | None:
+    """Of the copies of one format of a work, the one to repair: the nominated copy when its
+    name has no date in the app's form, else the first such among the others - or None when
+    every copy has one (already repaired, or dated since)."""
+
+    if not copy: return None
+    if copy.get('date') is None: return copy
+    return next((x for x in copy.get('older') or [] if x.get('date') is None), None)
+
+
+def repair_copies(records: list[dict], plan: dict, filetypes: list[str],
+                  repair: dict[str, dict[str, str]], only: set[str] | None = None) -> None:
+    """An import's *Repair from AO3*: each chosen file is replaced with AO3's latest version,
+    whatever it holds - the person chose it on the dating page, as the way to date a file they
+    could not. It goes into `superseded`, out of `plan['keep']`, and its work into `stale`, so
+    the downloader fetches that format and `replace_superseded` takes the file away once the new
+    one is whole. The new file is named with AO3's date, as every download is.
+
+    A work in `only` was only to be looked up: nothing but its files to repair is fetched."""
+
+    existing = plan.get('existing') or {}
+    keep: dict[str, set[str]] = plan.setdefault('keep', {})
+    for record in records:
+        work = str(record.get('id') or '')
+        link = record.get('link') or ''
+        if not link or work not in repair: continue
+        if work in (only or set()):
+            others = {x.upper() for x in filetypes if x.upper() not in repair[work]}
+            if others:
+                keep.setdefault(link, set()).update(others)
+                plan.setdefault('keptSaid', set()).add(link)
+        for filetype in filetypes:
+            if filetype.upper() not in repair[work]: continue
+            copy = undated_copy((existing.get(work) or {}).get(filetype.upper()))
+            if copy is None:
+                print(strings.AO3_INFO_REPAIR_NOTHING.format(filetype.upper(), work))
+                continue
+            print(strings.AO3_INFO_REPAIR_FILE.format(
+                filetype.upper(), work, os.path.basename(str(copy['path']).replace('\\', '/'))))
+            plan['superseded'].setdefault(link, {})[filetype] = copy['path']
+            if link in keep:
+                keep[link].discard(filetype.upper())
+                if not keep[link]: keep.pop(link)
+            if link not in plan['stale']: plan['stale'].append(link)
+
+
+def fichub_repairs(job: 'Job | None', work: str, existing: dict, record: dict,
+                   filetypes: list[str]) -> dict[str, str]:
+    """Which of an import's files to repair FicHub may replace, by format, for a work AO3 did
+    not give: none unless the person agreed to FicHub before the run (`repairFicHub`); then only
+    when FicHub's copy is dated the same as or later than the date guessed from the file's name
+    as it was chosen, and - with no date to guess - only when they agreed to that too
+    (`repairFicHubUndated`). The guessed date decides here because the person chose this rule
+    for these files, knowing it is a guess (`test_guessed_dates_never_decide.py`). A file
+    repaired already, by AO3, has its date and is not here at all."""
+
+    if job is None: return {}
+    targets = repair_targets(job).get(work) or {}
+    allowed: dict[str, str] = {}
+    fichub_date = parse_text.get_date_stamp(record.get('date_updated') or '')
+    for filetype in filetypes:
+        name = targets.get(filetype.upper())
+        if not name: continue
+        copy = undated_copy((existing.get(work) or {}).get(filetype.upper()))
+        if copy is None: continue
+        file = os.path.basename(str(copy['path']).replace('\\', '/'))
+        kind = filetype.upper()
+        if not job.options.get('repairFicHub'):
+            print(strings.AO3_INFO_REPAIR_FICHUB_OFF.format(kind, work, file))
+            continue
+        if not fichub_date:
+            print(strings.AO3_INFO_REPAIR_FICHUB_UNDATED.format(kind, work, file))
+            continue
+        guess = parse_text.infer_date_from_filename(name)
+        if guess and fichub_date >= guess:
+            print(strings.AO3_INFO_REPAIR_FICHUB_TAKE.format(
+                kind, work, parse_text.written_date(fichub_date), parse_text.written_date(guess), file))
+            allowed[filetype] = copy['path']
+        elif guess:
+            print(strings.AO3_INFO_REPAIR_FICHUB_OLDER.format(
+                kind, work, parse_text.written_date(fichub_date), parse_text.written_date(guess), file))
+        elif job.options.get('repairFicHubUndated'):
+            print(strings.AO3_INFO_REPAIR_FICHUB_NO_GUESS_TAKE.format(kind, work, file))
+            allowed[filetype] = copy['path']
+        else:
+            print(strings.AO3_INFO_REPAIR_FICHUB_NO_GUESS_KEEP.format(kind, work, file))
+    return allowed
+
+
 def work_numbers(given) -> list[str]:
     """A list of work numbers from a request: anything that is not one is dropped."""
 
@@ -3092,7 +3225,9 @@ def run_import(job: Job, fileops: FileOps, repo: Repository, report) -> None:
       date in its name, and only when the import was told to (`replaceOutdated`); otherwise
       only the formats you do not have are fetched;
     - undated files are left alone without asking: the page has just offered to date them, and
-      a file left undated there was left that way on purpose.
+      a file left undated there was left that way on purpose - unless it was chosen there to
+      *Repair from AO3* (`repair`), which replaces it with AO3's latest version, or FicHub's
+      on the rule agreed to before the run (`repair_copies`, `fichub_repairs`).
 
     No series walk: an import is about what is in the folder.
     """
@@ -3172,7 +3307,11 @@ def run_fic_list(job: Job, fileops: FileOps, repo: Repository, report, importing
     if importing:
         name_files_from_index(fileops, records)
         replace = bool(job.options.get('replaceOutdated'))
-        index_only = set(job.options.get('indexOnly') or [])
+        repair = repair_targets(job)
+        # a work with a file to repair is downloaded for it - only for it, if it was otherwise
+        # only looked up (`repair_copies`)
+        repair_only = set(job.options.get('indexOnly') or []) & set(repair)
+        index_only = set(job.options.get('indexOnly') or []) - set(repair)
         updating = [r for r in records if str(r.get('id') or '') not in index_only]
         if index_only and len(updating) < len(records):
             print(strings.AO3_INFO_IMPORT_INDEX_ONLY.format(len(records) - len(updating)))
@@ -3185,8 +3324,18 @@ def run_fic_list(job: Job, fileops: FileOps, repo: Repository, report, importing
                                              if x in ao3.held_only]
             ao3.filetypes = downloadtypes
         elif downloadtypes: print(strings.AO3_INFO_IMPORT_KEEPING)
+        if repair:
+            print(strings.AO3_INFO_IMPORT_REPAIRING.format(sum(len(x) for x in repair.values())))
+            # a format only a file to repair is in is fetched only where there is a copy - and
+            # every work with one that is not repaired keeps it (`keep_existing_copies`)
+            extra = sorted({x for formats in repair.values() for x in formats}
+                           - {x.upper() for x in downloadtypes})
+            if extra:
+                ao3.held_only = set(ao3.held_only) | set(extra)
+                downloadtypes = downloadtypes + extra
+                ao3.filetypes = downloadtypes
         download_planned(job, fileops, ao3, updating, downloadtypes, report,
-                         keep_existing=not replace)
+                         keep_existing=not replace, repair=repair, repair_only=repair_only)
     else:
         records = merge_by_work(records, index_marked_series(job, ao3, report))
         download_planned(job, fileops, ao3, records, downloadtypes, report, overwrite=asked)
@@ -4206,6 +4355,10 @@ def rescue_with_fichub(job: Job, fileops: FileOps, ao3, report) -> None:
     print(strings.AO3_INFO_FICHUB_TRYING.format(len(works), ', '.join(works)))
     progress.report(report, progress.PHASE, name=progress.FICHUB)
     filetypes = [x for x in job.filetypes if x != strings.AO3_DOWNLOAD_TYPE_METADATA]
+    # an import's files to repair are in formats it may not have asked for (`run_fic_list`)
+    repair_only = sorted({x for formats in repair_targets(job).values() for x in formats}
+                         - {x.upper() for x in filetypes})
+    filetypes += repair_only
     indexes = strings.AO3_DOWNLOAD_TYPE_METADATA in job.filetypes
     wanted = set(works)
     entries = indexed_entries(ao3, fileops, wanted)
@@ -4226,7 +4379,9 @@ def rescue_with_fichub(job: Job, fileops: FileOps, ao3, report) -> None:
     # fetched for it, and without `replaceOutdated` a format you hold a copy of is never
     # fetched again - the same rules its ao3 side follows (`indexOnly`, `keep_existing_copies`)
     importing = job.action == ACTION_IMPORT
-    index_only = {str(x) for x in job.options.get('indexOnly') or []} if importing else set()
+    repair = repair_targets(job)
+    looked_up = {str(x) for x in job.options.get('indexOnly') or []} if importing else set()
+    index_only = looked_up - set(repair)
     keep_held = importing and not job.options.get('replaceOutdated')
 
     for done, failure in enumerate(candidates, start=1):
@@ -4236,7 +4391,13 @@ def rescue_with_fichub(job: Job, fileops: FileOps, ao3, report) -> None:
             job.steps.skip('fichub')
             return
         work = str(failure['id'])
-        types = fichub_formats_for(work, filetypes, existing, index_only, keep_held)
+        repairing = set(repair.get(work) or {})
+        types = fichub_formats_for(work, filetypes, existing, index_only, keep_held,
+                                   repairing=repairing)
+        # a format only a file to repair is in is asked for only for that file's work - and a
+        # work otherwise only looked up is asked for nothing but its files to repair
+        types = [x for x in types if (x not in repair_only and work not in looked_up)
+                 or x in repairing]
         rescue_one(ao3, failure, entries.get(work), existing, types,
                    indexes, maximum, overwrite, done, len(candidates), job=job,
                    every=every.get(work))
@@ -4255,18 +4416,20 @@ def rescue_with_fichub(job: Job, fileops: FileOps, ao3, report) -> None:
 
 
 def fichub_formats_for(work: str, filetypes: list[str], existing: dict, index_only: set[str],
-                       keep_held: bool) -> list[str]:
+                       keep_held: bool, repairing: set[str] | None = None) -> list[str]:
     """The formats to ask FicHub for, for one work of a run: none for a work an import only
-    looks up, and - for an import keeping your copies - only the formats with no copy on disk."""
+    looks up, and - for an import keeping your copies - only the formats with no copy on disk,
+    and those with a file to repair (`repairing`, judged in `fichub_repairs`)."""
 
     if work in index_only:
         if filetypes: print(strings.AO3_INFO_FICHUB_INDEX_ONLY.format(work))
         return []
     if not keep_held: return filetypes
+    repairing = repairing or set()
     have = existing.get(work) or {}
-    held = [x for x in filetypes if have.get(x.upper())]
+    held = [x for x in filetypes if have.get(x.upper()) and x.upper() not in repairing]
     if held: print(strings.AO3_INFO_KEEPING_YOURS.format(', '.join(held)))
-    return [x for x in filetypes if not have.get(x.upper())]
+    return [x for x in filetypes if x not in held]
 
 
 def existing_entry(ao3, fileops: FileOps, work: str):
@@ -4359,15 +4522,24 @@ def rescue_one(ao3, failure: dict, entry: dict | None, existing: dict, filetypes
         run_overwrites = overwrite
         held_new = [x for x in filetypes if (existing.get(work) or {}).get(x.upper())] \
             if before is not None and work not in before else []
+        # an import's files to repair are judged by the rule the person agreed to before the run
+        # (`fichub_repairs`), never by the rules below: replaced when it allows, else kept
+        targets = set(repair_targets(job).get(work) or {}) if job is not None else set()
+        considered = [x for x in filetypes if x.upper() in targets
+                      and undated_copy((existing.get(work) or {}).get(x.upper()))]
+        repairing = fichub_repairs(job, work, existing, record, considered) if considered else {}
+        filetypes = [x for x in filetypes if x not in considered]
         if behind:
             if not older_fichub_formats(job, failure, existing,
                                         [x for x in filetypes if x not in held_new], behind,
-                                        overwrite and not held_new) and not held_new:
+                                        overwrite and not held_new) \
+                    and not held_new and not repairing:
                 return
             alongside = behind.get('alongside') or []
             filetypes = behind['missing'] + behind['replace'] + alongside + \
                 [x for x in held_new if x not in behind['missing'] + behind['replace'] + alongside]
             overwrite = bool(behind['replace'])
+        filetypes = filetypes + [x for x in repairing if x not in filetypes]
 
         def from_fichub(filetype: str) -> bytes:
             print(strings.AO3_INFO_FICHUB_FETCHING.format(filetype, failure['id']))
@@ -4380,6 +4552,10 @@ def rescue_one(ao3, failure: dict, entry: dict | None, existing: dict, filetypes
             # kept, with FicHub's copy saved beside each (keep both): fetched, nothing replaced
             for filetype in (behind or {}).get('alongside') or []:
                 plan['superseded'].setdefault(link, {})[filetype] = KEEP_BOTH
+                if link not in plan['stale']: plan['stale'].append(link)
+            # a file to repair that FicHub may replace: replaced, as AO3's would have been
+            for filetype, path in repairing.items():
+                plan['superseded'].setdefault(link, {})[filetype] = path
                 if link not in plan['stale']: plan['stale'].append(link)
             asked = ask_about_unindexed_copies(job, [record], existing, plan, filetypes, before,
                                                strings.SOURCE_FICHUB, overwriting=run_overwrites)
@@ -4659,7 +4835,10 @@ def plan_refresh(job: Job, fileops: FileOps, records: list[dict],
                                        overwriting=overwrite)
     if job.action == ACTION_IMPORT:
         # the page offered to date them before the import started; left undated there, kept
-        if plan['undated']: print(strings.AO3_INFO_IMPORT_UNDATED_KEPT)
+        # those chosen to repair are not kept: `repair_copies` says so for each
+        repairing = set(repair_targets(job))
+        if any(parse_text.get_work_number(x) not in repairing for x in plan['undated']):
+            print(strings.AO3_INFO_IMPORT_UNDATED_KEPT)
     else:
         ask_about_unsure_copies(job, records, existing, plan, downloadtypes, skip=asked,
                                  overwriting=overwrite)
@@ -5987,6 +6166,11 @@ class Handler(BaseHTTPRequestHandler):
         if action != ACTION_IMPORT:
             options['replaceOutdated'] = False
             options['indexOnly'] = []
+            options['repair'] = []
+        # FicHub's part in a repair means nothing without files to repair, and the second
+        # agreement nothing without the first
+        if not options.get('repair'): options['repairFicHub'] = False
+        if not options.get('repairFicHub'): options['repairFicHubUndated'] = False
         # the scans alone can be resumed; the run itself checks the one named can be
         if action not in RESUME_ACTIONS: options['resume'] = options['retryMode'] = ''
         # the same for checking non-bookmarks, which costs a request per work outside a series

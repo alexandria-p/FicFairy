@@ -865,6 +865,20 @@ export class ImportDialog {
   protected readonly dates = signal<Record<string, string>>({});
   /** the files to leave undated, by path */
   protected readonly skipped = signal<Record<string, boolean>>({});
+  /**
+   * The files to repair from AO3, by path: replaced in the run with AO3's latest version, named
+   * with its date - the way to date a file nobody can (`repair` in the request). A row is dated,
+   * skipped or repaired, never two at once.
+   */
+  protected readonly repairing = signal<Record<string, boolean>>({});
+  /**
+   * When AO3 will not give a file to repair, FicHub may - only if the reader agrees here, before
+   * the run: its copy replaces the file when dated the same as or later than a date guessed from
+   * the file's name. Off to begin with.
+   */
+  protected readonly repairFicHub = signal(false);
+  /** and, agreed to as well, when no date can be guessed from the file's name at all */
+  protected readonly repairFicHubUndated = signal(false);
   /** the files whose date `Infer date` set, and has not been changed by hand since */
   protected readonly inferred = signal<Record<string, boolean>>({});
   /** the rows' order, by path - by name, until `Infer date` moves what it dated to the top */
@@ -899,6 +913,10 @@ export class ImportDialog {
     return !!this.skipped()[file.path];
   }
 
+  protected isRepaired(file: FoundFile): boolean {
+    return !!this.repairing()[file.path];
+  }
+
   protected isInferred(file: FoundFile): boolean {
     return !!this.inferred()[file.path];
   }
@@ -911,6 +929,18 @@ export class ImportDialog {
 
   protected setSkipped(file: FoundFile, skip: boolean): void {
     this.skipped.update((s) => ({ ...s, [file.path]: skip }));
+    if (skip) this.repairing.update((r) => ({ ...r, [file.path]: false }));
+  }
+
+  protected setRepaired(file: FoundFile, repair: boolean): void {
+    this.repairing.update((r) => ({ ...r, [file.path]: repair }));
+    if (repair) this.skipped.update((s) => ({ ...s, [file.path]: false }));
+  }
+
+  /** every row repaired from AO3 - its date and Skip tick set aside */
+  protected repairAll(): void {
+    this.repairing.set(Object.fromEntries(this.undated().map((f) => [f.path, true])));
+    this.skipped.set({});
   }
 
   /** the one date put in every row - skips stay as they are, and can still be changed */
@@ -923,6 +953,7 @@ export class ImportDialog {
 
   protected skipAll(): void {
     this.skipped.set(Object.fromEntries(this.undated().map((f) => [f.path, true])));
+    this.repairing.set({});
   }
 
   /**
@@ -962,21 +993,31 @@ export class ImportDialog {
     }
   }
 
-  /** the files that will be renamed: given a real date, and not skipped */
+  /** the files that will be renamed: given a real date, and neither skipped nor repaired */
   protected readonly toDate = computed(() =>
-    this.undated().filter((f) => !this.skipped()[f.path] && isFileDate(this.dates()[f.path] ?? '')),
+    this.undated().filter((f) => !this.skipped()[f.path] && !this.repairing()[f.path] &&
+      isFileDate(this.dates()[f.path] ?? '')),
   );
+  /** the files the run is to repair from AO3 */
+  protected readonly toRepair = computed(() => this.undated().filter((f) => this.repairing()[f.path]));
   protected readonly bulkValid = computed(() => isFileDate(this.bulkDate()));
   /**
    * Rows neither given a date nor ticked Skip. Continue waits on them, so a file is never left
    * undated by a date box someone missed: each has to be dated or skipped on purpose.
    */
   protected readonly needsAnswer = computed(() =>
-    this.undated().filter((f) => !this.skipped()[f.path] && !isFileDate(this.dates()[f.path] ?? '')),
+    this.undated().filter((f) => !this.skipped()[f.path] && !this.repairing()[f.path] &&
+      !isFileDate(this.dates()[f.path] ?? '')),
   );
 
   protected needsAnswerFor(file: FoundFile): boolean {
-    return !this.isSkipped(file) && !isFileDate(this.dateOf(file));
+    return !this.isSkipped(file) && !this.isRepaired(file) && !isFileDate(this.dateOf(file));
+  }
+
+  /** marks every row still without a date to repair from AO3, leaving the dated ones as they are */
+  protected repairUndatedRows(): void {
+    const left = this.needsAnswer();
+    this.repairing.update((r) => ({ ...r, ...Object.fromEntries(left.map((f) => [f.path, true])) }));
   }
 
   /** ticks Skip on every row still without a date, leaving the dated ones as they are */
@@ -1062,10 +1103,11 @@ export class ImportDialog {
   protected readonly updates = computed(
     () => this.updating().length > 0 && (this.picked().length > 0 || this.replaceOutdated()),
   );
-  /** the works a run is over: those looked up, and those updated */
+  /** the works a run is over: those looked up, those updated, and those with a file to repair */
   protected readonly scope = computed(() => {
     const ids = new Set<string>(this.lookups());
     if (this.updates()) for (const id of this.updating()) ids.add(id);
+    for (const file of this.toRepair()) ids.add(file.id);
     return [...ids].map((id) => ({ id, files: [] }));
   });
   /** how many files the window knows of for these works - the copies a replacing run might fetch again */
@@ -1235,10 +1277,14 @@ export class ImportDialog {
         count: works.length,
         filetypes: ['JSON', ...(updates ? this.picked() : [])],
         replaceOutdated: updates && this.replaceOutdated(),
-        indexOnly: this.lookups().filter((id) => taken.has(id) && !updating.has(id)),
+        // every work not updated is only looked up - one with a file to repair gets that alone
+        indexOnly: [...taken].filter((id) => !updating.has(id)),
         lookups: this.lookups().filter((id) => taken.has(id)).length,
         scope: updates ? this.scopeChosen() : 'skip',
         files: this.filesOf(taken),
+        repair: this.toRepair().map((f) => f.name),
+        repairFicHub: this.toRepair().length > 0 && this.repairFicHub(),
+        repairFicHubUndated: this.toRepair().length > 0 && this.repairFicHub() && this.repairFicHubUndated(),
       },
       dated: this.dated(),
     });

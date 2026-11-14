@@ -130,6 +130,12 @@ export interface JobOptions {
   replaceOutdated?: boolean;
   /** an import: the works among its links only looked up for their index entry */
   indexOnly?: string[];
+  /** an import: files with no date in their names to replace with AO3's latest version, by name */
+  repair?: string[];
+  /** an import: FicHub may repair a file AO3 would not give, when as new as the date its name suggests */
+  repairFicHub?: boolean;
+  /** an import: and when no date can be guessed from the file's name */
+  repairFicHubUndated?: boolean;
   /**
    * Check every non-bookmark in the index for updates too - the works it holds only because
    * something else led a run to them, such as another work's series. Not narrowed by a date

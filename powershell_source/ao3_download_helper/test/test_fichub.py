@@ -739,6 +739,46 @@ def test_an_import_replacing_outdated_copies_never_replaces_an_undated_one_from_
 
 
 @pytest.mark.fichub
+@pytest.mark.parametrize('name, agreed, replaced', [
+    # FicHub's copy (27 April 2026) is newer than the date guessed from the name: replaced
+    ('75354806 Wolfbird (1 May 2025).epub', True, True),
+    # older than the guess: kept
+    ('75354806 Wolfbird (1 May 2027).epub', True, False),
+    # FicHub not agreed to: kept, however new its copy
+    ('75354806 Wolfbird (1 May 2025).epub', False, False),
+])
+def test_an_imports_file_to_repair_is_replaced_from_fichub_only_on_the_rule_agreed_to(
+        library, monkeypatch, name, agreed, replaced):
+    a_copy(library, name)
+    fetched = fichub_serving(monkeypatch)
+    job, ao3 = an_import(library, ['JSON'], repair=[name], repairFicHub=agreed)
+
+    server.rescue_with_fichub(job, library, ao3, MagicMock())
+
+    if replaced:
+        assert fetched == ['EPUB']
+        assert work_files(library) == ['75354806 Wolfbird - OpalApparition 2026-04-27.epub']
+    else:
+        assert fetched == []
+        # kept, named from the entry as an import names every file - without FicHub's date
+        assert work_files(library) == ['75354806 Wolfbird - OpalApparition.epub']
+
+
+@pytest.mark.fichub
+def test_a_work_only_looked_up_gets_nothing_from_fichub_but_its_file_to_repair(library, monkeypatch):
+    a_copy(library, '75354806 Wolfbird.epub')
+    fetched = fichub_serving(monkeypatch)
+    job, ao3 = an_import(library, ['JSON', 'HTML'], indexOnly=['75354806'],
+                         repair=['75354806 Wolfbird.epub'], repairFicHub=True,
+                         repairFicHubUndated=True)
+
+    server.rescue_with_fichub(job, library, ao3, MagicMock())
+
+    assert fetched == ['EPUB']
+    assert work_files(library) == ['75354806 Wolfbird - OpalApparition 2026-04-27.epub']
+
+
+@pytest.mark.fichub
 def test_an_import_names_its_files_from_a_fichub_entry_keeping_each_files_own_date_or_none(
         library, monkeypatch):
     a_copy(library, '75354806 saved long ago.html')

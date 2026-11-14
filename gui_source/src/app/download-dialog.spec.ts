@@ -2947,11 +2947,27 @@ describe('DownloadDialog', () => {
       expect(jobs.started[0].options.replaceOutdated).toBe(false);
     });
 
+    it('says what it will repair from AO3, and whether FicHub may stand in, and sends both', async () => {
+      await openImport({ ...IMPORT, filetypes: ['JSON'], replaceOutdated: false, scope: 'skip',
+                         repair: ['1 A.html', '2 B.pdf'], repairFicHub: true, repairFicHubUndated: false });
+      const lines = [...element.querySelectorAll('.import-summary li')].map((li) => li.textContent?.trim());
+      expect(lines).toEqual([
+        'Lookup 2 works with missing index',
+        'Repair 2 files with no date from AO3, replacing each with the latest version',
+        "Where AO3 can't, use FicHub's copy - only when it is as new as the date guessed from the file's name",
+      ]);
+      await advanceTo('running');
+      expect(jobs.started[0].options.repair).toEqual(['1 A.html', '2 B.pdf']);
+      expect(jobs.started[0].options.repairFicHub).toBe(true);
+      expect(jobs.started[0].options.repairFicHubUndated).toBe(false);
+    });
+
     it('is the only run that sends whether to replace outdated copies', async () => {
       await open('works');
       await advanceTo('running');
       expect('replaceOutdated' in jobs.started[0].options).toBe(false);
       expect('indexOnly' in jobs.started[0].options).toBe(false);
+      expect('repair' in jobs.started[0].options).toBe(false);
     });
   });
 

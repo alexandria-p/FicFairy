@@ -729,6 +729,15 @@ export class DownloadDialog implements OnDestroy {
     if (importing.scope !== 'skip' && importing.replaceOutdated) {
       lines.push('Will replace any outdated files with newer ones, if they exist');
     }
+    const repairs = importing.repair?.length ?? 0;
+    if (repairs) {
+      lines.push(`Repair ${repairs.toLocaleString()} ${repairs === 1 ? 'file' : 'files'} with no date from AO3, replacing ${repairs === 1 ? 'it' : 'each'} with the latest version`);
+      if (importing.repairFicHub) {
+        lines.push(importing.repairFicHubUndated
+          ? "Where AO3 can't, use FicHub's copy - when it is as new as the date guessed from the file's name, or no date can be guessed"
+          : "Where AO3 can't, use FicHub's copy - only when it is as new as the date guessed from the file's name");
+      }
+    }
     return lines;
   });
 
@@ -2121,7 +2130,13 @@ export class DownloadDialog implements OnDestroy {
         skipLogin: !this.logsIn(),
         // an import's alone: whether a copy you have is replaced when AO3 has a newer version
         ...(this.action() === 'import'
-          ? { replaceOutdated: !!this.importing()?.replaceOutdated, indexOnly: this.importing()?.indexOnly ?? [] }
+          ? {
+              replaceOutdated: !!this.importing()?.replaceOutdated,
+              indexOnly: this.importing()?.indexOnly ?? [],
+              repair: this.importing()?.repair ?? [],
+              repairFicHub: !!this.importing()?.repairFicHub,
+              repairFicHubUndated: !!this.importing()?.repairFicHubUndated,
+            }
           : {}),
       } satisfies JobOptions,
       // nothing is sent for a run that will not log in, whatever is in the boxes - but a
