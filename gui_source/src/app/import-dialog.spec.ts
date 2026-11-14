@@ -1055,6 +1055,8 @@ describe('ImportDialog', () => {
     const box = element.querySelector<HTMLInputElement>('input[name="rememberSkips"]')!;
     expect(box.closest('label')!.textContent).toContain("Don't ask this again for skipped files");
     expect(box.closest('label')!.textContent).toContain('import-excluded.json');
+    // never ticked to begin with: going on the list is the reader's choice
+    expect(box.checked).toBe(false);
     expect(element.querySelector('.remember-skips')!.compareDocumentPosition(element.querySelector('table.dating')!) &
       Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
 
