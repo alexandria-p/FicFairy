@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { VisitLog } from './visit-log';
+import { Jobs } from './jobs';
 import { Feedback, ISSUE_BODY_LIMIT, LOG_ATTACH_LIMIT, LOG_CUT_NOTE, VISIT_ATTACH_LIMIT, VISIT_CUT_NOTE, newestPart, Turnstile, USERNAME_REMOVED, issueLength, ISSUE_RESERVE, runSummary, logExcerpt, ZONE_REMOVED, PATH_REMOVED, failureReason, readLatestLog, redactLog } from './feedback';
 import { DEFAULT_PAGE_CONFIG, HelperConnection } from './helper-connection';
 import { Library } from './library';
@@ -480,6 +481,36 @@ describe('Feedback', () => {
     listed(['runs/20261020T100000Z-aaaa1111.json']);
     await settle();
     expect(read).not.toHaveBeenCalled();
+  });
+
+  it("reads a run still going from the helper, as History does - its file lags behind the window", async () => {
+    TestBed.inject(Library).store.set(storeWith({
+      'runs/20261020T100000Z-aaaa1111.json': record({ log: ['saved a while ago'] }),
+    }));
+    const jobs = TestBed.inject(Jobs);
+    jobs.activeRuns.set([{ id: 'aaaa1111-full-id', action: 'import' } as never]);
+    const live = vi.spyOn(jobs, 'liveRecord').mockResolvedValue(
+      JSON.parse(record({ log: ['saved a while ago', 'stopping at your request...'] })));
+    await make();
+    await openForm();
+    await tickLog();
+
+    expect(live).toHaveBeenCalledWith('aaaa1111-full-id');
+    const preview = element.querySelector('.log pre')?.textContent ?? '';
+    expect(preview).toContain('stopping at your request...');
+  });
+
+  it('reads an ended run from its file, never asking the helper', async () => {
+    TestBed.inject(Library).store.set(storeWith({
+      'runs/20261020T100000Z-aaaa1111.json': record({ log: ['all saved'] }),
+    }));
+    const live = vi.spyOn(TestBed.inject(Jobs), 'liveRecord');
+    await make();
+    await openForm();
+    await tickLog();
+
+    expect(live).not.toHaveBeenCalled();
+    expect(element.querySelector('.log pre')?.textContent).toContain('all saved');
   });
 
   it('shows a long run log trimmed to exactly what is sent, its heading kept, and says so', async () => {

@@ -233,21 +233,29 @@ export function runSummary(record: Record<string, unknown>): string[] {
   return lines;
 }
 
+/**
+ * A run still going, asked of the helper by the record's path: its file is saved only every
+ * couple of minutes, and only as lines arrive, so it can be far behind what the run window shows.
+ * Null when the run is not going, or the helper does not answer - the file is read then.
+ */
+export type LiveRecord = (path: string) => Promise<Record<string, unknown> | null>;
+
 /** The newest run record in the library, or null when there is none or it will not read. */
-export async function readLatestLog(store: LibraryStore): Promise<LatestLog | null> {
+export async function readLatestLog(store: LibraryStore, live?: LiveRecord): Promise<LatestLog | null> {
   try {
     // named for when they started, so the newest is last by name
     const newest = (await store.list('runs', false)).filter((path) => /\.json$/i.test(path)).sort().pop();
-    return newest ? await readRunLog(store, newest) : null;
+    return newest ? await readRunLog(store, newest, live) : null;
   } catch {
     return null;
   }
 }
 
 /** One run record's log, by its path in the library, or null when it will not read. */
-export async function readRunLog(store: LibraryStore, path: string): Promise<LatestLog | null> {
+export async function readRunLog(store: LibraryStore, path: string, live?: LiveRecord): Promise<LatestLog | null> {
   try {
-    const record = JSON.parse((await store.read(path)) ?? '') as Record<string, unknown>;
+    const going = live ? await live(path).catch(() => null) : null;
+    const record = (going ?? JSON.parse((await store.read(path)) ?? '')) as Record<string, unknown>;
     if (!record || typeof record !== 'object') return null;
     const text = (value: unknown) => (typeof value === 'string' ? value : '');
     return {
@@ -554,6 +562,16 @@ export class Feedback implements OnDestroy {
     return `${run.actionName || run.action} - ${at} - ${run.status}`;
   }
 
+  /**
+   * A run still going is read from the helper, as History's Download log reads it - found among
+   * the runs going by the id its file name ends with (`<started>-<id8>.json`)
+   */
+  private async liveRecord(path: string): Promise<Record<string, unknown> | null> {
+    const short = path.replace(/\.json$/i, '').split('-').pop() ?? '';
+    const run = short ? this.jobs.activeRuns().find((active) => active.id.startsWith(short)) : undefined;
+    return run ? this.jobs.liveRecord(run.id) : null;
+  }
+
   /** the log as it will be sent, for whichever run is chosen; empty (and Send held) until there is one */
   private async loadLogPreview(): Promise<void> {
     const read = ++this.previewRead;
@@ -565,7 +583,10 @@ export class Feedback implements OnDestroy {
     if (!store) return;
     const choosing = this.logChoice() === 'choose';
     if (choosing && !this.chosenRun()) return;
-    const log = choosing ? await readRunLog(store, `runs/${this.chosenRun()}`) : await readLatestLog(store);
+    const live = (path: string) => this.liveRecord(path);
+    const log = choosing
+      ? await readRunLog(store, `runs/${this.chosenRun()}`, live)
+      : await readLatestLog(store, live);
     if (read !== this.previewRead || !this.attachLog()) return;
     if (!log || !log.lines.length) {
       this.logNote.set(choosing ? 'That run has no log to attach.' : 'There is no run log in this library to attach yet.');
