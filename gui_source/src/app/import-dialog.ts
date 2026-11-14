@@ -937,29 +937,30 @@ export class ImportDialog {
     if (repair) this.skipped.update((s) => ({ ...s, [file.path]: false }));
   }
 
-  /** every row repaired from AO3 - its date and Skip tick set aside */
-  protected repairAll(): void {
-    this.repairing.set(Object.fromEntries(this.undated().map((f) => [f.path, true])));
-    this.skipped.set({});
-  }
 
-  /** the one date put in every row - skips stay as they are, and can still be changed */
-  protected applyToAll(): void {
+
+  /**
+   * The bulk row's four actions each answer only the **remaining** rows - those with no date,
+   * no Skip tick and no Repair tick (`needsAnswer`) - so nothing already answered is changed.
+   */
+  /** the one date put in every remaining row */
+  protected dateRemaining(): void {
     const date = this.bulkDate();
     if (!isFileDate(date)) return;
-    this.dates.set(Object.fromEntries(this.undated().map((f) => [f.path, date])));
-    this.inferred.set({});
+    const left = this.needsAnswer();
+    this.dates.update((d) => ({ ...d, ...Object.fromEntries(left.map((f) => [f.path, date])) }));
+    this.inferred.update((x) => ({ ...x, ...Object.fromEntries(left.map((f) => [f.path, false])) }));
   }
 
-  protected skipAll(): void {
-    this.skipped.set(Object.fromEntries(this.undated().map((f) => [f.path, true])));
-    this.repairing.set({});
+  /** Skip ticked on every remaining row */
+  protected skipRemaining(): void {
+    const left = this.needsAnswer();
+    this.skipped.update((s) => ({ ...s, ...Object.fromEntries(left.map((f) => [f.path, true])) }));
   }
 
   /**
-   * Read a date out of each file's name (`inferDate`), skipped files included - their date is
-   * filled in, though skipped they stay. What it dated goes to the top: those not skipped, then
-   * those skipped before it ran, each by name, then the rest by name.
+   * Read a date out of each remaining file's name (`inferDate`). What it dated goes to the top,
+   * by name, then the rest by name; a row already answered keeps its answer and its mark.
    */
   protected async inferDates(): Promise<void> {
     if (this.inferring()) return;
@@ -969,19 +970,18 @@ export class ImportDialog {
       await new Promise((resolve) => setTimeout(resolve, 0));
       const found: Record<string, string> = {};
       const files = this.undated();
-      for (const [index, file] of files.entries()) {
+      const left = this.needsAnswer();
+      for (const [index, file] of left.entries()) {
         const date = inferDate(file.name);
         if (date) found[file.path] = date;
         if (index % 200 === 199) await new Promise((resolve) => setTimeout(resolve, 0));
       }
       this.dates.update((d) => ({ ...d, ...found }));
-      this.inferred.set(Object.fromEntries(Object.keys(found).map((path) => [path, true])));
-      const skipped = this.skipped();
+      this.inferred.update((x) => ({ ...x, ...Object.fromEntries(Object.keys(found).map((path) => [path, true])) }));
       const byName = (a: FoundFile, b: FoundFile) => a.name.localeCompare(b.name);
       const dated = files.filter((f) => found[f.path]);
       this.order.set([
-        ...dated.filter((f) => !skipped[f.path]).sort(byName),
-        ...dated.filter((f) => skipped[f.path]).sort(byName),
+        ...dated.sort(byName),
         ...files.filter((f) => !found[f.path]).sort(byName),
       ].map((f) => f.path));
       this.inferredCount.set(dated.length);
@@ -1014,17 +1014,12 @@ export class ImportDialog {
     return !this.isSkipped(file) && !this.isRepaired(file) && !isFileDate(this.dateOf(file));
   }
 
-  /** marks every row still without a date to repair from AO3, leaving the dated ones as they are */
-  protected repairUndatedRows(): void {
+  /** Repair from AO3 ticked on every remaining row */
+  protected repairRemaining(): void {
     const left = this.needsAnswer();
     this.repairing.update((r) => ({ ...r, ...Object.fromEntries(left.map((f) => [f.path, true])) }));
   }
 
-  /** ticks Skip on every row still without a date, leaving the dated ones as they are */
-  protected skipUndatedRows(): void {
-    const left = this.needsAnswer();
-    this.skipped.update((s) => ({ ...s, ...Object.fromEntries(left.map((f) => [f.path, true])) }));
-  }
 
   protected setPaged(paged: boolean): void {
     this.paged.set(paged);

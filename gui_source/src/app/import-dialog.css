@@ -309,9 +309,13 @@ input[type='date'] {
   color: var(--warn-text-dim);
 }
 
-/* the bulk row's last button sits on the right */
+/* what the bulk row's buttons answer: the rows still unanswered */
+.bulk-what {
+  flex-basis: 100%;
+  font-size: 0.85rem;
+}
+
 .bulk .infer {
-  margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: 6px;

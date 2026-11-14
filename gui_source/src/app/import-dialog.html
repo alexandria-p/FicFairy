@@ -520,21 +520,29 @@
         Repair from AO3: the import replaces the file with the latest version from AO3, named with
         its date. Every file needs a date or a tick before you can continue.
       </p>
-      <div class="bulk">
+      <div class="bulk" role="group" aria-label="For the remaining files">
+        <span class="bulk-what">
+          For the {{ needsAnswer().length | number }} remaining
+          {{ needsAnswer().length === 1 ? 'file' : 'files' }}
+          <span class="hint">with no date, Skip or Repair tick</span>
+        </span>
         <label>
-          <span>Date for all</span>
+          <span>Date</span>
           <input type="date" name="bulkDate" [value]="bulkDate()"
                  (input)="bulkDate.set($any($event.target).value)" />
         </label>
-        <button type="button" class="button" [disabled]="!bulkValid()" (click)="applyToAll()">
-          Use for all
-        </button>
-        <button type="button" class="button" (click)="skipAll()">Skip all</button>
-        <button type="button" class="button repair-all" (click)="repairAll()">Repair all from AO3</button>
-        <button type="button" class="button infer" [disabled]="inferring()" (click)="inferDates()"
-                title="Read a date out of each file's name, however it is written">
+        <button type="button" class="button" [disabled]="!bulkValid() || !needsAnswer().length"
+                (click)="dateRemaining()">Use date for remaining</button>
+        <button type="button" class="button infer" [disabled]="inferring() || !needsAnswer().length"
+                (click)="inferDates()" title="Read a date out of each remaining file's name, however it is written">
           @if (inferring()) { <span class="spinner" aria-hidden="true"></span> }
-          Infer date
+          Infer date for remaining
+        </button>
+        <button type="button" class="button" [disabled]="!needsAnswer().length" (click)="skipRemaining()">
+          Skip remaining
+        </button>
+        <button type="button" class="button repair-rest" [disabled]="!needsAnswer().length" (click)="repairRemaining()">
+          Repair remaining from AO3
         </button>
       </div>
       @if (inferredCount() !== null) {
@@ -592,25 +600,19 @@
       @if (needsAnswer().length; as left) {
         <div class="needs-answer-note" role="alert">
           <span>
-            {{ left | number }} {{ left === 1 ? 'file has' : 'files have' }} no date and no Skip tick
-            (highlighted). Give {{ left === 1 ? 'it' : 'each' }} a date or tick Skip to continue.
-          </span>
-          <span class="needs-answer-actions">
-            <button type="button" class="button" (click)="skipUndatedRows()">
-              Skip {{ left === 1 ? 'it' : 'all ' + (left | number) }}
-            </button>
-            <button type="button" class="button repair-rest" (click)="repairUndatedRows()">
-              Repair {{ left === 1 ? 'it' : 'all ' + (left | number) }} from AO3
-            </button>
+            {{ left | number }} {{ left === 1 ? 'file has' : 'files have' }} no date, Skip or Repair tick
+            (highlighted). Answer {{ left === 1 ? 'it' : 'each' }}, or use the buttons above for the
+            remaining, to continue.
           </span>
         </div>
       }
       @if (toRepair().length; as repairs) {
         <div class="repair-fichub">
-          <p class="hint">
-            {{ repairs | number }} {{ repairs === 1 ? 'file' : 'files' }} will be replaced with the
-            latest version from AO3, whatever {{ repairs === 1 ? 'it holds' : 'they hold' }}, and named
-            with its date. A file AO3 will not give is kept as it is, unless you allow FicHub below.
+          <p class="warning repair-warning" role="note">
+            <strong>Repair from AO3 overwrites {{ repairs === 1 ? 'the file' : 'all ' + (repairs | number) + ' files' }}</strong>
+            with the newest version on AO3, whatever {{ repairs === 1 ? 'it holds' : 'they hold' }},
+            named with AO3's date. If AO3 can't give a file, choose below what happens: with neither
+            box ticked, that file is kept as it is.
           </p>
           <label class="check">
             <input type="checkbox" name="repairFicHub" [checked]="repairFicHub()"

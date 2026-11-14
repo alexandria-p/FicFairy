@@ -161,7 +161,7 @@ function skipBox(path: string): HTMLInputElement {
 
 /** on the dates page: ticks Skip on every file, then goes on with none dated */
 async function skipDates() {
-  await click('Skip all');
+  await click('Skip remaining');
   await click('Skip this step');
 }
 
@@ -1079,7 +1079,7 @@ describe('ImportDialog', () => {
     await open();
     await click('Continue');
     await type(dateBox('works/2 C - D.html'), '2024-05-06');
-    await click('Repair all 2 from AO3');
+    await click('Repair remaining from AO3');
 
     expect(repairBox('works/2 C - D.html').checked).toBe(false);
     expect(repairBox('works/2 C - D.pdf').checked).toBe(true);
@@ -1088,11 +1088,22 @@ describe('ImportDialog', () => {
     expect(primary().textContent).toContain('Date 1 file and continue');
   });
 
+  it('warns that repairing overwrites each file with the newest from AO3, and points at the FicHub choice', async () => {
+    await open();
+    await click('Continue');
+    expect(element.querySelector('.repair-warning')).toBeNull();
+    await click('Repair remaining from AO3');
+    const warning = element.querySelector('.repair-warning')?.textContent?.replace(/\s+/g, ' ') ?? '';
+    expect(warning).toContain('Repair from AO3 overwrites all 3 files');
+    expect(warning).toContain('newest version on AO3');
+    expect(warning).toContain("If AO3 can't give a file, choose below what happens");
+  });
+
   it('asks before FicHub may stand in for AO3, and the second agreement only after the first', async () => {
     await open();
     await click('Continue');
     expect(element.querySelector('input[name="repairFicHub"]')).toBeNull();
-    await click('Repair all from AO3');
+    await click('Repair remaining from AO3');
 
     const fichub = element.querySelector<HTMLInputElement>('input[name="repairFicHub"]')!;
     const undated = element.querySelector<HTMLInputElement>('input[name="repairFicHubUndated"]')!;
@@ -1108,7 +1119,7 @@ describe('ImportDialog', () => {
   it("hands the run the files to repair by name, and their works only for that when they are not updated", async () => {
     await open();
     await click('Continue');
-    await click('Skip all');
+    await click('Skip remaining');
     repairBox('works/2 C - D.html').click();
     await fixture.whenStable();
     element.querySelector<HTMLInputElement>('input[name="repairFicHub"]')!.click();
@@ -1179,7 +1190,7 @@ describe('ImportDialog', () => {
     await open();
     TestBed.inject(Library).store.set(store);
     await click('Continue');
-    await click('Skip all');
+    await click('Skip remaining');
     await click('Skip this step');
     expect(step()).toBe('index');
     expect(store.written.size).toBe(0);
@@ -1191,18 +1202,18 @@ describe('ImportDialog', () => {
     expect(primary().disabled).toBe(true);
     expect(primary().getAttribute('title')).toBe('Give every file a date, or tick Skip');
     expect(element.querySelectorAll('tr.needs-answer')).toHaveLength(3);
-    expect(element.querySelector('.needs-answer-note')?.textContent).toContain('3 files have no date and no Skip tick');
+    expect(element.querySelector('.needs-answer-note')?.textContent).toContain('3 files have no date, Skip or Repair tick');
 
     await type(dateBox('works/2 C - D.html'), '2024-05-06');
     skipBox('works/2 C - D.pdf').click();
     await fixture.whenStable();
     expect(row('works/2 C - D.html').classList).not.toContain('needs-answer');
     expect(row('works/2 C - D.pdf').classList).not.toContain('needs-answer');
-    expect(element.querySelector('.needs-answer-note')?.textContent).toContain('1 file has no date and no Skip tick');
+    expect(element.querySelector('.needs-answer-note')?.textContent).toContain('1 file has no date, Skip or Repair tick');
     expect(primary().disabled).toBe(true);
 
-    // the note's own button skips what is left, keeping the date given
-    await click('Skip it');
+    // Skip remaining skips what is left, keeping the date and the skip given
+    await click('Skip remaining');
     expect(element.querySelector('.needs-answer-note')).toBeNull();
     expect(skipBox('works/3 E - F.epub').checked).toBe(true);
     expect(dateBox('works/2 C - D.html').value).toBe('2024-05-06');
@@ -1220,25 +1231,36 @@ describe('ImportDialog', () => {
     expect(getComputedStyle(row('works/2 C - D.pdf').querySelector('td')!).textDecoration).not.toContain('line-through');
   });
 
-  it('fills every date with Use for all, leaving skips as they are and changeable', async () => {
+  it('puts one date in the remaining rows only, leaving a skipped or dated row as it is', async () => {
     await open();
     await click('Continue');
     skipBox('works/2 C - D.pdf').click();
+    await type(dateBox('works/3 E - F.epub'), '2023-03-03');
     await type(element.querySelector<HTMLInputElement>('input[name="bulkDate"]')!, '2024-01-31');
-    await click('Use for all');
+    await click('Use date for remaining');
 
-    expect(rowOrder().map((p) => dateBox(p).value)).toEqual(['2024-01-31', '2024-01-31', '2024-01-31']);
+    expect(dateBox('works/2 C - D.html').value).toBe('2024-01-31');
+    expect(dateBox('works/2 C - D.pdf').value).toBe('');
+    expect(dateBox('works/3 E - F.epub').value).toBe('2023-03-03');
     expect(skipBox('works/2 C - D.pdf').checked).toBe(true);
     expect(primary().textContent).toContain('Date 2 files');
-    skipBox('works/2 C - D.pdf').click();
-    await fixture.whenStable();
-    expect(primary().textContent).toContain('Date 3 files');
   });
 
-  it('ticks every skip with Skip all', async () => {
+  it('says how many rows remain, and holds every bulk action once none do', async () => {
     await open();
     await click('Continue');
-    await click('Skip all');
+    expect(element.querySelector('.bulk-what')?.textContent).toContain('For the 3 remaining files');
+    await click('Skip remaining');
+    expect(element.querySelector('.bulk-what')?.textContent).toContain('For the 0 remaining files');
+    for (const label of ['Infer date for remaining', 'Skip remaining', 'Repair remaining from AO3']) {
+      expect(button(label)!.disabled).toBe(true);
+    }
+  });
+
+  it('ticks Skip on every remaining row with Skip remaining', async () => {
+    await open();
+    await click('Continue');
+    await click('Skip remaining');
     expect(rowOrder().every((p) => skipBox(p).checked)).toBe(true);
     expect(primary().textContent?.trim()).toBe('Skip this step');
     await click('Skip this step');
@@ -1284,38 +1306,47 @@ describe('ImportDialog', () => {
     new Set(),
   );
 
-  it('reads dates out of the names, whatever their form, and moves what it dated to the top in yellow', async () => {
+  it('reads dates out of the remaining names, whatever their form, and moves what it dated to the top in yellow', async () => {
     await open(MESSY);
     await click('Continue');
     skipBox('works/13 Gamma 14 Dec 2021 - W.html').click();
     await fixture.whenStable();
-    await click('Infer date');
+    await click('Infer date for remaining');
 
-    // dated and not skipped, by name; then dated and skipped, by name; then the rest, by name
+    // what it dated, by name; then the rest, by name
     expect(rowOrder()).toEqual([
       'works/10 Zeta 20230115 - W.html',
       'works/11 Alpha - W (posted 03-04-2022).epub',
-      'works/13 Gamma 14 Dec 2021 - W.html',
       'works/12 Beta - W.pdf',
+      'works/13 Gamma 14 Dec 2021 - W.html',
       'works/20240304 Delta - W.html',
     ]);
     expect(dateBox('works/10 Zeta 20230115 - W.html').value).toBe('2023-01-15');
     expect(dateBox('works/11 Alpha - W (posted 03-04-2022).epub').value).toBe('2022-03-04');
-    // a skipped file is dated too, and stays skipped
-    expect(dateBox('works/13 Gamma 14 Dec 2021 - W.html').value).toBe('2021-12-14');
+    // a skipped row is answered already: left as it is
+    expect(dateBox('works/13 Gamma 14 Dec 2021 - W.html').value).toBe('');
     expect(skipBox('works/13 Gamma 14 Dec 2021 - W.html').checked).toBe(true);
-    expect(row('works/13 Gamma 14 Dec 2021 - W.html').classList).toContain('inferred');
+    expect(row('works/13 Gamma 14 Dec 2021 - W.html').classList).not.toContain('inferred');
     // a work number is not a date
     expect(dateBox('works/20240304 Delta - W.html').value).toBe('');
     expect(row('works/10 Zeta 20230115 - W.html').classList).toContain('inferred');
-    expect(element.querySelector('.infer-said')?.textContent).toContain('3 files were auto-dated');
+    expect(element.querySelector('.infer-said')?.textContent).toContain('2 files were auto-dated');
     expect(primary().textContent).toContain('Date 2 files');
+  });
+
+  it('leaves a date given by hand as it is when inferring the remaining rows', async () => {
+    await open(MESSY);
+    await click('Continue');
+    await type(dateBox('works/10 Zeta 20230115 - W.html'), '2020-02-02');
+    await click('Infer date for remaining');
+    expect(dateBox('works/10 Zeta 20230115 - W.html').value).toBe('2020-02-02');
+    expect(row('works/10 Zeta 20230115 - W.html').classList).not.toContain('inferred');
   });
 
   it('takes the yellow off a row changed by hand, which stays where it is', async () => {
     await open(MESSY);
     await click('Continue');
-    await click('Infer date');
+    await click('Infer date for remaining');
     await type(dateBox('works/10 Zeta 20230115 - W.html'), '2023-01-20');
     expect(row('works/10 Zeta 20230115 - W.html').classList).not.toContain('inferred');
     expect(rowOrder()[0]).toBe('works/10 Zeta 20230115 - W.html');
@@ -1324,21 +1355,21 @@ describe('ImportDialog', () => {
   it('says when it could date nothing', async () => {
     await open(unindexedWorks(['works/1 No Date Here - W.html'], new Set()));
     await click('Continue');
-    await click('Infer date');
+    await click('Infer date for remaining');
     expect(element.querySelector('.infer-said')?.textContent).toContain('Unable to auto-date any works');
   });
 
   it('holds Continue and its own button while it runs', async () => {
     await open(MESSY);
     await click('Continue');
-    button('Infer date')!.click();
+    button('Infer date for remaining')!.click();
     fixture.detectChanges();
     expect(element.querySelector<HTMLButtonElement>('.button.infer')!.disabled).toBe(true);
     expect(element.querySelector('.button.infer .spinner')).not.toBeNull();
     expect(primary().disabled).toBe(true);
     await settle();
     expect(element.querySelector<HTMLButtonElement>('.button.infer')!.disabled).toBe(false);
-    await click('Skip all');
+    await click('Skip remaining');
     expect(primary().disabled).toBe(false);
   });
 
@@ -1390,7 +1421,7 @@ describe('ImportDialog', () => {
   it('stops renaming when closed part way, keeping what was renamed', async () => {
     await open();
     await click('Continue');
-    await click('Skip all');
+    await click('Skip remaining');
     for (const path of ['works/2 C - D.html', 'works/2 C - D.pdf']) {
       skipBox(path).click();
       await type(dateBox(path), '2024-05-06');
