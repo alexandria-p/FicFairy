@@ -96,7 +96,9 @@ async function openForm() {
 }
 
 async function fill(kind: 'general' | 'feature' | 'bug', message: string, name = '') {
-  (element.querySelector(`input[name="kind"][value="${kind}"]`) as HTMLInputElement).dispatchEvent(new Event('change'));
+  const select = element.querySelector('select[name="kind"]') as HTMLSelectElement;
+  select.value = kind;
+  select.dispatchEvent(new Event('change'));
   const text = element.querySelector('textarea') as HTMLTextAreaElement;
   text.value = message;
   text.dispatchEvent(new Event('input'));
@@ -192,7 +194,7 @@ describe('Feedback', () => {
     expect(element.querySelector('input[type="email"]')).toBeNull();
   });
 
-  it('cannot be sent without a kind and a message, or before the bot check passes', async () => {
+  it('cannot be sent without a message, or before the bot check passes', async () => {
     turnstile.pass = false;
     await make();
     await openForm();
@@ -229,38 +231,50 @@ describe('Feedback', () => {
     expect(element.querySelector('a[href*="label%3Afeedback"]')).not.toBeNull();
   });
 
-  it('asks what kind of feedback it is: general, a feature suggestion or a bug report', async () => {
+  it('asks what kind of feedback it is from a dropdown, starting on general feedback', async () => {
+    const fetching = answering(201, { ok: true, number: 4, url: 'https://github.com/o/r/issues/4' });
     await make();
     await openForm();
-    const labels = [...element.querySelectorAll('.kind label')].map((l) => l.textContent?.trim());
-    expect(labels).toEqual(['General feedback', 'Feature suggestion', 'Bug report']);
-    expect(element.querySelector('.kind legend')?.textContent).toContain('(required)');
+    const select = element.querySelector<HTMLSelectElement>('select[name="kind"]')!;
+    expect([...select.options].map((o) => o.textContent?.trim())).toEqual(['General feedback', 'Feature suggestion', 'Bug report']);
+    expect(select.value).toBe('general');
+
+    // a message alone is enough: the kind is already chosen
+    const text = element.querySelector('textarea') as HTMLTextAreaElement;
+    text.value = 'Lovely';
+    text.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+    await send();
+    expect(sentBody(fetching)).toMatchObject({ kind: 'general' });
   });
 
-  it('sends only the quick questions that were moved, folded away to begin with', async () => {
+  it('sends only the quick questions answered, each by a word picked, folded away to begin with', async () => {
     const fetching = answering(201, { ok: true, number: 3, url: 'https://github.com/o/r/issues/3' });
     await make();
     await openForm();
     const fold = element.querySelector<HTMLDetailsElement>('details.quick-questions')!;
     expect(fold.open).toBe(false);
     expect(fold.querySelector('summary')?.textContent).toContain('(Optional) Quick questions about your experience');
-    const slider = (key: string) => element.querySelector<HTMLInputElement>(`[data-rating="${key}"] input[type="range"]`)!;
-    // every slider starts in the middle, unanswered
-    expect(['easy', 'useful', 'confusing', 'complete'].map((k) => slider(k).value)).toEqual(['3', '3', '3', '3']);
+    const choices = (key: string) => [...element.querySelectorAll<HTMLInputElement>(`[data-rating="${key}"] input[type="radio"]`)];
+    const words = (key: string) => [...element.querySelectorAll(`[data-rating="${key}"] .rating-choices label`)].map((l) => l.textContent?.trim());
+    expect(words('easy')).toEqual(['Very hard', 'Hard', 'Neutral', 'Easy', 'Very easy']);
+    // nothing picked to begin with: every question unanswered
+    expect(['easy', 'useful', 'confusing', 'complete'].every((k) => choices(k).every((c) => !c.checked))).toBe(true);
     expect(element.querySelector('[data-rating="easy"] .rating-said')?.textContent).toContain('Not answered');
 
-    const move = async (key: string, value: string) => {
-      slider(key).value = value;
-      slider(key).dispatchEvent(new Event('input'));
+    const pick = async (key: string, value: number) => {
+      choices(key)[value - 1].click();
       await fixture.whenStable();
     };
-    await move('easy', '4');
-    await move('useful', '2');
-    // moved back to the middle still counts: it was answered
-    await move('complete', '3');
+    await pick('easy', 4);
+    await pick('useful', 2);
+    // the middle word is an answer like any other
+    await pick('complete', 3);
+    expect(element.querySelector('[data-rating="easy"]')!.classList).toContain('answered');
     element.querySelector<HTMLButtonElement>('[data-rating="useful"] .clear-rating')!.click();
     await fixture.whenStable();
     expect(element.querySelector('[data-rating="useful"] .rating-said')?.textContent).toContain('Not answered');
+    expect(choices('useful').every((c) => !c.checked)).toBe(true);
     expect(fold.querySelector('summary')?.textContent).toContain('2 answered');
 
     await fill('feature', 'A dark mode please');

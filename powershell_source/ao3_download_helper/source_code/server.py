@@ -4409,6 +4409,7 @@ def rescue_with_fichub(job: Job, fileops: FileOps, ao3, report) -> None:
     # every format, not only the run's: a format FicHub gives that there was no file of is
     # warned about when another of the work's files is dated later (`note_fichub_older`). one
     # listing, narrowed to the run's formats for everything else
+    if filetypes: print(strings.AO3_INFO_FICHUB_CHECKING_FILES)
     every = shared.scan_downloaded_works(fileops.worksfolder, strings.AO3_ACCEPTABLE_DOWNLOAD_TYPES,
                                          storage=fileops.storage) if filetypes else {}
     asked = {x.upper() for x in filetypes}

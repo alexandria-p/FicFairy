@@ -34,7 +34,7 @@ import { VisitLog } from './visit-log';
  * has neither, and a form that could never be sent is not offered.
  */
 
-/** what kind of feedback it is - one has to be chosen; the Worker labels the issue by it */
+/** what kind of feedback it is - general to begin with; the Worker labels the issue by it */
 export type FeedbackKind = 'general' | 'feature' | 'bug';
 
 export const FEEDBACK_KINDS: { value: FeedbackKind; label: string; title: string }[] = [
@@ -43,20 +43,24 @@ export const FEEDBACK_KINDS: { value: FeedbackKind; label: string; title: string
   { value: 'bug', label: 'Bug report', title: 'Bug report' },
 ];
 
-/** a quick question, answered 1 to 5 on a slider - the Worker's `RATINGS`, keyed the same */
+/** a quick question, answered 1 to 5 by one of five words - the Worker's `RATINGS`, keyed the same */
 export type RatingKey = 'easy' | 'useful' | 'confusing' | 'complete';
 
 /**
- * The optional quick questions, folded away to begin with. Each slider starts in the middle
- * (`RATING_MIDDLE`) and counts as unanswered - and is not sent - until it is moved.
+ * The optional quick questions, folded away to begin with. Each is five radio buttons, its
+ * words in `scale` (1 first - the Worker's `scale`, which the issue says), none picked to begin
+ * with: unanswered until one is, and not sent unless one is. Clear unpicks it.
  */
-export const RATING_QUESTIONS: { key: RatingKey; question: string; low: string; high: string }[] = [
-  { key: 'easy', question: 'How easy is FicFairy to use?', low: 'Very hard', high: 'Very easy' },
-  { key: 'useful', question: 'How useful do you find it?', low: 'Not useful', high: 'Very useful' },
-  { key: 'confusing', question: 'How confusing do you find it?', low: 'Not at all confusing', high: 'Very confusing' },
-  { key: 'complete', question: 'Does it do everything you want?', low: 'Missing a lot', high: 'Does everything I want' },
+export const RATING_QUESTIONS: { key: RatingKey; question: string; scale: string[] }[] = [
+  { key: 'easy', question: 'How easy is FicFairy to use?',
+    scale: ['Very hard', 'Hard', 'Neutral', 'Easy', 'Very easy'] },
+  { key: 'useful', question: 'How useful do you find it?',
+    scale: ['Not useful', 'Slightly useful', 'Neutral', 'Useful', 'Very useful'] },
+  { key: 'confusing', question: 'How confusing do you find it?',
+    scale: ['Not at all confusing', 'Slightly confusing', 'Neutral', 'Confusing', 'Very confusing'] },
+  { key: 'complete', question: 'Does it do everything you want?',
+    scale: ['Missing a lot', 'Missing some', 'Neutral', 'Mostly', 'Does everything I want'] },
 ];
-export const RATING_MIDDLE = 3;
 
 /** what is said in place of the AO3 username in an attached log */
 export const USERNAME_REMOVED = '[your AO3 username]';
@@ -341,12 +345,11 @@ export class Feedback implements OnDestroy {
   protected readonly open = signal(false);
   protected readonly stage = signal<Stage>('form');
 
-  protected readonly kind = signal<FeedbackKind | ''>('');
+  protected readonly kind = signal<FeedbackKind | ''>('general');
   protected readonly kinds = FEEDBACK_KINDS;
   /** the quick questions moved off the middle - only these are sent */
   protected readonly ratings = signal<Partial<Record<RatingKey, number>>>({});
   protected readonly ratingQuestions = RATING_QUESTIONS;
-  protected readonly ratingMiddle = RATING_MIDDLE;
   protected readonly message = signal('');
   protected readonly name = signal('');
   protected readonly attachLog = signal(false);
@@ -709,12 +712,12 @@ export class Feedback implements OnDestroy {
     return 'no library open';
   }
 
-  /** a quick question moved: answered from now on, even if moved back to the middle */
+  /** a quick question's word picked: answered from now on, until cleared */
   protected setRating(key: RatingKey, value: number): void {
     this.ratings.update((r) => ({ ...r, [key]: value }));
   }
 
-  /** back to unanswered: the slider returns to the middle and nothing is sent for it */
+  /** back to unanswered: no word picked, and nothing is sent for it */
   protected clearRating(key: RatingKey): void {
     this.ratings.update((r) => {
       const next = { ...r };
@@ -733,7 +736,7 @@ export class Feedback implements OnDestroy {
   /** the answers as lines, for the saved copy of a feedback that could not be sent */
   private ratingLines(): string[] {
     return RATING_QUESTIONS.filter((q) => this.ratings()[q.key] !== undefined).map(
-      (q) => `${q.question} ${this.ratings()[q.key]} (1 = ${q.low}, 5 = ${q.high})`,
+      (q) => `${q.question} ${q.scale[(this.ratings()[q.key] ?? 1) - 1]}`,
     );
   }
 
@@ -764,7 +767,7 @@ export class Feedback implements OnDestroy {
 
   private reset(): void {
     this.stage.set('form');
-    this.kind.set('');
+    this.kind.set('general');
     this.ratings.set({});
     this.message.set('');
     this.name.set('');

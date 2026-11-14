@@ -474,6 +474,7 @@ AO3_INFO_FICHUB_ASK = ('{} works could not be fetched from AO3 ({}). '
 AO3_INFO_FICHUB_DECLINED = 'not trying FicHub'
 AO3_INFO_FICHUB_TRYING = 'trying FicHub for {} works: {}'
 # each said before the thing it describes happens, so the run says what it is waiting on
+AO3_INFO_FICHUB_CHECKING_FILES = 'checking which files you already have of these works...'
 AO3_INFO_FICHUB_WORK = 'FicHub {} of {}: asking FicHub about work {} ({})...'
 AO3_INFO_FICHUB_FOUND = '  FicHub has work {}: {}'
 AO3_INFO_FICHUB_FETCHING = '  fetching {} of work {} from FicHub...'

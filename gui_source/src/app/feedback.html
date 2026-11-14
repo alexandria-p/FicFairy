@@ -31,16 +31,14 @@
           </footer>
         } @else {
           <section class="body">
-            <fieldset class="kind" aria-required="true">
-              <legend>What kind of feedback is this? <span class="required">(required)</span></legend>
-              @for (choice of kinds; track choice.value) {
-                <label [class.chosen]="kind() === choice.value">
-                  <input type="radio" name="kind" [value]="choice.value" [checked]="kind() === choice.value"
-                    (change)="kind.set(choice.value)" />
-                  {{ choice.label }}
-                </label>
-              }
-            </fieldset>
+            <label class="field kind">
+              <span>What kind of feedback is this?</span>
+              <select name="kind" (change)="kind.set($any($event.target).value)">
+                @for (choice of kinds; track choice.value) {
+                  <option [value]="choice.value" [selected]="kind() === choice.value">{{ choice.label }}</option>
+                }
+              </select>
+            </label>
 
             <label class="field">
               <span>Your feedback</span>
@@ -74,30 +72,34 @@
               </p>
             }
 
-            <!-- optional, folded away; a slider left in the middle is not answered, and not sent -->
+            <!-- optional, folded away; a question with no word picked is not answered, and not sent -->
             <details class="quick-questions">
               <summary>
                 <em>(Optional)</em> Quick questions about your experience
                 @if (ratedCount()) { <span class="dim">- {{ ratedCount() }} answered</span> }
               </summary>
-              <p class="hint">Move a slider to answer it. One you leave in the middle is not sent.</p>
+              <p class="hint">Pick an answer for any you like. One you leave unpicked is not sent.</p>
               @for (q of ratingQuestions; track q.key) {
-                <div class="rating" [attr.data-rating]="q.key" [class.answered]="ratingOf(q.key) !== undefined">
-                  <label [attr.for]="'rating-' + q.key">{{ q.question }}</label>
-                  <input type="range" [id]="'rating-' + q.key" min="1" max="5" step="1"
-                    [value]="ratingOf(q.key) ?? ratingMiddle"
-                    [attr.aria-valuetext]="ratingOf(q.key) === undefined ? 'Not answered' : ratingOf(q.key) + ' of 5'"
-                    (input)="setRating(q.key, +$any($event.target).value)" />
-                  <div class="rating-ends"><span>{{ q.low }}</span><span>{{ q.high }}</span></div>
+                <fieldset class="rating" [attr.data-rating]="q.key" [class.answered]="ratingOf(q.key) !== undefined">
+                  <legend>{{ q.question }}</legend>
+                  <div class="rating-choices">
+                    @for (word of q.scale; track $index) {
+                      <label [class.chosen]="ratingOf(q.key) === $index + 1">
+                        <input type="radio" [name]="'rating-' + q.key" [value]="$index + 1"
+                          [checked]="ratingOf(q.key) === $index + 1" (change)="setRating(q.key, $index + 1)" />
+                        {{ word }}
+                      </label>
+                    }
+                  </div>
                   <p class="rating-said">
                     @if (ratingOf(q.key) === undefined) {
                       <span class="dim">Not answered</span>
                     } @else {
-                      {{ ratingOf(q.key) }} of 5
+                      Answered
                       <button type="button" class="clear-rating" (click)="clearRating(q.key)">Clear</button>
                     }
                   </p>
-                </div>
+                </fieldset>
               }
             </details>
 
