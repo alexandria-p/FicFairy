@@ -327,6 +327,14 @@ input[type='date'] {
   font-size: 0.85rem;
 }
 
+.bulk-date {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+
 .bulk .infer {
   display: inline-flex;
   align-items: center;

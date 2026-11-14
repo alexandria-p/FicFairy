@@ -526,13 +526,6 @@
           {{ needsAnswer().length === 1 ? 'file' : 'files' }}
           <span class="hint">with no date, Skip or Repair tick</span>
         </span>
-        <label>
-          <span>Date</span>
-          <input type="date" name="bulkDate" [value]="bulkDate()"
-                 (input)="bulkDate.set($any($event.target).value)" />
-        </label>
-        <button type="button" class="button" [disabled]="!bulkValid() || !needsAnswer().length"
-                (click)="dateRemaining()">Use date for remaining</button>
         <button type="button" class="button infer" [disabled]="inferring() || !needsAnswer().length"
                 (click)="inferDates()" title="Read a date out of each remaining file's name, however it is written">
           @if (inferring()) { <span class="spinner" aria-hidden="true"></span> }
@@ -544,6 +537,16 @@
         <button type="button" class="button repair-rest" [disabled]="!needsAnswer().length" (click)="repairRemaining()">
           Repair remaining from AO3
         </button>
+        <!-- one date for every remaining row, on a row of its own under the other buttons -->
+        <div class="bulk-date">
+          <label>
+            <span>Date</span>
+            <input type="date" name="bulkDate" [value]="bulkDate()"
+                   (input)="bulkDate.set($any($event.target).value)" />
+          </label>
+          <button type="button" class="button" [disabled]="!bulkValid() || !needsAnswer().length"
+                  (click)="dateRemaining()">Use date for remaining</button>
+        </div>
       </div>
       @if (inferredCount() !== null) {
         <p class="infer-said" role="status">
