@@ -516,9 +516,8 @@
         your copy is outdated.
       </p>
       <p class="hint">
-        Not sure? Tick Skip. A skipped file keeps its name, and the import leaves it alone. Or tick
-        Repair from AO3: the import replaces the file with the latest version from AO3, named with
-        its date. Every file needs a date or a tick before you can continue.
+        Not sure? A skip will leave the file alone. Or, you can fetch the latest information from
+        AO3. Every file needs a decision before you can continue.
       </p>
       <!-- every button answers only the rows with no date, Skip or Repair tick yet -->
       <details class="bulk-actions">
@@ -617,9 +616,9 @@
       @if (needsAnswer().length; as left) {
         <div class="needs-answer-note" role="alert">
           <span>
-            {{ left | number }} {{ left === 1 ? 'file has' : 'files have' }} no date, Skip or Repair tick
-            (highlighted). Answer {{ left === 1 ? 'it' : 'each' }}, or use <strong>Bulk actions</strong>
-            above for the remaining, to continue.
+            {{ left | number }} {{ left === 1 ? 'file' : 'files' }} (highlighted above)
+            {{ left === 1 ? 'has' : 'have' }} no date, Skip or Repair. Answer {{ left === 1 ? 'it' : 'each' }},
+            or use <strong>Bulk actions</strong> above.
           </span>
         </div>
       }

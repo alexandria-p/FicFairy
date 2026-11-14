@@ -1268,14 +1268,14 @@ describe('ImportDialog', () => {
     expect(primary().disabled).toBe(true);
     expect(primary().getAttribute('title')).toBe('Give every file a date, or tick Skip or Repair from AO3');
     expect(element.querySelectorAll('tr.needs-answer')).toHaveLength(3);
-    expect(element.querySelector('.needs-answer-note')?.textContent).toContain('3 files have no date, Skip or Repair tick');
+    expect(element.querySelector('.needs-answer-note')?.textContent?.replace(/\s+/g, ' ')).toContain('3 files (highlighted above) have no date, Skip or Repair. Answer each, or use Bulk actions above.');
 
     await type(dateBox('works/2 C - D.html'), '2024-05-06');
     skipBox('works/2 C - D.pdf').click();
     await fixture.whenStable();
     expect(row('works/2 C - D.html').classList).not.toContain('needs-answer');
     expect(row('works/2 C - D.pdf').classList).not.toContain('needs-answer');
-    expect(element.querySelector('.needs-answer-note')?.textContent).toContain('1 file has no date, Skip or Repair tick');
+    expect(element.querySelector('.needs-answer-note')?.textContent?.replace(/\s+/g, ' ')).toContain('1 file (highlighted above) has no date, Skip or Repair. Answer it, or use Bulk actions above.');
     expect(primary().disabled).toBe(true);
 
     // Skip remaining skips what is left, keeping the date and the skip given
