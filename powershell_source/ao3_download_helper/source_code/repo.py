@@ -62,6 +62,9 @@ class Repository:
     # the zone a run's lines say a time in (the person's AO3 zone); None is UTC
     zone = None
     maintenance_delay = 30
+    # how long to wait before asking again after a request timed out - longer than the
+    # doubling retry wait starts at, since ao3 too slow to answer is rarely ready a moment later
+    timeout_retry_delay = 30
 
 
     def __init__(self, fileops: FileOps, progress: ProgressCallback | None = None,
@@ -84,6 +87,8 @@ class Repository:
                                                 type(self).maintenance_retries)
         self.maintenance_delay = self.setting(strings.INI_MAINTENANCE_DELAY,
                                               type(self).maintenance_delay)
+        self.timeout_retry_delay = self.setting(strings.INI_TIMEOUT_RETRY_DELAY,
+                                                type(self).timeout_retry_delay)
         self.retry_max_delay = self.setting(strings.INI_RETRY_MAX_DELAY,
                                             type(self).retry_max_delay)
         # True once logged in, False for a run told not to, None until either is known
@@ -382,6 +387,10 @@ class Repository:
                 timeout_capped = self.max_timeouts != 0 and timeouts >= self.max_timeouts
                 if should_retry and not timeout_capped:
                     attempt += 1
+                    # a timeout waits its own, longer, wait - the doubling one starts at a
+                    # fraction of a second, which only asks a server that is too slow again
+                    if isinstance(e, exceptions.TimeoutException):
+                        retry_delay = self.timeout_retry_delay
                     self.log_error(url, strings.MESSAGE_RETRY.format(method, attempt, retry_delay), e)
                     if isinstance(e, exceptions.TimeoutException):
                         print(strings.MESSAGE_TIMED_OUT_RETRYING.format(

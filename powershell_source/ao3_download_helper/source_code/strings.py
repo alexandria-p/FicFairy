@@ -109,6 +109,7 @@ INI_STILL_WAITING = 'StillWaitingSeconds'
 # ao3's maintenance page: how many more tries, how far apart
 INI_MAINTENANCE_RETRIES = 'MaintenanceRetries'
 INI_MAINTENANCE_DELAY = 'MaintenanceRetrySeconds'
+INI_TIMEOUT_RETRY_DELAY = 'TimeoutRetrySeconds'
 # the longest a retry of a failed request waits before asking again
 INI_RETRY_MAX_DELAY = 'RetryMaxWaitSeconds'
 # how long a run waits for the page to read or write the library, and how long for a page
