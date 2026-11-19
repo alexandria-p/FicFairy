@@ -44,8 +44,12 @@
     <article class="run run-active" data-active-run>
       <header class="run-head">
         <span class="run-name">{{ active.actionName }}</span>
-        <span class="run-status">
-          In progress - {{ active.paused ? 'paused' : 'running' }}
+        <!-- in the top right corner, as on every other card, so it never breaks across lines
+             after the name -->
+        <span class="run-corner">
+          <span class="run-status">
+            In progress - {{ active.paused ? 'paused' : 'running' }}
+          </span>
         </span>
       </header>
       <p class="run-when">
