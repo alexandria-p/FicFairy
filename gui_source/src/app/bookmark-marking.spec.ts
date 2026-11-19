@@ -325,7 +325,7 @@ describe('downloading or updating from the Works tab', () => {
       await settle();
     }
     const bar = element.querySelector('button.fetch-ticked') as HTMLButtonElement;
-    expect(bar.textContent?.trim()).toBe('Download/update 1 work now');
+    expect(bar.textContent?.trim()).toBe('Download/update latest for 1 work now from AO3');
     expect(bar.title).toContain('the series is left out');
     expect(bar.title).toContain('the external work is left out');
     bar.click();
