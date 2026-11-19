@@ -2668,3 +2668,35 @@ def test_a_page_that_cannot_tell_leaves_the_field_as_it_was() -> None:
     assert 'bookmarked' not in fresh
 
 # endregion
+
+
+# region newly indexed
+
+def test_an_entry_written_where_there_was_none_is_newly_indexed():
+    ao3, _, fileops = make_ao3()
+    fileops.load_json.return_value = None
+    ao3.save_metadata({'id': '101', 'title': 'New', 'link': 'https://archiveofourown.org/works/101'})
+
+    assert ao3.reindexed == {'101'}
+    assert ao3.newly_indexed == {'101'}
+
+
+def test_an_entry_brought_up_to_date_is_re_indexed_and_not_new():
+    ao3, _, fileops = make_ao3()
+    fileops.load_json.return_value = {'id': '202', 'title': 'Old', 'indexes': []}
+    ao3.save_metadata({'id': '202', 'title': 'Old', 'link': 'https://archiveofourown.org/works/202'})
+
+    assert ao3.reindexed == {'202'}
+    assert ao3.newly_indexed == set()
+
+
+def test_an_entry_made_then_written_again_in_the_same_run_stays_new():
+    ao3, _, fileops = make_ao3()
+    fileops.load_json.return_value = None
+    ao3.save_metadata({'id': '303', 'title': 'Twice', 'link': 'https://archiveofourown.org/works/303'})
+    fileops.load_json.return_value = {'id': '303', 'title': 'Twice', 'indexes': []}
+    ao3.save_metadata({'id': '303', 'title': 'Twice', 'link': 'https://archiveofourown.org/works/303'})
+
+    assert ao3.newly_indexed == {'303'}
+
+# endregion

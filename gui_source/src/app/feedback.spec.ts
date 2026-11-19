@@ -795,6 +795,11 @@ describe('logExcerpt', () => {
 });
 
 describe('runSummary', () => {
+  it('counts the index entries a run made apart from the ones it brought up to date', () => {
+    const lines = runSummary({ reindexed: ['1', '2', '3'], newlyIndexed: ['2'], downloaded: [], updated: [] });
+    expect(lines).toContain('Newly indexed 1, re-indexed 2, downloaded 0, updated 0');
+  });
+
   it('says what the run was and how it went, as History does', () => {
     const lines = runSummary({
       actionName: 'Full scan', status: 'partial', started: '2026-10-20T10:00:00+00:00', finished: '2026-10-20T11:00:00+00:00',
@@ -806,7 +811,7 @@ describe('runSummary', () => {
     expect(lines).toContain('Status: partial');
     expect(lines).toContain('Finished: 2026-10-20T11:00:00+00:00');
     expect(lines).toContain('File types: JSON, HTML');
-    expect(lines).toContain('Re-indexed 2, downloaded 1, updated 0');
+    expect(lines).toContain('Newly indexed 0, re-indexed 2, downloaded 1, updated 0');
     expect(lines).toContain('Issues: 1 could not be downloaded; 1 bookmarks that are not works');
     expect(lines).toContain('Log: 2 lines (40 earlier lines dropped by the run itself)');
   });

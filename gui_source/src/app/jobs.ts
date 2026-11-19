@@ -364,7 +364,10 @@ export interface RunHistory {
   url?: string;
   /** the ao3 account it logged in as - never the password; absent on older runs */
   username?: string;
+  /** every work whose index entry the run wrote, new or brought up to date */
   reindexed: string[];
+  /** of those, the ones it made - they had no entry before; absent on older runs */
+  newlyIndexed?: string[];
   downloaded: string[];
   updated: string[];
   choices: RunChoice[];

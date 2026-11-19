@@ -220,7 +220,9 @@ export function runSummary(record: Record<string, unknown>): string[] {
   const filetypes = Array.isArray(record['filetypes']) ? record['filetypes'].map(String).join(', ') : '';
   if (filetypes) lines.push(`File types: ${filetypes}`);
   if (record['background']) lines.push('Ran in the background: yes');
-  lines.push(`Re-indexed ${count(record['reindexed'])}, downloaded ${count(record['downloaded'])}, updated ${count(record['updated'])}`);
+  const newly = Array.isArray(record['newlyIndexed']) ? record['newlyIndexed'].length : 0;
+  lines.push(`Newly indexed ${newly}, re-indexed ${count(record['reindexed']) - newly}, ` +
+    `downloaded ${count(record['downloaded'])}, updated ${count(record['updated'])}`);
   const issues = issuesOf(record as unknown as RunHistory);
   const kinds: [number, string][] = [
     [issues.indexGaps?.length ?? 0, 'where indexing broke off'],

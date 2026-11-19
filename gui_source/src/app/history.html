@@ -417,11 +417,7 @@
           collapsed by default: a run that touched a thousand works would bury the next one,
           and the number is usually all anybody wants from it
         -->
-        @for (group of [
-          { label: 'Re-indexed', ids: run.reindexed },
-          { label: 'Downloaded', ids: run.downloaded },
-          { label: 'Updated', ids: run.updated }
-        ]; track group.label) {
+        @for (group of idGroups(run); track group.label) {
           @if (group.ids.length) {
             <details class="ids" (toggle)="toggleList(run.file + ':' + group.label, $any($event.target).open)">
               <summary>

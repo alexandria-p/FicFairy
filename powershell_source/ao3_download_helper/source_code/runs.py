@@ -207,6 +207,8 @@ class RunRecord:
             # different questions: what got a fresh index entry, what arrived as a file,
             # and what replaced a copy that was already there.
             'reindexed': [],
+            # of those, the works whose entry the run made - they had none before
+            'newlyIndexed': [],
             'downloaded': [],
             'updated': [],
             # anything the run stopped to ask, and what was answered
@@ -338,6 +340,8 @@ class RunRecord:
 
         if ao3 is None: return
         self.data['reindexed'] = sorted(ao3.reindexed)
+        newly = getattr(ao3, 'newly_indexed', None)
+        self.data['newlyIndexed'] = sorted(newly) if isinstance(newly, set) else []
         self.data['downloaded'] = sorted(ao3.downloaded)
         self.data['updated'] = sorted(ao3.updated)
         self.data['failures'] = list(ao3.failures)
