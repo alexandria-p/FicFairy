@@ -431,6 +431,51 @@ describe('DownloadDialog', () => {
     expect(checkbox('EPUB')!.checked).toBe(false);
   });
 
+  it('offers work skins only in debug mode', async () => {
+    await open('bookmarks');
+    await advanceTo('filetypes');
+
+    expect(element.querySelector('input[name=skins]')).toBeNull();
+  });
+
+  for (const action of ['bookmarks', 'quick', 'custom'] as const) {
+    it(`sends work skins on a ${action} run when ticked in debug mode`, async () => {
+      debugOn();
+      await open(action);
+      await advanceTo('filetypes');
+      const box = element.querySelector<HTMLInputElement>('input[name=skins]')!;
+      expect(box.checked).toBe(false);
+      box.click();
+      await fixture.whenStable();
+
+      await advanceTo('running');
+
+      expect(jobs.started[0].options).toMatchObject({ skins: true });
+    });
+  }
+
+  it('does not offer work skins on a run that cannot take them', async () => {
+    debugOn();
+    await open('update');
+    await advanceTo('filetypes');
+
+    expect(element.querySelector('input[name=skins]')).toBeNull();
+  });
+
+  it('holds work skins while HTML is unticked, and sends none', async () => {
+    debugOn();
+    await open('bookmarks');
+    await advanceTo('filetypes');
+    element.querySelector<HTMLInputElement>('input[name=skins]')!.click();
+    checkbox('HTML')!.click();
+    await fixture.whenStable();
+
+    expect(element.querySelector<HTMLInputElement>('input[name=skins]')!.disabled).toBe(true);
+    expect(element.querySelector('.skins-hint')?.textContent).toContain('Tick HTML');
+    await advanceTo('running');
+    expect(jobs.started[0].options).toMatchObject({ skins: false });
+  });
+
   it('ticks html to begin with but lets it be turned off', async () => {
     // it costs a request per work on top of the indexing, which is the expensive half
     await open();
@@ -1049,6 +1094,8 @@ describe('DownloadDialog', () => {
       series: true,
       // images are a custom run's to ask for; a full scan is not offered them
       images: false,
+      // work skins are offered only in debug mode
+      skins: false,
       workdates: false,
       // only a custom run may turn this off, so every other run always indexes
       reindex: true,

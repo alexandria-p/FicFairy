@@ -213,6 +213,26 @@
           }
         </fieldset>
 
+        <!-- debug mode only for now: each work's skin, which AO3's download leaves out, put
+             into its html - see the helper's `Ao3.dress` -->
+        @if (picksSkins()) {
+          <label class="check skins-option" [class.locked]="!htmlTicked()">
+            <input type="checkbox" name="skins" [checked]="skins()" [disabled]="!htmlTicked()"
+                   (change)="skins.set($any($event.target).checked)" />
+            <span>[DEBUG] Fetch work skin for HTML downloads</span>
+          </label>
+          <p class="hint skins-hint">
+            @if (htmlTicked()) {
+              Puts each work's skin - its author's own styling, which AO3's download leaves out -
+              into the HTML file, and saves it as <code>skins/&lt;work number&gt;.css</code>. Only
+              HTML can take one. A work whose page this run does not read anyway costs one more
+              request to AO3.
+            } @else {
+              Tick HTML to use this - a work skin only goes into HTML files.
+            }
+          </p>
+        }
+
         <!-- JSON is only listed in debug mode, so only then is there anything to say about it -->
         @if (!debugMode.on()) {
         } @else if (picksReindex()) {

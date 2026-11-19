@@ -108,6 +108,8 @@ export interface JobOptions {
   pages: number;
   series: boolean;
   images: boolean;
+  /** put each work's skin into the html the run downloads (debug only for now) */
+  skins?: boolean;
   workdates: boolean;
   /**
    * Fetch every requested format again, whether or not the copy held is behind.

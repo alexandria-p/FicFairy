@@ -95,6 +95,9 @@ type Step =
   | 'failed';
 
 /** how long the run page waits on the helper (and a quick scan's floor) before giving up */
+/** the runs that can put work skins into their html - the helper's `SKIN_ACTIONS` */
+export const SKIN_ACTIONS: readonly JobAction[] = ['bookmarks', 'quick', 'custom', 'work', 'works'];
+
 export const START_WAIT_MS = 2 * 60 * 1000;
 const TIMED_OUT = Symbol('timed out');
 const CANCELLED = Symbol('cancelled');
@@ -259,6 +262,8 @@ export class DownloadDialog implements OnDestroy {
   protected readonly pages = signal(0);
   protected readonly series = signal(false);
   protected readonly images = signal(false);
+  /** put each work's skin into the html this run downloads - a debug option for now */
+  protected readonly skins = signal(false);
   protected readonly workdates = signal(false);
   /** fetch every requested format again, whether or not the copy held is behind */
   protected readonly overwrite = signal(false);
@@ -850,6 +855,19 @@ export class DownloadDialog implements OnDestroy {
   protected readonly picksImages = computed(() => this.action() === 'custom');
 
   /**
+   * Work skins - the CSS an author gives a work, which AO3's own download leaves out - put into
+   * the html this run downloads (the helper's `Ao3.dress`). Debug mode only for now, on the scans
+   * and the fic runs (the helper's `SKIN_ACTIONS`), and only when HTML is ticked. A work page the
+   * run reads anyway gives the skin for nothing; otherwise each work's page is read once.
+   */
+  protected readonly picksSkins = computed(() =>
+    this.debugTools() && !this.resuming() && SKIN_ACTIONS.includes(this.action()));
+
+  /** whether HTML is among the file types - the only format a skin goes into */
+  protected readonly htmlTicked = computed(() =>
+    this.selected().some((x) => x.toUpperCase() === 'HTML'));
+
+  /**
    * Which runs may fetch a work again that nothing says is out of date.
    *
    * The two that can be pointed at a library and told to spend more on it: a full scan and
@@ -1052,6 +1070,7 @@ export class DownloadDialog implements OnDestroy {
     if (this.workdates()) chosen.push('look up publication dates');
     if (this.picksSeries() && this.series()) chosen.push('the rest of each series');
     if (this.picksImages() && this.images()) chosen.push('save images separately');
+    if (this.picksSkins() && this.skins() && this.htmlTicked()) chosen.push('work skins in html');
     if (this.picksReindex() && !this.reindex()) {
       chosen.push(this.recheck() ? 'each indexed work looked up on AO3' : 'no reindexing');
     }
@@ -1185,6 +1204,12 @@ export class DownloadDialog implements OnDestroy {
       rows.push({
         label: 'Embedded images',
         value: this.images() ? 'saved separately' : 'not saved separately',
+      });
+    }
+    if (this.picksSkins()) {
+      rows.push({
+        label: 'Work skins',
+        value: this.skins() && this.htmlTicked() ? 'put into html downloads' : 'not fetched',
       });
     }
     if (this.picksOverwrite()) {
@@ -1833,6 +1858,7 @@ export class DownloadDialog implements OnDestroy {
     const options = chosen.options ?? {};
     this.series.set(!!options['series']);
     this.images.set(!!options['images']);
+    this.skins.set(!!options['skins']);
     this.overwrite.set(!!options['overwrite']);
     this.nonBookmarks.set(!!options['nonBookmarks']);
     this.retryReindex.set(options['reindex'] !== false);
@@ -2200,6 +2226,7 @@ export class DownloadDialog implements OnDestroy {
         subcollections: this.picksCollectionWorks() && this.subcollections(),
         parentCollections: this.picksCollectionWorks() && this.parentCollections(),
         images: this.images(),
+        skins: this.picksSkins() && this.skins() && this.htmlTicked(),
         workdates: this.workdates(),
         // only offered on the runs that can be pointed at a known set of works
         // an import's from its own window's *Overwrite existing downloads*

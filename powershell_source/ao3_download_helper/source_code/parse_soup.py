@@ -239,6 +239,15 @@ def has_custom_skin(soup: BeautifulSoup) -> bool:
     return bool(soup.select('ul.work.navigation.actions li.style'))
 
 
+def get_work_skin(soup: BeautifulSoup) -> str:
+    """A work's skin - the CSS its author attached to it - as the work page carries it: one
+    `<style>` block inside `div#work-skin`, ahead of the work itself. '' when it has none (the
+    wrapper is there on every work page, empty without a skin)."""
+
+    style = soup.select_one('#work-skin style')
+    return style.get_text().strip() if style else ''
+
+
 def get_title(soup: BeautifulSoup, link: str, pattern: str) -> list[str]:
     """Get (non-truncated) filename for the work"""
 

@@ -5,6 +5,9 @@ INVALID_FILENAME_CHARACTERS = r'<>:"/\|?*.' + ''.join(chr(i) for i in range(32))
 TIMESTAMP_FORMAT = '%m/%d/%Y, %H:%M:%S'
 
 IMAGE_FOLDER_NAME = 'images'
+# each work's skin as a file of its own, `<worknum>.css` - made the first time one is saved, and
+# never read as a work (nothing looks for works outside `works/`)
+SKINS_FOLDER_NAME = 'skins'
 INDEXING_FOLDER_NAME = 'indexing'
 COLLECTIONS_FOLDER_NAME = 'collections'
 HTML_FOLDER_NAME = 'source_code.html'
@@ -462,6 +465,12 @@ STEP_UPDATE_WINDOW = 'Download or update each fic as necessary'
 STEP_UPDATE = 'Re-index each fic, then download or update as necessary'
 STEP_FILL_GAPS = 'Fetch any format still missing'
 STEP_IMAGES = 'Save embedded images separately'
+AO3_INFO_SKIN_FOUND = 'work {} has a work skin - it goes into its html'
+AO3_INFO_SKIN_NONE = 'work {} has no work skin'
+AO3_INFO_SKIN_READING = 'reading work {} on AO3 for its work skin'
+AO3_INFO_SKIN_UNREADABLE = 'could not read the work skin of work {} - its html is saved without it: {}'
+AO3_INFO_SKIN_ADDED = 'work skin added to {}'
+AO3_INFO_SKIN_NOT_ADDED = 'the html of work {} could not take its work skin - saved without it'
 STEP_REPORT = 'Report any failures'
 STEP_SERIES = 'Index works in series marked for walkthrough'
 STEP_NON_BOOKMARKS = 'Check remaining non-bookmarks for updates'
