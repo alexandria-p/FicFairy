@@ -381,6 +381,8 @@ COLLECTION_ACTIONS = (ACTION_COLLECTIONS, ACTION_COLLECTION)
 # and nowhere else. ACTION_WORK is absent on purpose: it always overwrites, and `run_work`
 # sets that itself rather than taking it from the request.
 OVERWRITE_ACTIONS = (ACTION_BOOKMARKS, ACTION_CUSTOM)
+# the runs that can put work skins into their html: the scans and the fic runs
+SKIN_ACTIONS = (ACTION_BOOKMARKS, ACTION_QUICK, ACTION_CUSTOM, ACTION_WORK, ACTION_WORKS)
 
 # The runs that may also check every non-bookmark in the index for updates - the works it
 # holds only because they were found through something else, such as another work's series.
@@ -486,6 +488,9 @@ def resolve_options(requested) -> dict:
         'subcollections': bool(given.get('subcollections')),
         'parentCollections': bool(given.get('parentCollections')),
         'images': bool(given.get('images')),
+        # put each work's skin - its author's CSS, which AO3's download leaves out - into the
+        # html the run downloads (`Ao3.dress`). Debug only for now
+        'skins': bool(given.get('skins')),
         'workdates': bool(given.get('workdates')),
         # fetch every requested format again, however current the copy on disk looks. the
         # answer to a damaged or truncated file, which no version check can see: the name
@@ -946,6 +951,7 @@ class Job:
         self._ao3 = value
         # a test may stand a mock in for the class itself
         real = isinstance(Ao3, type) and isinstance(value, Ao3)
+        if real: value.skins = bool((getattr(self, 'options', None) or {}).get('skins'))
         if real: value.run_id = self.id
         done = self.earlier_progress().get('formatsDone') if getattr(self, 'resume', None) else None
         if value is not None and isinstance(done, dict):
@@ -6474,6 +6480,7 @@ class Handler(BaseHTTPRequestHandler):
         # re-fetch a whole library
         # an import may overwrite too, when its window was told to (`run_fic_list`)
         if action not in OVERWRITE_ACTIONS and action != ACTION_IMPORT: options['overwrite'] = False
+        if action not in SKIN_ACTIONS: options['skins'] = False
         # the import's alone: every other run replaces what is outdated as a matter of course
         if action != ACTION_IMPORT:
             options['replaceOutdated'] = False

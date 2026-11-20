@@ -341,6 +341,11 @@ class Ao3:
         # attempt saved, which a retry carrying on from it does not fetch again (`format_done`)
         self.saved_formats: dict[str, set[str]] = {}
         self.formats_done: dict[str, set[str]] = {}
+        # whether this run puts each work's skin into the html it downloads (`dress`), and what
+        # it has learnt of each work's skin, by number - '' for none. Taken from every work page
+        # the run reads anyway (`note_skin`), so a work it has already read costs nothing more
+        self.skins = False
+        self.skin_css: dict[str, str] = {}
         # how far the collection listing being read has got: its first page, the last page
         # read in full, and the works found - said when one breaks off
         self.listing_read: dict = {}
@@ -838,7 +843,75 @@ class Ao3:
         if isinstance(status, int) and not 200 <= status < 300:
             raise exceptions.InvalidStatusCodeException(
                 strings.ERROR_INVALID_STATUS_CODE.format(status))
+        if work: self.note_skin(url, soup)
         return soup
+
+
+    def note_skin(self, url: str, soup) -> None:
+        """Remember the skin on a work page this run read anyway - the fic runs, the update
+        pass and every other re-read - so `skin_for` never asks AO3 for the same page twice."""
+
+        if not self.skins: return
+        work = parse_text.get_work_number(url or '')
+        if not work: return
+        try:
+            self.skin_css[str(work)] = parse_soup.get_work_skin(soup)
+        except Exception:
+            pass # a page that cannot be read for a skin is a work with none, for this run
+
+
+    def skin_for(self, work: str) -> str:
+        """A work's skin, '' for none: from a page this run already read, or else its own page,
+        read once (the first chapter is enough - the skin is the same on every one).
+
+        A page that will not read costs the skin and nothing else: the html is saved without it.
+        A stop, or a lapsed login, still ends the run.
+        """
+
+        work = str(work)
+        if work in self.skin_css: return self.skin_css[work]
+        print(strings.AO3_INFO_SKIN_READING.format(work))
+        try:
+            self.fetch_page(f'{strings.AO3_BASE_URL}/works/{work}', work=True)
+        except (exceptions.CancelledException, exceptions.SessionExpiredException):
+            raise
+        except Exception as e:
+            self.skin_css[work] = ''
+            self.log_error({'message': strings.AO3_INFO_SKIN_UNREADABLE.format(work, e),
+                            'link': f'{strings.AO3_BASE_URL}/works/{work}'}, e)
+            print(strings.AO3_INFO_SKIN_UNREADABLE.format(work, e))
+            return ''
+        css = self.skin_css.setdefault(work, '')
+        print((strings.AO3_INFO_SKIN_FOUND if css else strings.AO3_INFO_SKIN_NONE).format(work))
+        return css
+
+
+    def dress(self, work: str, filetype: str, name: str, content: bytes) -> bytes:
+        """A downloaded file with its work's skin put in, when this run was asked to - html only.
+
+        AO3's download leaves the skin out, and its rules are all written `#workskin .<class>`,
+        so the CSS goes into the `<head>` and the body is wrapped in `<div id="workskin">`, as on
+        the work page. Done before the file is saved, so it is written once and every check on
+        it (`saved_intact`, its name and date) sees the file as it is kept. The skin is saved
+        beside the works too, `skins/<worknum>.css`. Anything that does not fit leaves the file
+        exactly as AO3 sent it.
+        """
+
+        if not self.skins or filetype.upper() != 'HTML':
+            return content
+        css = self.skin_for(work)
+        if not css: return content
+        try:
+            self.fileops.save_bytes(os.path.join(strings.SKINS_FOLDER_NAME, f'{work}.css'),
+                                    css.encode('utf-8'))
+        except Exception as e:
+            self.log_error({'message': strings.AO3_INFO_SKIN_NOT_ADDED.format(work)}, e)
+        dressed = with_skin(content, css)
+        if dressed is None:
+            print(strings.AO3_INFO_SKIN_NOT_ADDED.format(work))
+            return content
+        print(strings.AO3_INFO_SKIN_ADDED.format(name))
+        return dressed
 
 
     def download_indexed(self, records: list[dict], visited: list[str] | None = None,
@@ -975,8 +1048,10 @@ class Ao3:
             with self.one_format(filetype, failed):
                 content = fetch(filetype) if fetch else self.repo.download_file(
                     parse_text.get_direct_download_link(work, filetype), filetype)
-                self.save_download(record['link'], filetype,
-                                   filename + parse_text.get_file_type(filetype), content)
+                name = filename + parse_text.get_file_type(filetype)
+                # AO3's own html only: FicHub's copy carries no skin to match
+                if not fetch: content = self.dress(work, filetype, name, content)
+                self.save_download(record['link'], filetype, name, content)
                 if arrived is not None: arrived.append(filetype)
 
         # anything that did arrive is a download, even when a format beside it failed
@@ -2388,6 +2463,7 @@ class Ao3:
 
         thesoup = self.repo.get_soup(work_url)
         thesoup = self.proceed(thesoup)
+        self.note_skin(work_url, thesoup)
 
         if chapters is not None: # TODO this is a super awkward place for this logic to be and I don't like it.
             currentchapters = parse_soup.get_current_chapters(thesoup)
@@ -2426,8 +2502,9 @@ class Ao3:
             with self.one_format(filetype, failed):
                 link = parse_soup.get_download_link(thesoup, filetype)
                 response = self.repo.get_book(link)
-                self.save_download(work_url, filetype,
-                                   filename + parse_text.get_file_type(filetype), response)
+                name = filename + parse_text.get_file_type(filetype)
+                if number: response = self.dress(number, filetype, name, response)
+                self.save_download(work_url, filetype, name, response)
 
         if self.images:
             self.save_images(thesoup, filename, work_url, title)
@@ -2713,3 +2790,31 @@ class Ao3:
         if not isinstance(exception, exceptions.Ao3DownloaderException):
             log['stacktrace'] = ''.join(traceback.TracebackException.from_exception(exception).format())
         self.fileops.write_log(log)
+
+
+SKIN_OPEN = '<div id="workskin">'
+
+
+def with_skin(content: bytes, css: str) -> bytes | None:
+    """AO3's downloaded html with a work skin in it, or None when it cannot take one as it is.
+
+    The CSS goes in a `<style>` at the end of the `<head>`, after AO3's own download styles, and
+    everything in the `<body>` goes inside `<div id="workskin">`, which every skin rule names.
+    None - and the file is saved as AO3 sent it - for a file that is not utf-8, has no head or
+    body to find, already has the wrapper, or a skin that would close its own `<style>`.
+    """
+
+    try:
+        text = content.decode('utf-8')
+    except (UnicodeDecodeError, AttributeError):
+        return None
+    lower = text.lower()
+    if 'id="workskin"' in lower or '</style' in css.lower(): return None
+    head_end = lower.find('</head>')
+    body = re.search(r'<body[^>]*>', text, re.IGNORECASE)
+    body_end = lower.rfind('</body>')
+    if head_end < 0 or not body or body_end < body.end(): return None
+    style = f'<style type="text/css">\n/* the work skin, from the work\'s page on AO3 */\n{css}\n</style>\n'
+    return (text[:head_end] + style + text[head_end:body.end()] + '\n' + SKIN_OPEN
+            + text[body.end():body_end] + '</div>\n' + text[body_end:]).encode('utf-8')
+

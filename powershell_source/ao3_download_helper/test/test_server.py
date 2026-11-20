@@ -104,7 +104,7 @@ def test_html_is_offered_by_default_but_can_be_turned_off():
 
 def test_resolve_options_defaults_match_the_console_defaults():
     assert server.resolve_options(None) == {
-        'start': 1, 'pages': 0, 'series': False, 'images': False, 'workdates': False,
+        'start': 1, 'pages': 0, 'series': False, 'images': False, 'skins': False, 'workdates': False,
         'reindex': True, 'dates': False, 'order': '', 'recheck': False, 'skipLogin': False, 'dateFrom': '', 'dateTo': '',
         'overwrite': False, 'floorRun': '', 'nonBookmarks': False, 'resume': '', 'retryMode': '',
         'collectionWorks': False, 'subcollections': False, 'parentCollections': False,
@@ -121,7 +121,7 @@ def test_resolve_options_reads_what_was_asked_for():
          'dateTo': '2026-06-30', 'overwrite': True, 'nonBookmarks': True,
          'collectionWorks': True, 'subcollections': True, 'parentCollections': True})
 
-    assert result == {'start': 5, 'pages': 8, 'series': True, 'images': True,
+    assert result == {'start': 5, 'pages': 8, 'series': True, 'images': True, 'skins': False,
                       'workdates': True, 'reindex': False, 'dates': True, 'order': 'bookmarked',
                       'recheck': False, 'skipLogin': False,
                       'dateFrom': '2026-01-01', 'dateTo': '2026-06-30',
