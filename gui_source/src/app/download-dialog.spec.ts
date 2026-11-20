@@ -1886,6 +1886,20 @@ describe('DownloadDialog', () => {
     expect(said).toContain('EPUB: failed to repair from AO3 due to a name clash - 1 Fic - Someone 2026-05-01.epub is already another file');
   });
 
+  it('lists at the end the work skins it could not fetch or put in', async () => {
+    await open('bookmarks');
+    await advanceTo('running');
+    jobs.push!({ type: 'skinFailures', skinFailures: [
+      { id: '1', link: 'https://archiveofourown.org/works/1', error: 'its work page would not read: 503' }] } as JobEvent);
+    jobs.push!({ type: 'finished' } as JobEvent);
+    await fixture.whenStable();
+
+    const said = element.querySelector('.skin-failures')?.textContent?.replace(/\s+/g, ' ') ?? '';
+    expect(said).toContain('1 work skin could not be fetched or put in');
+    expect(said).toContain('its work page would not read: 503');
+    expect(said).toContain('kept as AO3 sent it');
+  });
+
   it('asks about a file whose date is only guessed, saying what it thinks and recommends', async () => {
     await open('bookmarks');
     await advanceTo('running');
@@ -3675,9 +3689,11 @@ describe('DownloadDialog', () => {
     expect(said).toContain('unrevealed collection');
     expect(said).toContain('made private, or hidden');
     // and the failures list, which is the other half of the report
-    expect(element.querySelector('.failures:not(.skipped)')?.textContent).toContain(
+    expect(element.querySelector('.failures:not(.skipped):not(.skin-failures)')?.textContent).toContain(
       'timed out',
     );
+    // and a work skin that could not be had
+    expect(element.querySelector('.skin-failures')?.textContent).toContain('its work page would not read');
   });
 
   it('sends nothing to the helper for a made-up report', async () => {

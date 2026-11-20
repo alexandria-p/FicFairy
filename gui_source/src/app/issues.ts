@@ -17,6 +17,8 @@ export interface RunIssues {
   fichubOlder?: FicHubOlder[];
   /** files Resolve issues asked to repair, not repaired: the name each would get is taken */
   repairClashes?: RepairClash[];
+  /** work skins the run could not get, or could not put into the work's html */
+  skinFailures?: WorkFailure[];
 }
 
 /** how many entries there are across every kind */
@@ -28,7 +30,8 @@ export function issueCount(issues: RunIssues): number {
     issues.notRemoved.length +
     issues.skipped.length +
     (issues.fichubOlder?.length ?? 0) +
-    (issues.repairClashes?.length ?? 0)
+    (issues.repairClashes?.length ?? 0) +
+    (issues.skinFailures?.length ?? 0)
   );
 }
 
@@ -58,6 +61,7 @@ export function issuesOf(run: RunHistory): RunIssues {
     skipped: run.skipped ?? [],
     fichubOlder: run.fichubOlder ?? [],
     repairClashes: run.repairClashes ?? [],
+    skinFailures: run.skinFailures ?? [],
   };
 }
 
@@ -153,6 +157,13 @@ export function issuesReport(issues: RunIssues, heading = 'Issues from this run'
     (issues.repairClashes ?? []).map((row) =>
       [row.id, row.link, row.format, row.site, row.file, row.wanted].join('\t'),
     ),
+  );
+  section(
+    plural(issues.skinFailures?.length ?? 0,
+      'work skin that could not be fetched or put in',
+      'work skins that could not be fetched or put in'),
+    'work id, link, reason (its HTML is kept as AO3 sent it)',
+    (issues.skinFailures ?? []).map((row) => [row.id, row.link, row.error].join('\t')),
   );
   return lines.join('\n') + '\n';
 }

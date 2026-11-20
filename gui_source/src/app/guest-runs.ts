@@ -52,6 +52,7 @@ export const GUEST_STEP_LABELS = {
   STEP_FILL_GAPS: 'Fetch any format still missing',
   STEP_IMAGES: 'Save embedded images separately',
   STEP_SKINS_ONLY: 'Fetch work skins',
+  STEP_SKINS_FOR_HTML: 'Fetch work skins for the HTML downloaded',
   STEP_REPORT: 'Report any failures',
   STEP_SERIES: 'Index works in series marked for walkthrough',
   STEP_NON_BOOKMARKS: 'Check remaining non-bookmarks for updates',
@@ -147,6 +148,7 @@ export function guestPlan(action: JobAction, filetypes: string[], options: Optio
       window.push(
         step('check', L.STEP_CHECK_FILES),
         step('update', L.STEP_UPDATE_WINDOW),
+        ...skinsStep(filetypes, options),
         step('fichub', L.STEP_FICHUB),
         step('cleanup', L.STEP_CLEANUP),
         step('report', L.STEP_REPORT),
@@ -169,8 +171,15 @@ export function guestPlan(action: JobAction, filetypes: string[], options: Optio
     if (downloads.length) plan.push(step('check', L.STEP_CHECK_FILES), step('download', L.STEP_DOWNLOAD));
     if (options['images'] && action === 'custom') plan.push(step('images', L.STEP_IMAGES));
   }
+  plan.push(...skinsStep(filetypes, options));
   plan.push(step('fichub', L.STEP_FICHUB), step('cleanup', L.STEP_CLEANUP), step('report', L.STEP_REPORT));
   return plan;
+}
+
+/** The step that reads the work skins the html downloads had not to hand (`fetch_pending_skins`). */
+function skinsStep(filetypes: string[], options: Options): GuestStep[] {
+  return options['skins'] && filetypes.map((x) => x.toUpperCase()).includes('HTML')
+    ? [{ id: 'skins', label: L.STEP_SKINS_FOR_HTML }] : [];
 }
 
 /** a custom run indexes unless told not to - the helper's own default (`resolve_options`) */
@@ -541,6 +550,15 @@ export class GuestRun {
         for (const work of this.picked(works).slice(0, 2)) {
           await this.wait(pace.work);
           this.say(`  no embedded images in ${work.title}`);
+        }
+        this.mark(id, 'done');
+        return;
+      }
+      case 'skins': {
+        this.mark(id, 'running');
+        for (const work of this.picked(works).slice(0, 2)) {
+          await this.wait(pace.work);
+          this.say(`work skin put into ${work.title}`);
         }
         this.mark(id, 'done');
         return;

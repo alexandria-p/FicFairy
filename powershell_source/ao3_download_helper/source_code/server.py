@@ -31,7 +31,7 @@ import requests
 
 from source_code import access, dropbox_library, exceptions, fichub, settings_file, indexing, naming, parse_soup, parse_text, progress, runs, strings, updater as updates
 from source_code.actions import shared
-from source_code.ao3 import REASON_MAINTENANCE, SKIN_NOTES, SORT_DATE_SELECTORS, failure_reason, Ao3, index_gaps, was_bookmark
+from source_code.ao3 import REASON_MAINTENANCE, SKIN_NOTES, with_skin, SORT_DATE_SELECTORS, failure_reason, Ao3, index_gaps, was_bookmark
 from source_code.fileio import FileOps
 from source_code.repo import Repository
 from source_code.storage import PageStorage
@@ -1190,6 +1190,12 @@ def checks_non_bookmarks(job: Job) -> bool:
     return job.action != ACTION_CUSTOM or bool(job.options.get('reindex'))
 
 
+def fetches_skins(job: Job) -> bool:
+    """Whether the run fetches work skins with the html it downloads - and so lists the step
+    that reads the ones not to hand (`fetch_pending_skins`)."""
+    return bool((job.options or {}).get('skins')) and 'HTML' in [str(x).upper() for x in job.filetypes]
+
+
 def step_plan(job: Job) -> list[tuple[str, str]]:
     """What this particular run is going to do, in order.
 
@@ -1283,8 +1289,9 @@ def step_plan(job: Job) -> list[tuple[str, str]]:
             if checks_non_bookmarks(job):
                 window.append(('nonbookmarks', strings.STEP_NON_BOOKMARKS))
             window.extend([('check', strings.STEP_CHECK_FILES),
-                           ('update', strings.STEP_UPDATE_WINDOW),
-                           ('fichub', strings.STEP_FICHUB),
+                           ('update', strings.STEP_UPDATE_WINDOW)])
+            if fetches_skins(job): window.append(('skins', strings.STEP_SKINS_FOR_HTML))
+            window.extend([('fichub', strings.STEP_FICHUB),
                            ('cleanup', strings.STEP_CLEANUP),
                            ('report', strings.STEP_REPORT)])
             return window
@@ -1317,6 +1324,7 @@ def step_plan(job: Job) -> list[tuple[str, str]]:
     # end. every run can end with files to tidy away, and every run reports - in that order,
     # so a work FicHub gave us is linked to its collections, and anything the cleanup could
     # not remove is in the report
+    if fetches_skins(job): plan.append(('skins', strings.STEP_SKINS_FOR_HTML))
     plan.append(('fichub', strings.STEP_FICHUB))
     plan.append(('cleanup', strings.STEP_CLEANUP))
     plan.append(('report', strings.STEP_REPORT))
@@ -5144,10 +5152,78 @@ def run_skins_only(job: Job, fileops: FileOps, repo: Repository, report) -> None
     finish_run(job, fileops, ao3, report)
 
 
+def fetch_pending_skins(job: Job, fileops: FileOps, ao3, report) -> None:
+    """The work skins of the works whose html this run downloaded without the skin to hand -
+    read in one pass, after every download, as a step of its own (`STEP_SKINS_FOR_HTML`).
+
+    A skin is to hand where the run read the work's page anyway (the fic runs, the update pass,
+    any re-read); the scans index from listing pages, which carry none, so their downloads leave
+    each work here (`Ao3.skins_pending`) rather than reading its page between two downloads. Each
+    page is read once; the skin is saved beside the works, and put into the html file the run
+    downloaded - written beside it and swapped in (`Ao3.swap_in`), so the file is never part-
+    written. A skin that cannot be had or put in is listed (`Ao3.skin_failures`): the html stays as
+    AO3 sent it. Stop ends it; Skip this step leaves the rest without skins.
+    """
+
+    planned = any(step == 'skins' for step, _ in getattr(job.steps, 'plan', []) or [])
+    pending = list(getattr(ao3, 'skins_pending', None) or []) if getattr(ao3, 'skins', False) is True else []
+    if not pending:
+        if planned:
+            print(strings.AO3_INFO_SKINS_PENDING_NONE)
+            job.steps.skip('skins')
+        return
+    job.steps.start('skins')
+    print(strings.AO3_INFO_SKINS_PENDING.format(len(pending)))
+    try:
+        copies = shared.scan_downloaded_works(fileops.worksfolder, ['HTML'], storage=fileops.storage)
+    except Exception:
+        copies = {}
+    for done, work in enumerate(pending, 1):
+        ao3.check_cancelled()
+        if job.skipping():
+            print(strings.AO3_INFO_STEP_SKIPPED)
+            job.steps.skip('skins')
+            return
+        progress.report(report, progress.WORK, title=f'work {work}',
+                        link=f'{strings.AO3_BASE_URL}/works/{work}', filetype='skin',
+                        phase=progress.DOWNLOADING, done=done - 1, total=len(pending))
+        css = ao3.skin_for(work)
+        if work in ao3.skins_unread: continue
+        if not ao3.save_skin(work, css) or not css: continue
+        put_in_skin(fileops, ao3, work, css, ((copies.get(work) or {}).get('HTML') or {}).get('path'))
+    job.steps.done('skins')
+
+
+def put_in_skin(fileops: FileOps, ao3, work: str, css: str, path: str | None) -> None:
+    """Put a work's skin into its html file, as a download would have - written beside it and
+    swapped in, never over it. Any trouble is listed, and the file left as it is."""
+
+    if not path:
+        ao3.note_skin_failure(work, strings.SKIN_FAILED_NO_HTML)
+        return
+    name = os.path.relpath(path, fileops.downloadfolder)
+    shown = os.path.basename(path)
+    try:
+        content = fileops.read_text(path).encode('utf-8')
+        dressed = with_skin(content, css)
+        if dressed is None:
+            print(strings.AO3_INFO_SKIN_NOT_ADDED.format(work))
+            ao3.note_skin_failure(work, strings.SKIN_FAILED_NOT_PUT_IN.format(
+                'the file is not shaped as AO3 sends it, or has a skin already'))
+            return
+        ao3.swap_in(name, dressed)
+        print(strings.AO3_INFO_SKIN_PUT_IN.format(shown))
+    except exceptions.CancelledException:
+        raise
+    except Exception as e:
+        ao3.note_skin_failure(work, strings.SKIN_FAILED_NOT_PUT_IN.format(e))
+
+
 def finish_run(job: Job, fileops: FileOps, ao3, report) -> None:
     """How every run ends: FicHub for what ao3 would not give us, the cleanup step, then
     the report of anything left undone."""
 
+    fetch_pending_skins(job, fileops, ao3, report)
     rescue_with_fichub(job, fileops, ao3, report)
     cleanup(job, fileops, ao3)
     report_failures(ao3, report)
@@ -6186,6 +6262,11 @@ def report_failures(ao3: Ao3, report) -> None:
     if isinstance(clashes, list) and clashes:
         print(strings.AO3_INFO_REPAIR_CLASHES.format(len(clashes)))
         progress.report(report, progress.REPAIR_CLASHES, repairClashes=clashes)
+
+    skins = getattr(ao3, 'skin_failures', None)
+    if isinstance(skins, list) and skins:
+        print(strings.AO3_INFO_SKIN_FAILURES.format(len(skins)))
+        progress.report(report, progress.SKIN_FAILURES, skinFailures=skins)
 
     rescued = getattr(ao3, 'rescued', None)
     if isinstance(rescued, list) and rescued:

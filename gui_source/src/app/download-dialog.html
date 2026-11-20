@@ -2329,6 +2329,25 @@
           </details>
         }
 
+        <!-- work skins the run could not get, or could not put into the HTML it downloaded -->
+        @if (skinFailures().length) {
+          <details class="failures skin-failures" [open]="skinFailures().length <= 5">
+            <summary class="failures-text">
+              <strong>{{ skinFailures().length | number }}</strong>
+              work {{ skinFailures().length === 1 ? 'skin' : 'skins' }} could not be fetched or put in.
+            </summary>
+            <p class="hint">Their HTML is kept as AO3 sent it, without the skin.</p>
+            <ul class="failed-list">
+              @for (item of skinFailures(); track $index) {
+                <li>
+                  <a [href]="item.link" [appWorkLink]="item.id" target="_blank" rel="noopener">{{ item.id }}</a>
+                  <span class="reason">{{ item.error }}</span>
+                </li>
+              }
+            </ul>
+          </details>
+        }
+
         <!--
           files with no date written the app's way were asked about, one at a time: dating them
           in Resolve issues means the next run judges them by their date instead of asking

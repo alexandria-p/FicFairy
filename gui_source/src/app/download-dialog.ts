@@ -637,6 +637,8 @@ export class DownloadDialog implements OnDestroy {
   protected readonly fichubOlder = signal<FicHubOlder[]>([]);
   /** Resolve issues' repairs not done: the name each would get is taken (`repairClashes`) */
   protected readonly repairClashes = signal<RepairClash[]>([]);
+  /** work skins the run could not get or put in (`skinFailures`): their HTML is as AO3 sent it */
+  protected readonly skinFailures = signal<WorkFailure[]>([]);
 
   /**
    * How many undated files the run has stopped to ask about, or 0 when it is not asking.
@@ -2247,6 +2249,7 @@ export class DownloadDialog implements OnDestroy {
     this.keptCopies.set([]);
     this.fichubOlder.set([]);
     this.repairClashes.set([]);
+    this.skinFailures.set([]);
     this.unsureFiles.set(0);
     this.duplicateCopies.set(null);
     this.notRemoved.set([]);
@@ -2469,6 +2472,9 @@ export class DownloadDialog implements OnDestroy {
       case 'repairClashes':
         this.repairClashes.set(event.repairClashes ?? []);
         break;
+      case 'skinFailures':
+        this.skinFailures.set(event.skinFailures ?? []);
+        break;
       case 'fichubOlder':
         this.fichubOlder.set(event.fichubOlder ?? []);
         break;
@@ -2596,6 +2602,10 @@ export class DownloadDialog implements OnDestroy {
         error: 'in an unrevealed collection - it cannot be downloaded until it is revealed' },
       { id: null, link: '', title: 'Something',
         error: 'not a work - it may have been deleted, made private, or hidden' },
+    ]);
+    this.skinFailures.set([
+      { id: '333', link: 'https://archiveofourown.org/works/333',
+        error: "its work page would not read: 503" },
     ]);
     this.append('debug: showing a made-up report - nothing here really happened');
     this.step.set('done');
@@ -2802,6 +2812,7 @@ export class DownloadDialog implements OnDestroy {
     skipped: this.skipped(),
     fichubOlder: this.fichubOlder(),
     repairClashes: this.repairClashes(),
+    skinFailures: this.skinFailures(),
   }));
 
   /** how many entries there are across every list of issues this run reported */

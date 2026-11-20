@@ -24,7 +24,7 @@ FILETYPES = (['JSON', 'HTML'], ['JSON'], ['HTML'])
 # (repairing is put before replacing, so the case kept for an import's download step - the same
 # plan either way - stays the replacing one)
 CHOICES = ('collectionWorks', 'series', 'repair', 'replaceOutdated', 'reindex', 'dates', 'images',
-           'nonBookmarks', 'skipIndex', 'recheck', 'orderBookmarked', 'skinsOnly')
+           'nonBookmarks', 'skipIndex', 'recheck', 'orderBookmarked', 'skinsOnly', 'skins')
 # a choice sent as a list rather than a flag: on is this, and the case records it as true
 LISTS = {'repair': ['1 Fic.html']}
 # a choice whose 'on' sends a false option: a custom run told to skip its indexing

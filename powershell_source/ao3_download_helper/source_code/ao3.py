@@ -259,6 +259,11 @@ class Ao3:
         # Resolve issues' repairs not done: the name the file would get is another file's
         # ({id, link, file, wanted, site}) - reported at the end (`report_failures`)
         self.repair_clashes: list[dict] = []
+        # work skins this run could not get or put in, {id, link, error} - the `skinFailures` list
+        self.skin_failures: list[dict] = []
+        # works whose html this run downloaded without its skin to hand - read in one pass of their
+        # own after the downloads (`server.fetch_pending_skins`), not one by one between them
+        self.skins_pending: list[str] = []
         # new copies that arrived while the older copy they replace could not be removed.
         # nothing is lost, but there are now two copies, so the run names each one
         self.kept_copies: list[dict] = []
@@ -894,6 +899,7 @@ class Ao3:
         except Exception as e:
             self.skin_css[work] = ''
             self.skins_unread.add(work)
+            self.note_skin_failure(work, strings.SKIN_FAILED_UNREADABLE.format(e))
             self.log_error({'message': strings.AO3_INFO_SKIN_UNREADABLE.format(work, e),
                             'link': f'{strings.AO3_BASE_URL}/works/{work}'}, e)
             print(strings.AO3_INFO_SKIN_UNREADABLE.format(work, e))
@@ -903,6 +909,14 @@ class Ao3:
         print((found if css else strings.AO3_INFO_SKIN_NONE).format(work))
         return css
 
+
+    def note_skin_failure(self, work: str, error: str) -> None:
+        """A work's skin this run could not get, or could not put in - once per work."""
+
+        work = str(work)
+        if any(x['id'] == work for x in self.skin_failures): return
+        self.skin_failures.append({'id': work, 'link': f'{strings.AO3_BASE_URL}/works/{work}',
+                                   'error': error})
 
     def save_skin(self, work: str, css: str) -> bool:
         """Save a work's skin as `skins/<worknum>.css`, over any saved before - or, for a work with
@@ -920,6 +934,7 @@ class Ao3:
         except Exception as e:
             self.log_error({'message': strings.AO3_INFO_SKIN_NOT_SAVED.format(work, e)}, e)
             print(strings.AO3_INFO_SKIN_NOT_SAVED.format(work, e))
+            self.note_skin_failure(work, strings.SKIN_FAILED_NOT_SAVED.format(e))
             return False
         self.skins_saved.add(work)
         return True
@@ -936,13 +951,20 @@ class Ao3:
         so the CSS goes into the `<head>` and the body is wrapped in `<div id="workskin">`, as on
         the work page - before the file is saved, so it is written once and every check on it sees
         the file as it is kept. Anything that does not fit leaves the file exactly as AO3 sent it.
-        It costs nothing where the run read the work's page anyway, and one request otherwise; a
-        page that will not read saves nothing.
+        It costs nothing where the run read the work's page anyway. Otherwise the work is noted
+        (`skins_pending`) and its page read after every download is done, in a step of its own
+        (`server.fetch_pending_skins`), which puts the skin into the file then - so the skins never
+        hold a download up, and a run stopped or skipped there has every file it fetched.
         """
 
         if not self.skins or filetype.upper() != 'HTML': return content
+        work = str(work)
+        if work not in self.skin_css:
+            # not to hand: read after the downloads, in a step of its own, and put in then
+            if work not in self.skins_pending: self.skins_pending.append(work)
+            return content
         css = self.skin_for(work)
-        if str(work) in self.skins_unread: return content
+        if work in self.skins_unread: return content
         self.save_skin(work, css)
         if not css: return content
         dressed = with_skin(content, css)
@@ -2276,6 +2298,7 @@ class Ao3:
             try:
                 self.check_cancelled()
                 thesoup = self.proceed(self.repo.get_soup(work_link))
+                self.note_skin(work_link, thesoup)  # the page is in hand: its skin costs nothing
                 record['date_created'] = parse_soup.get_text_or_empty(thesoup, 'dd.published')
                 # single chapter works have no status line; keep the listing date in that case
                 updated = parse_soup.get_text_or_empty(thesoup, 'dd.status')

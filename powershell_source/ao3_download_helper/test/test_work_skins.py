@@ -2,8 +2,9 @@
 
 A run asked to (`skins`, a debug option for now) puts each work's skin into the html it
 downloads, and keeps it beside the works as `skins/<worknum>.css`. A work page the run reads
-anyway gives the skin for nothing; otherwise the work's own page is read once, and only when an
-html file is about to be written.
+anyway gives the skin for nothing, put in as the file is written; otherwise the work is noted and
+its page read once, in a step of its own after every download (`fetch_pending_skins`), which puts
+the skin into the file then.
 """
 
 import os
@@ -109,10 +110,37 @@ def saved(tmp_path, ext: str) -> bytes:
     return (tmp_path / strings.WORKS_FOLDER_NAME / found[0]).read_bytes()
 
 
-def test_an_indexed_download_reads_the_work_page_once_and_puts_its_skin_in_the_html(tmp_path):
+def the_skins_step(ao3, tmp_path, skip=False):
+    """Run the step that reads the skins the downloads left for later, as `finish_run` does."""
+    fileops = ao3.fileops
+    fileops.worksfolder = str(tmp_path / strings.WORKS_FOLDER_NAME)
+    fileops.storage = LocalStorage(str(tmp_path))
+    fileops.list_files.side_effect = lambda folder: FileOps.list_files(fileops, folder)
+    fileops.read_text.side_effect = lambda path: FileOps.read_text(fileops, path)
+    job = MagicMock()
+    job.skipping.return_value = skip
+    job.steps.plan = [('skins', strings.STEP_SKINS_FOR_HTML)]
+    reported = []
+    server.fetch_pending_skins(job, fileops, ao3, reported.append)
+    return job, reported
+
+
+def test_an_indexed_download_leaves_the_skin_for_its_own_step_and_never_holds_up_the_download(tmp_path):
     ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWork')})
 
     ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
+
+    # no work page read between downloads: the file is saved as AO3 sent it, the work noted
+    ao3.repo.get_soup.assert_not_called()
+    assert saved(tmp_path, '.html') == downloaded()
+    assert ao3.skins_pending == ['41822007']
+
+
+def test_the_skins_step_reads_each_page_once_and_puts_its_skin_in_the_html(tmp_path):
+    ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWork')})
+    ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
+
+    job, _ = the_skins_step(ao3, tmp_path)
 
     assert ao3.repo.get_soup.call_count == 1
     html = saved(tmp_path, '.html').decode('utf-8')
@@ -121,6 +149,9 @@ def test_an_indexed_download_reads_the_work_page_once_and_puts_its_skin_in_the_h
     assert saved(tmp_path, '.epub') == b'epub bytes'
     css = (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').read_text(encoding='utf-8')
     assert css.startswith('#workskin .centered')
+    job.steps.start.assert_called_once_with('skins')
+    job.steps.done.assert_called_once_with('skins')
+    assert ao3.skin_failures == []
 
 
 def test_a_work_page_the_run_already_read_costs_no_second_request(tmp_path):
@@ -131,6 +162,24 @@ def test_a_work_page_the_run_already_read_costs_no_second_request(tmp_path):
 
     assert ao3.repo.get_soup.call_count == 1
     assert '<div id="workskin">' in saved(tmp_path, '.html').decode('utf-8')
+    # nothing left for the step, which then has nothing to do
+    assert ao3.skins_pending == []
+    job, _ = the_skins_step(ao3, tmp_path)
+    assert ao3.repo.get_soup.call_count == 1
+    job.steps.skip.assert_called_once_with('skins')
+
+
+def test_the_work_dates_pass_gives_the_skin_for_nothing_too(tmp_path):
+    ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWork')})
+    ao3.note_skin(WORK_PAGE, page('unlockedWork'))  # as any work page read does
+
+    assert ao3.skin_css['41822007'].startswith('#workskin .centered')
+    import inspect
+    from source_code.ao3 import Ao3
+    # every place that reads a work page notes its skin
+    for name in ('index_one_work', 'refresh_one', 'try_download'):
+        source = inspect.getsource(getattr(Ao3, name))
+        assert 'note_skin' in source or 'work=True' in source, name
 
 
 def test_a_work_without_a_skin_is_saved_as_ao3_sent_it_and_asked_about_once(tmp_path, capsys):
@@ -138,6 +187,7 @@ def test_a_work_without_a_skin_is_saved_as_ao3_sent_it_and_asked_about_once(tmp_
 
     ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
     ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
+    the_skins_step(ao3, tmp_path)
 
     assert ao3.repo.get_soup.call_count == 1
     assert saved(tmp_path, '.html') == downloaded()
@@ -145,6 +195,7 @@ def test_a_work_without_a_skin_is_saved_as_ao3_sent_it_and_asked_about_once(tmp_
     assert (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.none').exists()
     assert not (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').exists()
     assert strings.AO3_INFO_SKIN_NONE.format('41822007') in capsys.readouterr().out
+    assert ao3.skin_failures == []
 
 
 def test_no_work_page_is_read_when_the_run_writes_no_html(tmp_path):
@@ -152,6 +203,7 @@ def test_no_work_page_is_read_when_the_run_writes_no_html(tmp_path):
     ao3.filetypes = ['EPUB']
 
     ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
+    the_skins_step(ao3, tmp_path)
 
     ao3.repo.get_soup.assert_not_called()
 
@@ -161,29 +213,87 @@ def test_without_the_option_nothing_is_read_and_nothing_changed(tmp_path):
     ao3.skins = False
 
     ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
+    the_skins_step(ao3, tmp_path)
 
     ao3.repo.get_soup.assert_not_called()
     assert saved(tmp_path, '.html') == downloaded()
     assert not (tmp_path / strings.SKINS_FOLDER_NAME).exists()
 
 
-def test_a_page_that_will_not_read_costs_the_skin_and_nothing_else(tmp_path, capsys):
+def test_a_page_that_will_not_read_is_listed_and_costs_the_skin_and_nothing_else(tmp_path, capsys):
     ao3 = skinning(tmp_path, {})
     ao3.repo.get_soup.side_effect = exceptions.InvalidStatusCodeException('503')
 
     ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
+    the_skins_step(ao3, tmp_path)
 
     assert saved(tmp_path, '.html') == downloaded()
     assert ao3.failures == []
     assert 'could not read the work skin of work 41822007' in capsys.readouterr().out
+    assert [x['id'] for x in ao3.skin_failures] == ['41822007']
+    assert '503' in ao3.skin_failures[0]['error']
 
 
-def test_a_stop_while_reading_the_skin_still_ends_the_run(tmp_path):
+def test_a_skin_with_no_html_file_to_go_in_is_listed(tmp_path):
+    ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWork')})
+    ao3.skins_pending = ['41822007']  # its html since gone
+
+    the_skins_step(ao3, tmp_path)
+
+    assert (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').exists()
+    assert ao3.skin_failures[0]['error'] == strings.SKIN_FAILED_NO_HTML
+
+
+def test_a_stop_in_the_skins_step_still_ends_the_run(tmp_path):
     ao3 = skinning(tmp_path, {})
     ao3.repo.get_soup.side_effect = exceptions.CancelledException()
+    ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
 
     with pytest.raises(exceptions.CancelledException):
-        ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
+        the_skins_step(ao3, tmp_path)
+
+
+def test_skip_this_step_leaves_the_rest_without_skins(tmp_path):
+    ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWork')})
+    ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
+
+    job, _ = the_skins_step(ao3, tmp_path, skip=True)
+
+    ao3.repo.get_soup.assert_not_called()
+    assert saved(tmp_path, '.html') == downloaded()
+    job.steps.skip.assert_called_once_with('skins')
+    job.steps.done.assert_not_called()
+
+
+def test_the_skins_step_comes_after_the_downloads_and_before_fichub():
+    job = MagicMock()
+    job.action = server.ACTION_BOOKMARKS
+    job.filetypes = ['HTML', 'JSON']
+    job.options = server.resolve_options({'skins': True})
+    steps = [x for x, _ in server.step_plan(job)]
+
+    assert steps.index('skins') == steps.index('fichub') - 1
+    assert steps.index('skins') > steps.index('download')
+    job.options = server.resolve_options({})
+    assert 'skins' not in [x for x, _ in server.step_plan(job)]
+    job.options = server.resolve_options({'skins': True})
+    job.filetypes = ['EPUB', 'JSON']
+    assert 'skins' not in [x for x, _ in server.step_plan(job)]
+
+
+def test_skins_that_failed_are_reported_and_kept_with_the_run():
+    from source_code import progress, runs
+    ao3 = MagicMock()
+    ao3.failures, ao3.skipped_works = [], []
+    ao3.skin_failures = [{'id': '1', 'link': 'https://archiveofourown.org/works/1', 'error': 'x'}]
+    reported = []
+    server.report_failures(ao3, reported.append)
+
+    assert {'type': progress.SKIN_FAILURES, 'skinFailures': ao3.skin_failures} in reported
+    record = runs.RunRecord.__new__(runs.RunRecord)
+    record.data = {}
+    record.collect(ao3)
+    assert record.data['skinFailures'] == ao3.skin_failures
 
 
 def test_ficHubs_html_is_never_given_an_ao3_skin(tmp_path):
@@ -219,9 +329,8 @@ def current_html(tmp_path, pages, works=('41822007',)):
 def test_a_work_whose_html_is_current_is_never_looked_at_for_a_skin(tmp_path):
     ao3, job = current_html(tmp_path, {WORK_PAGE: page('unlockedWork')})
 
-    import inspect
-    # nothing at the end of a run reaches for skins: only an html download does
-    assert 'skin' not in inspect.getsource(server.finish_run)
+    # nothing downloaded, so nothing waits for the skins step
+    the_skins_step(ao3, tmp_path)
     ao3.repo.get_soup.assert_not_called()
 
 # endregion
@@ -235,6 +344,7 @@ def test_an_update_overwrites_the_saved_skin_with_the_latest(tmp_path):
     (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').write_text('#workskin .old {}', encoding='utf-8')
 
     ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
+    the_skins_step(ao3, tmp_path)
 
     css = (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').read_text(encoding='utf-8')
     assert css.startswith('#workskin .centered')
@@ -246,6 +356,7 @@ def test_a_skin_the_author_dropped_is_dropped_from_the_saved_one_too(tmp_path):
     (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').write_text('#workskin .old {}', encoding='utf-8')
 
     ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
+    the_skins_step(ao3, tmp_path)
 
     assert not (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').exists()
     assert (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.none').exists()
