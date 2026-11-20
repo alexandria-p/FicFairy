@@ -462,6 +462,14 @@ describe('DownloadDialog', () => {
     expect(element.querySelector('input[name=skins]')).toBeNull();
   });
 
+  it('says a work got from FicHub gets no work skin', async () => {
+    debugOn();
+    await open('bookmarks');
+    await advanceTo('filetypes');
+
+    expect(element.querySelector('.skins-hint')?.textContent).toContain('FicHub');
+  });
+
   it('holds work skins while HTML is unticked, and sends none', async () => {
     debugOn();
     await open('bookmarks');

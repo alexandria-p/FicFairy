@@ -401,6 +401,8 @@ describe('ReadingSkinsSettings', () => {
     const options = [...element.querySelectorAll<HTMLOptionElement>('select[name=defaultReadingSkin] option')];
     expect(options.map((x) => x.value)).toEqual(['']);
     expect(element.querySelector('.no-skins')).not.toBeNull();
+    // a work from FicHub is laid out differently, and never has its author's skin
+    expect(element.querySelector('.fichub-look')?.textContent).toContain('FicHub');
   });
 
   it('holds Save until there is a name and some CSS', async () => {
