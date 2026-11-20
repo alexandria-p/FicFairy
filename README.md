@@ -9,7 +9,7 @@ Keep your own copy of your AO3 bookmarks and collections on your computer or Dro
 ![The works list](docs/screenshots/works.png)
 _Font: Lexend, Colour Palette: Light - Strawberry Milk_
 
-𓍊𓋼𓍊𖡼.𖤣𖥧𖡼.𖤣𖥧𓋼𓍊𓋼
+𓍊𓋼𓍊.𓋼𓍊𓋼
 
 ## What it does
 
@@ -117,7 +117,7 @@ Even though this tool only uses ao3's own download system, and does not pass any
 
 Again, this tool is only for personal use and I have been militant in ensuring that creative human works have not, and will not, be passed through AI - neither in the development nor use of this application. If you do not wish to use it, I encourage you again to look at [nianeyna's work](https://github.com/nianeyna/ao3downloader).
 
-The logo was hand-drawn by me using Procreate on my iPad. Title font is [Doomsdays Dragons by GraphicSauce](https://www.fontspace.com/doomsdays-dragons-elegant-business-font-f161455).
+The logo was hand-drawn by me using Procreate on my iPad. I hand-wrote the fake stories/blurbs used in guest-mode preview. Title font is [Doomsdays Dragons by GraphicSauce](https://www.fontspace.com/doomsdays-dragons-elegant-business-font-f161455).
 
 . ݁₊ ⊹ . ݁ ⟡ ݁ . ⊹ ₊ ݁.
 
@@ -151,6 +151,6 @@ If you do fork this, please link back to this repository and [nianeyna's](https:
 
 Do not repost this work with the intent to pass it off as your own, and do not use this work in any software for profit or with the intent to harm users. You have been warned 🫵🫵🫵
 
-𓍊𓋼𓍊𖡼.𖤣𖥧𖡼.𖤣𖥧𓋼𓍊𓋼
+𓍊𓋼𓍊.𓋼𓍊𓋼
 
 [latest-release]: https://github.com/alexandria-p/FicFairy/releases/latest
