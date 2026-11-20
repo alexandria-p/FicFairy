@@ -223,13 +223,13 @@
           </label>
           <p class="hint skins-hint">
             @if (htmlTicked()) {
-              Puts each work's skin - its author's own styling, which AO3's download leaves out -
-              into the HTML file, and saves it as <code>skins/&lt;work number&gt;.css</code>. Only
-              HTML can take one. A work whose HTML is already up to date is not downloaded again:
-              only its skin is saved, and it is shown when you open the work from FicFairy. A work
-              whose page this run does not read anyway costs one more request to AO3, once - a
-              work whose skin is saved already is not asked about again. A work this run has to get from FicHub instead gets no
-              work skin: FicHub does not keep its author's styling.
+              Every HTML file a run downloads has its work's skin - its author's own styling, which
+              AO3's download leaves out - saved beside it as <code>skins/&lt;work number&gt;.css</code>,
+              and shown when you open the work from FicFairy. Ticked, the skin also goes into the HTML
+              file itself, and works whose HTML is already up to date get their skin too, without being
+              downloaded again (once - a work checked before is not asked about again). A work whose
+              page this run does not read anyway costs one more request to AO3. A work this run has to
+              get from FicHub instead gets no work skin: FicHub does not keep its author's styling.
             } @else {
               Tick HTML to use this - a work skin only goes into HTML files.
             }
@@ -383,24 +383,27 @@
                     beside your works - nothing is indexed and nothing is downloaded again. The skin
                     shows when you open the work's HTML from FicFairy.
                     @if (skinWorks().length) {
-                      For the {{ skinWorks().length === 1 ? 'work' : skinWorks().length + ' works' }} you picked.
-                    } @else {
-                      For every work with HTML in your library. One request to AO3 per work.
+                      For the {{ skinWorks().length === 1 ? 'work' : skinWorks().length + ' works' }} you
+                      picked - each is checked again, whatever is saved for it.
                     }
                   </p>
-                  <label class="check">
-                    <input type="checkbox" name="overwriteSkins" [checked]="overwriteSkins()"
-                           (change)="overwriteSkins.set($any($event.target).checked)" />
-                    <span>Overwrite existing work skins</span>
-                  </label>
-                  <p class="hint nested">
-                    @if (overwriteSkins()) {
-                      Every work's skin is fetched again and replaces the one saved - in case one is
-                      damaged or out of date.
-                    } @else {
-                      A work whose skin is saved already is passed over, so this costs nothing for it.
-                    }
-                  </p>
+                  @if (!skinWorks().length) {
+                    <fieldset class="skin-scope">
+                      <legend>Which works with HTML in your library</legend>
+                      @for (choice of skinScopes; track choice.value) {
+                        <label class="check">
+                          <input type="radio" name="skinScope" [value]="choice.value"
+                                 [checked]="skinScope() === choice.value" (change)="skinScope.set(choice.value)" />
+                          <span>
+                            {{ choice.label }}
+                            @if (skinScope() === choice.value) {
+                              <span class="hint coverage-hint">{{ choice.hint }}</span>
+                            }
+                          </span>
+                        </label>
+                      }
+                    </fieldset>
+                  }
                 </div>
               }
             }

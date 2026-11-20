@@ -156,14 +156,15 @@ def test_no_work_page_is_read_when_the_run_writes_no_html(tmp_path):
     ao3.repo.get_soup.assert_not_called()
 
 
-def test_without_the_option_nothing_is_read_and_nothing_changed(tmp_path):
-    ao3 = skinning(tmp_path, {})
+def test_without_the_option_the_html_is_left_as_sent_but_its_skin_is_still_saved(tmp_path):
+    ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWork')})
     ao3.skins = False
 
     ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
 
-    ao3.repo.get_soup.assert_not_called()
     assert saved(tmp_path, '.html') == downloaded()
+    css = (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').read_text(encoding='utf-8')
+    assert css.startswith('#workskin .centered')
 
 
 def test_a_page_that_will_not_read_costs_the_skin_and_nothing_else(tmp_path, capsys):
@@ -309,30 +310,25 @@ def test_a_skin_the_author_dropped_is_dropped_from_the_saved_one_too(tmp_path):
     assert (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.none').exists()
 
 
-def saved_skin_listed(ao3, tmp_path):
-    ao3.fileops.list_files.side_effect = lambda folder: os.listdir(folder) if os.path.isdir(folder) else []
-
-
-def test_a_run_not_fetching_skins_still_refreshes_a_saved_one_when_the_html_is_downloaded(tmp_path, capsys):
+def test_a_run_not_fetching_skins_brings_a_saved_skin_up_to_date_with_the_html(tmp_path):
     ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWork')})
     ao3.skins = False
-    saved_skin_listed(ao3, tmp_path)
     (tmp_path / strings.SKINS_FOLDER_NAME).mkdir()
-    (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').write_text('#workskin .old {}', encoding='utf-8')
+    (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.none').write_text('', encoding='utf-8')
 
     ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
 
+    # the author has added one since it was noted as having none
     css = (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').read_text(encoding='utf-8')
     assert css.startswith('#workskin .centered')
-    # the html is left as AO3 sent it: the page puts the saved skin in as it opens
+    assert not (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.none').exists()
     assert saved(tmp_path, '.html') == downloaded()
-    assert strings.AO3_INFO_SKIN_REFRESHED.format('41822007') in capsys.readouterr().out
 
 
-def test_a_run_not_fetching_skins_reads_no_page_for_a_work_with_no_saved_skin(tmp_path):
+def test_no_skin_is_fetched_for_a_download_with_no_html(tmp_path):
     ao3 = skinning(tmp_path, {})
     ao3.skins = False
-    saved_skin_listed(ao3, tmp_path)
+    ao3.filetypes = ['EPUB']
 
     ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
 
@@ -345,7 +341,7 @@ def test_a_run_not_fetching_skins_reads_no_page_for_a_work_with_no_saved_skin(tm
 
 def skins_only(tmp_path, pages, options=None, works=('41822007',)):
     ao3, job = current_html(tmp_path, pages, works)
-    job.options = {'skinsOnly': True, 'overwriteSkins': False, 'skinWorks': [], **(options or {})}
+    job.options = {'skinsOnly': True, 'skinScope': 'unchecked', 'skinWorks': [], **(options or {})}
     job.cancel.is_set.return_value = False
     made = []
 
@@ -375,20 +371,37 @@ def test_fetching_skins_only_saves_each_skin_and_downloads_nothing(tmp_path, mon
     assert saved(tmp_path, '.html') == downloaded()
 
 
-def test_fetching_skins_only_keeps_a_saved_skin_unless_told_to_overwrite(tmp_path, monkeypatch):
-    for overwrite in (False, True):
-        folder = tmp_path / str(overwrite)
-        folder.mkdir()
-        ao3, job, build = skins_only(folder, {WORK_PAGE: page('unlockedWork')},
-                                     {'overwriteSkins': overwrite})
-        ao3.fileops.list_files.side_effect = lambda f: os.listdir(f) if os.path.isdir(f) else []
-        (folder / strings.SKINS_FOLDER_NAME).mkdir()
-        (folder / strings.SKINS_FOLDER_NAME / '41822007.css').write_text('#workskin .old {}', encoding='utf-8')
+@pytest.mark.parametrize('scope, fetched', [
+    ('unchecked', ['3']),
+    ('saved', ['1']),
+    ('none', ['2']),
+    ('all', ['1', '2', '3']),
+])
+def test_fetching_skins_only_takes_the_works_whose_saved_skin_fits_the_scope(tmp_path, monkeypatch, scope, fetched):
+    pages = {f'https://archiveofourown.org/works/{n}': page('unlockedWorkNoSkin') for n in '123'}
+    ao3, job, build = skins_only(tmp_path, pages, {'skinScope': scope}, works=('1', '2', '3'))
+    ao3.fileops.list_files.side_effect = lambda f: os.listdir(f) if os.path.isdir(f) else []
+    (tmp_path / strings.SKINS_FOLDER_NAME).mkdir()
+    (tmp_path / strings.SKINS_FOLDER_NAME / '1.css').write_text('#workskin .old {}', encoding='utf-8')
+    (tmp_path / strings.SKINS_FOLDER_NAME / '2.none').write_text('', encoding='utf-8')
 
-        run_only(monkeypatch, ao3, job, build)
+    run_only(monkeypatch, ao3, job, build)
 
-        css = (folder / strings.SKINS_FOLDER_NAME / '41822007.css').read_text(encoding='utf-8')
-        assert css.startswith('#workskin .centered') == overwrite
+    asked = [c.args[0].rsplit('/', 1)[-1] for c in ao3.repo.get_soup.call_args_list]
+    assert asked == fetched
+
+
+def test_works_picked_are_always_fetched_whatever_is_saved(tmp_path, monkeypatch):
+    other = 'https://archiveofourown.org/works/7'
+    ao3, job, build = skins_only(tmp_path, {other: page('unlockedWork')}, {'skinWorks': ['7']})
+    ao3.fileops.list_files.side_effect = lambda f: os.listdir(f) if os.path.isdir(f) else []
+    (tmp_path / strings.SKINS_FOLDER_NAME).mkdir()
+    (tmp_path / strings.SKINS_FOLDER_NAME / '7.none').write_text('', encoding='utf-8')
+
+    run_only(monkeypatch, ao3, job, build)
+
+    assert (tmp_path / strings.SKINS_FOLDER_NAME / '7.css').exists()
+    assert not (tmp_path / strings.SKINS_FOLDER_NAME / '7.none').exists()
 
 
 def test_fetching_skins_only_takes_the_works_picked(tmp_path, monkeypatch):
@@ -411,9 +424,12 @@ def test_fetching_skins_only_lists_only_its_own_steps():
 
 
 def test_only_a_custom_run_can_fetch_skins_only():
-    options = server.resolve_options({'skinsOnly': True, 'overwriteSkins': True, 'skinWorks': ['12', 'x', 3]})
-    assert options['skinsOnly'] and options['overwriteSkins']
+    options = server.resolve_options({'skinsOnly': True, 'skinScope': 'none', 'skinWorks': ['12', 'x', 3]})
+    assert options['skinsOnly'] and options['skinScope'] == 'none'
     assert options['skinWorks'] == ['12', '3']
+    assert server.resolve_options({'skinScope': 'nonsense'})['skinScope'] == 'unchecked'
+    # an older page's overwrite box: every work
+    assert server.resolve_options({'overwriteSkins': True})['skinScope'] == 'all'
 
 # endregion
 

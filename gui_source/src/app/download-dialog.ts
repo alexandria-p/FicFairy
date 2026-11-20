@@ -11,6 +11,7 @@ import {
   JobAction,
   JobEvent,
   JobOptions,
+  SkinScope,
   Jobs,
   RetryMode,
   RetryableRun,
@@ -324,13 +325,24 @@ export class DownloadDialog implements OnDestroy {
    */
   protected readonly skinsOnly = computed(
     () => this.action() === 'custom' && this.coverage() === 'skins' && !this.resuming());
-  /** fetching skins only: fetch the skins already saved again too */
-  protected readonly overwriteSkins = signal(false);
+  /** fetching skins only, over the whole library: which works, by what is saved for each */
+  protected readonly skinScope = signal<SkinScope>('unchecked');
+  protected readonly skinScopes: { value: SkinScope; label: string; hint: string }[] = [
+    { value: 'unchecked', label: 'Works never checked for a skin',
+      hint: 'Works FicFairy has not looked at for a skin yet. The cheapest choice after the first time.' },
+    { value: 'saved', label: 'Works that already have a skin saved',
+      hint: "Fetches each again and replaces the one saved, in case the author changed it or it is damaged." },
+    { value: 'none', label: 'Works last known to have no skin',
+      hint: 'Checks again in case their authors have added one since.' },
+    { value: 'all', label: 'All works',
+      hint: 'Every work with HTML in your library, whatever is saved for it. One request to AO3 per work.' },
+  ];
   /** what a run fetching skins only covers, in words */
   protected readonly skinsCover = computed(() => {
     const picked = this.skinWorks().length;
-    return picked ? `the work skins of the ${picked === 1 ? 'work' : `${picked} works`} you picked`
-      : 'the work skin of every work with HTML in your library';
+    if (picked) return `the work skins of the ${picked === 1 ? 'work' : `${picked} works`} you picked`;
+    const scope = this.skinScopes.find((x) => x.value === this.skinScope());
+    return `the work skins of: ${scope?.label.toLowerCase() ?? 'works never checked for a skin'}`;
   });
   /**
    * A custom run picking up where an unfinished run left off. It then runs as that run -
@@ -1175,10 +1187,6 @@ export class DownloadDialog implements OnDestroy {
       rows.push({ label: 'Ordered by', value: `date ${this.listingOrder()}` });
     } else if (this.skinsOnly()) {
       rows.push({ label: 'Covers', value: this.skinsCover() });
-      rows.push({
-        label: 'Work skins already saved',
-        value: this.overwriteSkins() ? 'fetched again, and replaced' : 'kept',
-      });
     } else if (this.action() === 'custom' && this.coverage() === 'existing') {
       rows.push({ label: 'Covers', value: 'every work already in your index' });
     } else if (this.picksDates() || this.action() === 'quick') {
@@ -2278,7 +2286,7 @@ export class DownloadDialog implements OnDestroy {
         recheck: this.recheck(),
         // a custom run fetching work skins and nothing else - the helper clears the rest
         skinsOnly: this.skinsOnly(),
-        overwriteSkins: this.skinsOnly() && this.overwriteSkins(),
+        skinScope: this.skinsOnly() ? this.skinScope() : 'unchecked',
         skinWorks: this.skinsOnly() ? this.skinWorks() : [],
         // a window of time and a slice of the listing are alternatives, so the one not
         // chosen is not sent at all rather than sent and ignored

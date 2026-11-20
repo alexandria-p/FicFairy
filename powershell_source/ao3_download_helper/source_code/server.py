@@ -383,6 +383,9 @@ COLLECTION_ACTIONS = (ACTION_COLLECTIONS, ACTION_COLLECTION)
 OVERWRITE_ACTIONS = (ACTION_BOOKMARKS, ACTION_CUSTOM)
 # the runs that can put work skins into their html: the scans and the fic runs
 SKIN_ACTIONS = (ACTION_BOOKMARKS, ACTION_QUICK, ACTION_CUSTOM, ACTION_WORK, ACTION_WORKS)
+# which works a run fetching skins alone takes, by what is saved for each in `skins/`: none yet
+# (never checked), a skin (`.css`), the note that it has none (`.none`), or every one
+SKIN_SCOPES = ('unchecked', 'saved', 'none', 'all')
 
 # The runs that may also check every non-bookmark in the index for updates - the works it
 # holds only because they were found through something else, such as another work's series.
@@ -545,8 +548,11 @@ def resolve_options(requested) -> dict:
         # a custom run that only fetches work skins: no index, no download - each work's page
         # read for its author's skin, saved as `skins/<worknum>.css` (`run_skins_only`)
         'skinsOnly': bool(given.get('skinsOnly')),
-        # and whether a skin already saved is fetched again, in case it is damaged or old
-        'overwriteSkins': bool(given.get('overwriteSkins')),
+        # which works with html it fetches skins for, by what is saved for them (`SKIN_SCOPES`):
+        # never checked (the default), a skin saved, noted as having none, or all of them.
+        # `overwriteSkins` from an older page is all of them
+        'skinScope': given.get('skinScope') if given.get('skinScope') in SKIN_SCOPES
+        else 'all' if given.get('overwriteSkins') else 'unchecked',
         # the works to fetch skins for, by number - picked in the Works tab. none is every work
         # with html in the library
         'skinWorks': [str(x) for x in given.get('skinWorks') if str(x).isdigit()]
@@ -5039,27 +5045,44 @@ def ask_yes_no(job, name: str, default: str, details: dict, work: str,
     return choice == 'yes' and not job.cancel.is_set()
 
 
-def saved_skin_ids(fileops: FileOps) -> set[str]:
-    """The works with a skin saved, or noted as having none - `skins/<worknum>.css` - by number.
-    Nothing when the folder is not there yet."""
+def saved_skin_states(fileops: FileOps) -> dict[str, str]:
+    """What `skins/` holds for each work, by number: 'css' for a skin saved, 'none' for the note
+    that it has none. Nothing when the folder is not there yet."""
     try:
         names = fileops.list_files(os.path.join(fileops.downloadfolder, strings.SKINS_FOLDER_NAME))
-        return {os.path.splitext(os.path.basename(str(x)))[0] for x in names
-                if str(x).lower().endswith(SKIN_NOTES)}
     except Exception:
-        return set()
+        return {}
+    states: dict[str, str] = {}
+    for name in names:
+        stem, extension = os.path.splitext(os.path.basename(str(name)))
+        if extension.lower() in SKIN_NOTES:
+            # a skin saved wins over a stray note that there was none
+            if states.get(stem) != 'css': states[stem] = extension.lower()[1:]
+    return states
+
+
+def saved_skin_ids(fileops: FileOps) -> set[str]:
+    """The works with a skin saved, or noted as having none."""
+    return set(saved_skin_states(fileops))
+
+
+def skin_scope_takes(scope: str, state: str | None) -> bool:
+    """Whether a work with this saved state (`saved_skin_states`) is in this scope."""
+    return (scope == 'all' or (scope == 'unchecked' and state is None)
+            or (scope == 'saved' and state == 'css') or (scope == 'none' and state == 'none'))
 
 
 def run_skins_only(job: Job, fileops: FileOps, repo: Repository, report) -> None:
     """A custom run that only fetches work skins: each work's page read for its author's skin,
-    saved as `skins/<worknum>.css` - an empty file for a work with none - and nothing else. No
-    index entry is written, no format downloaded, no html rewritten: the page puts the skin in
-    as a work is opened from FicFairy.
+    saved as `skins/<worknum>.css`, or `<worknum>.none` for a work with none, over whatever was
+    saved before - and nothing else. No index entry is written, no format downloaded, no html
+    rewritten: the page puts the skin in as a work is opened from FicFairy.
 
-    The works are the ones picked (`skinWorks`), or every work with html in the library. A work
-    whose skin is saved already is passed over unless the run overwrites them
-    (`overwriteSkins`), so a run left to itself costs one request per work once. A page that
-    will not read saves nothing, and is not a failure: the work itself is untouched.
+    The works picked in the Works tab (`skinWorks`) are always fetched, whatever is saved for
+    them - they were asked for by name. Otherwise every work with html in the library is narrowed
+    by what is saved for it (`skinScope`): never checked, a skin saved (to bring it up to date),
+    noted as having none (has its author added one since?), or all of them. A page that will not
+    read saves nothing, and is not a failure: the work itself is untouched.
     """
 
     ao3 = Ao3(repo, fileops, [], None, False, False, progress=report,
@@ -5072,12 +5095,10 @@ def run_skins_only(job: Job, fileops: FileOps, repo: Repository, report) -> None
         works = picked
     else:
         copies = shared.scan_downloaded_works(fileops.worksfolder, ['HTML'], storage=fileops.storage)
-        works = sorted(copies, key=lambda x: int(x) if str(x).isdigit() else 0)
-    if not job.options.get('overwriteSkins'):
-        have = saved_skin_ids(fileops)
-        for work in [x for x in works if x in have]:
-            if picked: print(strings.AO3_INFO_SKINS_ONLY_KEPT.format(work))
-        works = [x for x in works if x not in have]
+        states = saved_skin_states(fileops)
+        scope = job.options.get('skinScope') or 'unchecked'
+        works = sorted((x for x in copies if skin_scope_takes(scope, states.get(x))),
+                       key=lambda x: int(x) if str(x).isdigit() else 0)
     if not works:
         print(strings.AO3_INFO_SKINS_ONLY_NONE_LEFT)
         job.steps.skip('skins')
@@ -6656,7 +6677,7 @@ class Handler(BaseHTTPRequestHandler):
             for key in ('series', 'nonBookmarks', 'overwrite', 'images', 'recheck', 'dates', 'skins'):
                 options[key] = False
         else:
-            options['overwriteSkins'] = False
+            options['skinScope'] = 'unchecked'
             options['skinWorks'] = []
 
         url = (body.get('url') or '').strip()

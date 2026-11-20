@@ -96,6 +96,9 @@ export const BUILT_IN_CONFIG: ServerConfig = {
 };
 
 /** the questions the console menu asks after the file types */
+/** which works a run fetching skins alone takes, by what is saved for each */
+export type SkinScope = 'unchecked' | 'saved' | 'none' | 'all';
+
 export interface JobOptions {
   /**
    * Go without logging in to AO3. Only the runs pointed at fics by hand offer it; works only
@@ -167,8 +170,11 @@ export interface JobOptions {
   recheck?: boolean;
   /** a custom run that only fetches work skins - nothing indexed or downloaded (debug) */
   skinsOnly?: boolean;
-  /** fetching skins only: fetch those already saved again too */
-  overwriteSkins?: boolean;
+  /**
+   * fetching skins only, over the whole library: which works with html, by what is saved for each
+   * - never checked, a skin saved, noted as having none, or all of them (the helper's `SKIN_SCOPES`)
+   */
+  skinScope?: SkinScope;
   /** fetching skins only: the works picked, by number; none is every work with html */
   skinWorks?: string[];
   /**

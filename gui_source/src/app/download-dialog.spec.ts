@@ -468,8 +468,9 @@ describe('DownloadDialog', () => {
     await advanceTo('options');
     checkbox('Just fetch work skins')!.click();
     await fixture.whenStable();
-    expect(element.querySelector('.skins-only-hint')?.textContent).toContain('every work with HTML');
-    element.querySelector<HTMLInputElement>('input[name=overwriteSkins]')!.click();
+    // never checked, to begin with
+    expect(element.querySelector<HTMLInputElement>('input[name=skinScope][value=unchecked]')!.checked).toBe(true);
+    element.querySelector<HTMLInputElement>('input[name=skinScope][value=none]')!.click();
     await fixture.whenStable();
 
     await advanceTo('credentials');
@@ -477,7 +478,7 @@ describe('DownloadDialog', () => {
     await advanceTo('running');
 
     expect(jobs.started[0].filetypes).toEqual([]);
-    expect(jobs.started[0].options).toMatchObject({ skinsOnly: true, overwriteSkins: true, skinWorks: [] });
+    expect(jobs.started[0].options).toMatchObject({ skinsOnly: true, skinScope: 'none', skinWorks: [] });
   });
 
   it('does not offer fetching work skins only outside debug mode', async () => {
@@ -497,10 +498,12 @@ describe('DownloadDialog', () => {
     await advanceTo('options');
 
     expect(checkbox('Just fetch work skins')!.checked).toBe(true);
-    expect(element.querySelector('.skins-only-hint')?.textContent).toContain('2 works you picked');
+    expect(element.querySelector('.skins-only-hint')?.textContent).toContain('2 works you');
+    // works picked are always checked: no choice of which
+    expect(element.querySelector('input[name=skinScope]')).toBeNull();
     await advanceTo('running');
 
-    expect(jobs.started[0].options).toMatchObject({ skinsOnly: true, overwriteSkins: false, skinWorks: ['12', '34'] });
+    expect(jobs.started[0].options).toMatchObject({ skinsOnly: true, skinWorks: ['12', '34'] });
   });
 
   it('says a work got from FicHub gets no work skin', async () => {
@@ -1151,7 +1154,7 @@ describe('DownloadDialog', () => {
       // a custom run skipping its indexing may look each work up; nothing else may
       recheck: false,
       skinsOnly: false,
-      overwriteSkins: false,
+      skinScope: 'unchecked',
       skinWorks: [],
       // offered on a full scan, but off unless it is asked for
       overwrite: false,

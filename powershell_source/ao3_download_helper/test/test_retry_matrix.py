@@ -73,6 +73,10 @@ def a_repo(pages: dict) -> tuple[MagicMock, list, list]:
     files: list[tuple[str, str]] = []
 
     def get_soup(link):
+        # a work's own page is read only for its skin, as each html file is saved - not a
+        # listing page, and nothing these runs are judged on. none has a skin here
+        if re.search(r'/works/\d+$', link):
+            return BeautifulSoup('<div id="main"></div>', 'html.parser')
         asked.append(('updated' if strings.AO3_SORT_BY_UPDATED in link else 'bookmarked',
                       parse_text.get_page_number(link)))
         return pages[link]
