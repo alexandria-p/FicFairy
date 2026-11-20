@@ -12,11 +12,12 @@ import os
 import socket
 import threading
 from http.server import ThreadingHTTPServer
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
 from source_code import exceptions, parse_text, progress, server, settings_file, strings
+from source_code.repo import Repository
 from source_code.fileio import FileOps as RealFileOps
 from source_code.storage import LocalStorage
 
@@ -3832,3 +3833,57 @@ def test_the_downloader_leaves_alone_a_format_it_was_told_to_keep(capsys):
 
 # endregion
 
+
+
+# region the debug panel's Skip this step, on a fic run's index step
+
+def test_skipping_a_single_fics_index_step_skips_what_needs_it_and_downloads_nothing(fake_environment):
+    job = server.Job(server.ACTION_WORK, ['JSON', 'HTML'], 'Someone', None,
+                     'https://archiveofourown.org/works/111')
+    job.steps = MagicMock()
+    ao3 = MagicMock()
+    ao3.index_one_work.side_effect = exceptions.StepSkippedException()
+
+    with patch.object(server, 'Ao3', return_value=ao3), \
+         patch.object(server, 'finish_run') as finished_run, \
+         patch.object(server, 'download_planned') as download:
+        server.run_work(job, fake_environment['fileops'], fake_environment['repo'], None)
+
+    download.assert_not_called()
+    finished_run.assert_called_once()
+    assert [c.args[0] for c in job.steps.skip.call_args_list] == ['index', 'series', 'check', 'download']
+    ao3.record_failure.assert_not_called()
+
+
+def test_skipping_several_fics_index_step_keeps_the_fics_read_and_marks_it_skipped(fake_environment):
+    links = '\n'.join(f'https://archiveofourown.org/works/{n}' for n in (1, 2, 3))
+    job = server.Job(server.ACTION_WORKS, ['JSON', 'HTML'], 'Someone', None, links)
+    job.steps = MagicMock()
+    ao3 = MagicMock()
+    ao3.index_failures = []
+    ao3.index_one_work.side_effect = [finished('1'), exceptions.StepSkippedException(), finished('3')]
+
+    with patch.object(server, 'Ao3', return_value=ao3), \
+         patch.object(server, 'indexed_entries', return_value={}), \
+         patch.object(server, 'finish_run'), \
+         patch.object(server, 'download_planned') as download:
+        server.run_works(job, fake_environment['fileops'], fake_environment['repo'], None)
+
+    assert ao3.index_one_work.call_count == 2
+    assert [x['id'] for x in download.call_args.args[3]] == ['1']
+    job.steps.skip.assert_any_call('index')
+    assert call('index') not in job.steps.done.call_args_list
+
+
+def test_a_skip_lands_mid_request_and_is_never_retried():
+    repo = Repository.__new__(Repository)
+    repo.cancelled = None
+    presses = iter([True])
+    repo.skip_check = lambda: next(presses, False)
+
+    with pytest.raises(exceptions.StepSkippedException):
+        repo.check_cancelled()
+    # consumed: the next check goes on
+    repo.check_cancelled()
+
+# endregion

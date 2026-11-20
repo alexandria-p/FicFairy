@@ -3108,7 +3108,15 @@ def run_work(job: Job, fileops: FileOps, repo: Repository, report) -> None:
     progress.report(report, progress.PHASE, name=progress.INDEXING)
     print(strings.AO3_INFO_ONE_WORK.format(work))
     try:
-        record = ao3.index_one_work(link, find_existing=existing_entry(ao3, fileops, work))
+        with ao3.skippable():
+            record = ao3.index_one_work(link, find_existing=existing_entry(ao3, fileops, work))
+    except exceptions.StepSkippedException:
+        # Skip this step, from the debug panel: the fic was not read, so there is nothing to
+        # download or walk either
+        job.steps.skip('index')
+        for step in ('series', 'check', 'download'): job.steps.skip(step)
+        finish_run(job, fileops, ao3, report)
+        return
     except (exceptions.CancelledException, exceptions.SessionExpiredException):
         raise
     except Exception as e:
@@ -3469,10 +3477,13 @@ def run_fic_list(job: Job, fileops: FileOps, repo: Repository, report, importing
 
     records: list[dict] = []
     asked: list[str] = []
+    # Skip this step, from the debug panel: the fics not yet read are left, and the step says so
+    cut = False
     for done, link in enumerate(links, start=1):
         if job.cancel.is_set(): break
         if job.skipping():
             print(strings.AO3_INFO_STEP_SKIPPED)
+            cut = True
             break
         work = parse_text.get_work_number(link) or ''
         if work in finished:
@@ -3482,7 +3493,11 @@ def run_fic_list(job: Job, fileops: FileOps, repo: Repository, report, importing
         progress.report(report, progress.WORK, title=link, link=link, done=done,
                         total=len(links), phase=progress.INDEXING)
         try:
-            record = ao3.index_one_work(link, find_existing=existing_entry(ao3, fileops, work))
+            with ao3.skippable():
+                record = ao3.index_one_work(link, find_existing=existing_entry(ao3, fileops, work))
+        except exceptions.StepSkippedException:
+            cut = True
+            break
         except (exceptions.CancelledException, exceptions.SessionExpiredException):
             raise
         except Exception as e:
@@ -3503,7 +3518,8 @@ def run_fic_list(job: Job, fileops: FileOps, repo: Repository, report, importing
         return
     # a fic whose page would not read was not indexed: the step says so, and the run goes on
     # with the rest - the fics themselves are named in its issues
-    if any(gap.get('kind') == 'work' for gap in ao3.index_failures): job.steps.fail('index')
+    if cut: job.steps.skip('index')
+    elif any(gap.get('kind') == 'work' for gap in ao3.index_failures): job.steps.fail('index')
     else: job.steps.done('index')
 
     if importing:
@@ -5348,7 +5364,8 @@ def crawl_collections(job: Job, fileops: FileOps, ao3: Ao3, step: str, crawl) ->
         return None
     job.steps.start(step)
     ao3.walk_cut = False
-    records = crawl()
+    with ao3.skippable():
+        records = crawl()
     # Skip this step, from the debug panel, between pages of a listing
     if getattr(ao3, 'walk_cut', False) is True: job.steps.skip(step)
     # a collection whose listing broke off was saved with what it had, but not finished

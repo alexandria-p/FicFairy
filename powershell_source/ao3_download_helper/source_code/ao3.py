@@ -512,169 +512,170 @@ class Ao3:
         reached = {'bookmarked': '', 'updated': ''}
 
         try:
-            while True:
-                self.check_cancelled()
-                self.skip_point()
-                current = parse_text.get_page_number(link)
-                shown_total = None if open_ended else total_pages
-                print(strings.AO3_INFO_METADATA_FETCHING.format(str(current), str(shown_total))
-                      if shown_total else
-                      strings.AO3_INFO_METADATA_FETCHING_FIRST.format(str(current)))
-                # said before the request, so the ui names the page being fetched rather
-                # than the last one that finished. the fetch is the slow part, and a
-                # caption written only afterwards describes the wrong page for all of it
-                asking, asking_of = self.page_progress(current, shown_total)
-                progress.report(self.progress, progress.PAGE, page=asking, total=asking_of,
-                                listingPage=current, listingTotal=shown_total, fetching=True)
-                self.fileops.write_log({'link': link, 'message': strings.INFO_STARTING_PAGE, 'level': 'debug'})
-                thesoup = self.fetch_page(link)
-                if not parse_soup.get_blurbs(thesoup) and not parse_soup.looks_like_listing(thesoup):
-                    # not a listing at all: an end to the walk taken from it would be a guess
-                    raise exceptions.Ao3DownloaderException(strings.ERROR_LISTING_UNREADABLE)
-                if total_pages is None:
-                    total_pages = parse_soup.get_total_pages(thesoup)
-                page_records = []
-                # bookmarks of a series or of a work off ao3: indexed in their own folders,
-                # never downloaded, and never what a walk stops at
-                page_series: list[dict] = []
-                page_external: list[dict] = []
-                reached_known = False
-                for blurb in parse_soup.get_blurbs(thesoup):
-                    if ceiling:
-                        dated = parse_text.get_date_stamp(parse_soup.get_text_or_empty(
-                            blurb, SORT_DATE_SELECTORS.get(ceiling_on, 'div.header p.datetime')))
-                        if dated and dated > ceiling: continue
-                    kind, number = parse_soup.get_blurb_kind(blurb)
-                    if kind in (parse_soup.BLURB_SERIES, parse_soup.BLURB_EXTERNAL) and \
-                            (number or kind == parse_soup.BLURB_EXTERNAL):
-                        key = parse_soup.get_blurb_id(blurb) or f'{kind}-{number}'
-                        if key in seen: continue
-                        seen.add(key)
-                        if kind == parse_soup.BLURB_SERIES:
-                            document = parse_soup.get_series_bookmark_metadata(blurb, number)
-                            document[strings.BOOKMARK_TYPE_FIELD] = strings.BOOKMARK_TYPE_SERIES
-                            page_series.append(document)
-                        else:
-                            document = parse_soup.get_external_bookmark_metadata(blurb, number)
-                            document[strings.BOOKMARK_TYPE_FIELD] = strings.BOOKMARK_TYPE_EXTERNAL
-                            page_external.append(document)
-                        document['source'] = source
-                        if own_bookmarks: document[strings.BOOKMARKED_FIELD] = True
-                        continue
-                    worknum = number if kind == parse_soup.BLURB_WORK else None
-                    if not worknum:
-                        skipped += 1
-                        # why, not just how many - a count leaves no way to tell which
-                        # bookmark was passed over or to go and look at it
-                        self.skipped_works.append(parse_soup.get_blurb_skip_reason(blurb))
-                        continue
-                    # it still gets indexed below - it has a number and a place in the
-                    # listing - but asking ao3 for the file would fail by definition
-                    self.note_unrevealed(blurb, worknum)
+            with self.skippable():
+                while True:
+                    self.check_cancelled()
+                    self.skip_point()
+                    current = parse_text.get_page_number(link)
+                    shown_total = None if open_ended else total_pages
+                    print(strings.AO3_INFO_METADATA_FETCHING.format(str(current), str(shown_total))
+                          if shown_total else
+                          strings.AO3_INFO_METADATA_FETCHING_FIRST.format(str(current)))
+                    # said before the request, so the ui names the page being fetched rather
+                    # than the last one that finished. the fetch is the slow part, and a
+                    # caption written only afterwards describes the wrong page for all of it
+                    asking, asking_of = self.page_progress(current, shown_total)
+                    progress.report(self.progress, progress.PAGE, page=asking, total=asking_of,
+                                    listingPage=current, listingTotal=shown_total, fetching=True)
+                    self.fileops.write_log({'link': link, 'message': strings.INFO_STARTING_PAGE, 'level': 'debug'})
+                    thesoup = self.fetch_page(link)
+                    if not parse_soup.get_blurbs(thesoup) and not parse_soup.looks_like_listing(thesoup):
+                        # not a listing at all: an end to the walk taken from it would be a guess
+                        raise exceptions.Ao3DownloaderException(strings.ERROR_LISTING_UNREADABLE)
+                    if total_pages is None:
+                        total_pages = parse_soup.get_total_pages(thesoup)
+                    page_records = []
+                    # bookmarks of a series or of a work off ao3: indexed in their own folders,
+                    # never downloaded, and never what a walk stops at
+                    page_series: list[dict] = []
+                    page_external: list[dict] = []
+                    reached_known = False
+                    for blurb in parse_soup.get_blurbs(thesoup):
+                        if ceiling:
+                            dated = parse_text.get_date_stamp(parse_soup.get_text_or_empty(
+                                blurb, SORT_DATE_SELECTORS.get(ceiling_on, 'div.header p.datetime')))
+                            if dated and dated > ceiling: continue
+                        kind, number = parse_soup.get_blurb_kind(blurb)
+                        if kind in (parse_soup.BLURB_SERIES, parse_soup.BLURB_EXTERNAL) and \
+                                (number or kind == parse_soup.BLURB_EXTERNAL):
+                            key = parse_soup.get_blurb_id(blurb) or f'{kind}-{number}'
+                            if key in seen: continue
+                            seen.add(key)
+                            if kind == parse_soup.BLURB_SERIES:
+                                document = parse_soup.get_series_bookmark_metadata(blurb, number)
+                                document[strings.BOOKMARK_TYPE_FIELD] = strings.BOOKMARK_TYPE_SERIES
+                                page_series.append(document)
+                            else:
+                                document = parse_soup.get_external_bookmark_metadata(blurb, number)
+                                document[strings.BOOKMARK_TYPE_FIELD] = strings.BOOKMARK_TYPE_EXTERNAL
+                                page_external.append(document)
+                            document['source'] = source
+                            if own_bookmarks: document[strings.BOOKMARKED_FIELD] = True
+                            continue
+                        worknum = number if kind == parse_soup.BLURB_WORK else None
+                        if not worknum:
+                            skipped += 1
+                            # why, not just how many - a count leaves no way to tell which
+                            # bookmark was passed over or to go and look at it
+                            self.skipped_works.append(parse_soup.get_blurb_skip_reason(blurb))
+                            continue
+                        # it still gets indexed below - it has a number and a place in the
+                        # listing - but asking ao3 for the file would fail by definition
+                        self.note_unrevealed(blurb, worknum)
 
-                    # a work only a collection led the index to is checked here, when reached:
-                    # if you had not bookmarked it, it is new to your bookmarks, so the walk
-                    # reads it (marking it bookmarked) and carries on
-                    if known is not None and str(worknum) in known and \
-                            (not hasattr(known, 'confirmed') or known.confirmed(str(worknum))):
-                        # the first fic we already hold. everything past it on this page,
-                        # and every page after it, has been seen before
-                        print(strings.AO3_INFO_REACHED_KNOWN)
-                        reached_known = True
-                        break
-
-                    if stop_before:
-                        # only sound on a listing sorted by this date - see the docstring
-                        selector = ('div.user p.datetime' if stop_on == 'bookmarked'
-                                    else 'div.header p.datetime')
-                        updated = parse_text.get_date_stamp(parse_soup.get_text_or_empty(
-                            blurb, selector))
-                        if updated and updated < stop_before:
-                            print(strings.AO3_INFO_REACHED_OLDER.format(stop_before))
+                        # a work only a collection led the index to is checked here, when reached:
+                        # if you had not bookmarked it, it is new to your bookmarks, so the walk
+                        # reads it (marking it bookmarked) and carries on
+                        if known is not None and str(worknum) in known and \
+                                (not hasattr(known, 'confirmed') or known.confirmed(str(worknum))):
+                            # the first fic we already hold. everything past it on this page,
+                            # and every page after it, has been seen before
+                            print(strings.AO3_INFO_REACHED_KNOWN)
                             reached_known = True
                             break
-                    # a work can be bookmarked more than once, and can shift between pages
-                    # while we're paging through, so dedupe on the bookmark rather than the work
-                    key = parse_soup.get_blurb_id(blurb) or str(worknum)
-                    if key in seen: continue
-                    seen.add(key)
-                    document = {'source': source}
-                    document.update(parse_soup.get_blurb_metadata(blurb))
-                    document[strings.BOOKMARK_TYPE_FIELD] = strings.BOOKMARK_TYPE_WORK
-                    if own_bookmarks: document[strings.BOOKMARKED_FIELD] = True
-                    records.append(document)
-                    page_records.append(document)
-                # nothing is written until the whole page has been read. a page is one unit
-                # of work: it is fetched, parsed and only then saved, so a page abandoned
-                # partway leaves no half-built entries and simply gets asked for again.
-                # saving as each blurb was parsed made the page half-written by definition
-                for document in page_records:
-                    self.save_metadata(document)
-                for document in page_external:
-                    self.save_entry(document, strings.EXTERNAL_INDEX_FOLDER_NAME)
-                # a series is not walked here: it is marked, and every marked series is
-                # walked once indexing is over, so a work anywhere in the listing is read
-                # from the listing and not a second time from a series
-                for document in page_series:
-                    self.save_series_entry(document)
-                    self.mark_series(document['id'], document.get('title'), bookmark=document)
-                for document in page_records:
-                    self.mark_series_of(document)
-                if self.on_page:
-                    # the last bookmark on the page and the date it carries in the order the
-                    # listing is sorted by - the date is what a retry looks for again, since
-                    # pages move between attempts and an updated fic moves with them
-                    blurbs = parse_soup.get_blurbs(thesoup)
-                    anchor = None
-                    if blurbs and parse_soup.get_blurb_id(blurbs[-1]):
-                        sort = 'updated' if listing_sort(source) == 'updated' else 'bookmarked'
-                        anchor = {'id': parse_soup.get_blurb_id(blurbs[-1]),
-                                  'date': parse_text.get_date_stamp(parse_soup.get_text_or_empty(
-                                      blurbs[-1], SORT_DATE_SELECTORS[sort])),
-                                  'sort': sort}
-                    self.on_page(current, anchor, [str(d['id']) for d in page_records
-                                                   if d.get('id')])
-                shown_total = None if open_ended else total_pages
-                done, of = self.page_progress(current, shown_total)
-                # two sets of numbers on purpose: the bar measures the slice being fetched,
-                # so it runs 1..n and ends full, while the words say where that actually is
-                # in the listing - 'page 42 of 80' is what you would go and look at
-                progress.report(self.progress, progress.PAGE, page=done, total=of,
-                                listingPage=current, listingTotal=shown_total,
-                                works=len(records))
-                last_good = current
-                page_blurbs = parse_soup.get_blurbs(thesoup)
-                if page_blurbs:
-                    reached = {
-                        'bookmarked': parse_text.get_date_stamp(parse_soup.get_text_or_empty(
-                            page_blurbs[-1], 'div.user p.datetime')) or reached['bookmarked'],
-                        'updated': parse_text.get_date_stamp(parse_soup.get_text_or_empty(
-                            page_blurbs[-1], 'div.header p.datetime')) or reached['updated'],
-                    }
-                # said as soon as the page is in, and before any decision to stop: this used
-                # to sit after the break checks, so the page a run ended on - the last one
-                # of the listing, or the one the page limit stopped at - never reported
-                # finishing at all
-                print(strings.AO3_INFO_METADATA_PAGE.format(
-                          str(current), str(shown_total), str(len(records)))
-                      if shown_total else
-                      strings.AO3_INFO_METADATA_PAGE_ONLY.format(
-                          str(current), str(len(records))))
-                # the works ahead of the familiar or older one are still new, so they were kept
-                # and written; it is only the walking that stops here. after the page has said
-                # it finished, not before - a walk stopped by a floor used to end on 'fetching
-                # page 4' and never report the page it had actually read
-                if reached_known or not total_pages or current >= total_pages:
-                    self.walk_finished = True
-                    break
-                link = parse_text.get_next_page(link)
-                if self.pages and parse_text.get_page_number(link) == self.pages + 1:
-                    if self.debug: self.fileops.write_log({'link': link, 'message': strings.INFO_PAGE_LIMIT_REACHED, 'level': 'debug'})
-                    self.walk_finished = True
-                    break
+
+                        if stop_before:
+                            # only sound on a listing sorted by this date - see the docstring
+                            selector = ('div.user p.datetime' if stop_on == 'bookmarked'
+                                        else 'div.header p.datetime')
+                            updated = parse_text.get_date_stamp(parse_soup.get_text_or_empty(
+                                blurb, selector))
+                            if updated and updated < stop_before:
+                                print(strings.AO3_INFO_REACHED_OLDER.format(stop_before))
+                                reached_known = True
+                                break
+                        # a work can be bookmarked more than once, and can shift between pages
+                        # while we're paging through, so dedupe on the bookmark rather than the work
+                        key = parse_soup.get_blurb_id(blurb) or str(worknum)
+                        if key in seen: continue
+                        seen.add(key)
+                        document = {'source': source}
+                        document.update(parse_soup.get_blurb_metadata(blurb))
+                        document[strings.BOOKMARK_TYPE_FIELD] = strings.BOOKMARK_TYPE_WORK
+                        if own_bookmarks: document[strings.BOOKMARKED_FIELD] = True
+                        records.append(document)
+                        page_records.append(document)
+                    # nothing is written until the whole page has been read. a page is one unit
+                    # of work: it is fetched, parsed and only then saved, so a page abandoned
+                    # partway leaves no half-built entries and simply gets asked for again.
+                    # saving as each blurb was parsed made the page half-written by definition
+                    for document in page_records:
+                        self.save_metadata(document)
+                    for document in page_external:
+                        self.save_entry(document, strings.EXTERNAL_INDEX_FOLDER_NAME)
+                    # a series is not walked here: it is marked, and every marked series is
+                    # walked once indexing is over, so a work anywhere in the listing is read
+                    # from the listing and not a second time from a series
+                    for document in page_series:
+                        self.save_series_entry(document)
+                        self.mark_series(document['id'], document.get('title'), bookmark=document)
+                    for document in page_records:
+                        self.mark_series_of(document)
+                    if self.on_page:
+                        # the last bookmark on the page and the date it carries in the order the
+                        # listing is sorted by - the date is what a retry looks for again, since
+                        # pages move between attempts and an updated fic moves with them
+                        blurbs = parse_soup.get_blurbs(thesoup)
+                        anchor = None
+                        if blurbs and parse_soup.get_blurb_id(blurbs[-1]):
+                            sort = 'updated' if listing_sort(source) == 'updated' else 'bookmarked'
+                            anchor = {'id': parse_soup.get_blurb_id(blurbs[-1]),
+                                      'date': parse_text.get_date_stamp(parse_soup.get_text_or_empty(
+                                          blurbs[-1], SORT_DATE_SELECTORS[sort])),
+                                      'sort': sort}
+                        self.on_page(current, anchor, [str(d['id']) for d in page_records
+                                                       if d.get('id')])
+                    shown_total = None if open_ended else total_pages
+                    done, of = self.page_progress(current, shown_total)
+                    # two sets of numbers on purpose: the bar measures the slice being fetched,
+                    # so it runs 1..n and ends full, while the words say where that actually is
+                    # in the listing - 'page 42 of 80' is what you would go and look at
+                    progress.report(self.progress, progress.PAGE, page=done, total=of,
+                                    listingPage=current, listingTotal=shown_total,
+                                    works=len(records))
+                    last_good = current
+                    page_blurbs = parse_soup.get_blurbs(thesoup)
+                    if page_blurbs:
+                        reached = {
+                            'bookmarked': parse_text.get_date_stamp(parse_soup.get_text_or_empty(
+                                page_blurbs[-1], 'div.user p.datetime')) or reached['bookmarked'],
+                            'updated': parse_text.get_date_stamp(parse_soup.get_text_or_empty(
+                                page_blurbs[-1], 'div.header p.datetime')) or reached['updated'],
+                        }
+                    # said as soon as the page is in, and before any decision to stop: this used
+                    # to sit after the break checks, so the page a run ended on - the last one
+                    # of the listing, or the one the page limit stopped at - never reported
+                    # finishing at all
+                    print(strings.AO3_INFO_METADATA_PAGE.format(
+                              str(current), str(shown_total), str(len(records)))
+                          if shown_total else
+                          strings.AO3_INFO_METADATA_PAGE_ONLY.format(
+                              str(current), str(len(records))))
+                    # the works ahead of the familiar or older one are still new, so they were kept
+                    # and written; it is only the walking that stops here. after the page has said
+                    # it finished, not before - a walk stopped by a floor used to end on 'fetching
+                    # page 4' and never report the page it had actually read
+                    if reached_known or not total_pages or current >= total_pages:
+                        self.walk_finished = True
+                        break
+                    link = parse_text.get_next_page(link)
+                    if self.pages and parse_text.get_page_number(link) == self.pages + 1:
+                        if self.debug: self.fileops.write_log({'link': link, 'message': strings.INFO_PAGE_LIMIT_REACHED, 'level': 'debug'})
+                        self.walk_finished = True
+                        break
         except exceptions.StepSkippedException:
             # skipped from the debug panel: what was written stays, and the walk is not finished
-            pass
+            self.walk_cut = True
         except exceptions.CancelledException:
             # everything written so far stays on disk; this is not an error
             print(strings.INFO_CANCELLED)
@@ -1184,6 +1185,20 @@ class Ao3:
         return done, max(1, last - self.start + 1)
 
 
+    @contextlib.contextmanager
+    def skippable(self):
+        """While indexing: Skip this step lands mid-request too, as a stop does - the request in
+        flight, a retry's wait and AO3's break all end at once (`Repository.skip_check`). Nothing is
+        written from a request walked away from, so nothing is part-written."""
+
+        repo = self.repo
+        before = getattr(repo, 'skip_check', None)
+        if self.skip_requested is not None: repo.skip_check = self.skip_requested
+        try:
+            yield
+        finally:
+            repo.skip_check = before
+
     def skip_point(self) -> None:
         """Where a listing walk can be skipped: between pages, never inside one, so whatever a
         page held is written whole first. Raises `StepSkippedException` when Skip this step was
@@ -1501,7 +1516,7 @@ class Ao3:
                     self.take_collection(slug, source, records, blurb)
             self.walk_family(records)
         except exceptions.StepSkippedException:
-            pass  # skipped from the debug panel: what was saved stays
+            self.walk_cut = True  # skipped from the debug panel: what was saved stays
         except exceptions.CancelledException:
             print(strings.INFO_CANCELLED)
         except Exception as e:
@@ -1535,7 +1550,7 @@ class Ao3:
             self.take_collection(slug, link, records)
             self.walk_family(records)
         except exceptions.StepSkippedException:
-            pass  # skipped from the debug panel: what was saved stays
+            self.walk_cut = True  # skipped from the debug panel: what was saved stays
         except exceptions.CancelledException:
             print(strings.INFO_CANCELLED)
         except Exception as e:

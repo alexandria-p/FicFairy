@@ -74,6 +74,10 @@ class Repository:
         self.progress = progress
         self.cancelled = cancelled
         self.held = held
+        # the debug panel's Skip this step, while an indexing step lets it land mid-request
+        # (`Ao3.skippable`): asked wherever a stop is, so a request in flight, a retry's wait and
+        # AO3's break all end at once. Consumes the press as it reads it. None the rest of the time
+        self.skip_check: Callable[[], bool] | None = None
         self.session = requests.Session()
         self.debug = fileops.get_ini_value_boolean(strings.INI_DEBUG_LOGGING, False)
         self.extra_wait = fileops.get_ini_value_integer(strings.INI_WAIT_TIME, 0)
@@ -111,6 +115,9 @@ class Repository:
 
         if self.cancelled is not None and self.cancelled():
             raise exceptions.CancelledException()
+        if self.skip_check is not None and self.skip_check():
+            print(strings.AO3_INFO_STEP_SKIPPED)
+            raise exceptions.StepSkippedException()
 
 
     def wait(self, seconds: float) -> None:
@@ -377,6 +384,9 @@ class Repository:
                 # not count as an attempt: the user pausing is not the server failing
                 self.hold_if_asked()
                 continue
+            except exceptions.StepSkippedException:
+                # never retried: the press was consumed as it was read, and the step is over
+                raise
             except Exception as e:
                 # a page that times out repeatedly is unlikely to recover, so give up after (consecutive) 
                 # timeouts reach the configured limit to avoid wasting a lot of time on a dead page.
