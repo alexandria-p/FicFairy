@@ -514,3 +514,46 @@ def test_carrying_on_several_fics_passes_over_the_finished_and_fetches_only_what
     assert sorted(files) == sorted([('3', f) for f in FORMATS if f != 'HTML'] + every(4, 5, 6))
 
 # endregion
+
+
+# region the debug panel's Skip this step, during indexing
+
+SKIP_LINK = 'https://archiveofourown.org/users/Someone/bookmarks'
+
+
+def test_skip_this_step_ends_a_listing_walk_between_pages_keeping_what_was_read(library):
+    repo, asked, _ = a_repo(listing(SKIP_LINK, [1, 2], [3, 4], [5, 6]))
+    ao3 = Ao3(repo=repo, fileops=library, filetypes=[], pages=None, series=False, images=False)
+    presses = iter([False, True])
+    ao3.skip_requested = lambda: next(presses, False)
+
+    records = ao3.get_metadata(SKIP_LINK, False, own_bookmarks=True)
+
+    # the first page was read whole and kept; nothing after the press was asked for
+    assert [r['id'] for r in records] == ['1', '2']
+    assert asked == [('bookmarked', 1)]
+    assert ao3.walk_cut and not ao3.walk_finished and not ao3.walk_failed
+
+
+def test_a_skipped_walk_marks_its_step_skipped_not_done():
+    job = MagicMock()
+    ao3 = MagicMock(walk_skipped=False, walk_cut=True, walk_failed=False)
+
+    server.finish_walk_step(job, ao3, 'index')
+
+    job.steps.skip.assert_called_once_with('index')
+    job.steps.done.assert_not_called()
+
+
+def test_the_run_hands_its_skip_to_the_walk(library):
+    job = server.Job(server.ACTION_BOOKMARKS, ['JSON'], 'Someone', server.resolve_options({}))
+    ao3 = Ao3(repo=a_repo({})[0], fileops=library, filetypes=[], pages=None, series=False, images=False)
+
+    job.ao3 = ao3
+    job.skip.set()
+
+    assert ao3.skip_requested() is True
+    # one press skips one step
+    assert ao3.skip_requested() is False
+
+# endregion

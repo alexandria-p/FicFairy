@@ -968,6 +968,8 @@ class Job:
         real = isinstance(Ao3, type) and isinstance(value, Ao3)
         if real: value.skins = bool((getattr(self, 'options', None) or {}).get('skins'))
         if real: value.run_id = self.id
+        # the debug panel's Skip this step lands in a listing walk too, between pages
+        if real: value.skip_requested = self.skipping
         done = self.earlier_progress().get('formatsDone') if getattr(self, 'resume', None) else None
         if value is not None and isinstance(done, dict):
             value.formats_done = {str(work): {str(x).upper() for x in formats or []}
@@ -2102,6 +2104,8 @@ def finish_walk_step(job: Job, ao3: Ao3, step: str) -> None:
     but the step did not do what it says), or done."""
 
     if getattr(ao3, 'walk_skipped', False): mark_earlier(job, step)
+    # Skip this step, from the debug panel: what it would have done did not all happen
+    elif getattr(ao3, 'walk_cut', False) is True: job.steps.skip(step)
     elif getattr(ao3, 'walk_failed', False): job.steps.fail(step)
     else: job.steps.done(step)
 
@@ -3986,7 +3990,8 @@ def run_custom(job: Job, fileops: FileOps, repo: Repository, report) -> None:
         for record in records: ao3.mark_series_of(record)
         walked = True
         walk_broke = False
-    if walk_broke: job.steps.fail('index')
+    if getattr(ao3, 'walk_cut', False) is True: job.steps.skip('index')
+    elif walk_broke: job.steps.fail('index')
     else: job.steps.done('index') if walked else mark_earlier(job, 'index')
 
     records = merge_by_work(records, index_series_and_non_bookmarks(job, fileops, ao3, report))
@@ -5342,9 +5347,12 @@ def crawl_collections(job: Job, fileops: FileOps, ao3: Ao3, step: str, crawl) ->
         ao3.scoped = True
         return None
     job.steps.start(step)
+    ao3.walk_cut = False
     records = crawl()
+    # Skip this step, from the debug panel, between pages of a listing
+    if getattr(ao3, 'walk_cut', False) is True: job.steps.skip(step)
     # a collection whose listing broke off was saved with what it had, but not finished
-    if any(gap.get('kind') == 'collection' for gap in ao3.index_failures): job.steps.fail(step)
+    elif any(gap.get('kind') == 'collection' for gap in ao3.index_failures): job.steps.fail(step)
     else: job.steps.done(step)
     return records
 

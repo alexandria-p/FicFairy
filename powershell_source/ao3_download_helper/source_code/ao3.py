@@ -350,6 +350,11 @@ class Ao3:
         self.skins_saved: set[str] = set()
         # works whose page would not read for their skin this run
         self.skins_unread: set[str] = set()
+        # the debug panel's Skip this step, asked at each page of a listing walk - set by the run
+        # (`Job.ao3`, to `Job.skipping`, which clears the request as it reads it)
+        self.skip_requested = None
+        # whether the last walk was cut short by it (`skip_point`)
+        self.walk_cut = False
         # how far the collection listing being read has got: its first page, the last page
         # read in full, and the works found - said when one breaks off
         self.listing_read: dict = {}
@@ -497,6 +502,7 @@ class Ao3:
         total_pages = None
         self.walk_finished = False
         self.walk_failed = False
+        self.walk_cut = False
         # how far the walk got, for when it breaks off: the page it began on, the last one
         # read in full, and the dates on that page's last blurb - the bookmark's and the
         # work's own - which is how far back in time the listing was read
@@ -508,6 +514,7 @@ class Ao3:
         try:
             while True:
                 self.check_cancelled()
+                self.skip_point()
                 current = parse_text.get_page_number(link)
                 shown_total = None if open_ended else total_pages
                 print(strings.AO3_INFO_METADATA_FETCHING.format(str(current), str(shown_total))
@@ -665,6 +672,9 @@ class Ao3:
                     if self.debug: self.fileops.write_log({'link': link, 'message': strings.INFO_PAGE_LIMIT_REACHED, 'level': 'debug'})
                     self.walk_finished = True
                     break
+        except exceptions.StepSkippedException:
+            # skipped from the debug panel: what was written stays, and the walk is not finished
+            pass
         except exceptions.CancelledException:
             # everything written so far stays on disk; this is not an error
             print(strings.INFO_CANCELLED)
@@ -1174,6 +1184,16 @@ class Ao3:
         return done, max(1, last - self.start + 1)
 
 
+    def skip_point(self) -> None:
+        """Where a listing walk can be skipped: between pages, never inside one, so whatever a
+        page held is written whole first. Raises `StepSkippedException` when Skip this step was
+        pressed."""
+
+        if self.skip_requested and self.skip_requested():
+            self.walk_cut = True
+            print(strings.AO3_INFO_STEP_SKIPPED)
+            raise exceptions.StepSkippedException()
+
     def walk_pages(self, link: str, stop: int | None = None):
         """Yield each page of a paginated ao3 listing, following 'next' until it runs out -
         or until page `stop`, when given. It starts on whatever page `link` names."""
@@ -1181,6 +1201,7 @@ class Ao3:
         total_pages = None
         while True:
             self.check_cancelled()
+            self.skip_point()
             soup = self.fetch_page(link)
             yield soup
             if total_pages is None:
@@ -1479,6 +1500,8 @@ class Ao3:
                     if not slug: continue
                     self.take_collection(slug, source, records, blurb)
             self.walk_family(records)
+        except exceptions.StepSkippedException:
+            pass  # skipped from the debug panel: what was saved stays
         except exceptions.CancelledException:
             print(strings.INFO_CANCELLED)
         except Exception as e:
@@ -1511,6 +1534,8 @@ class Ao3:
             print(strings.AO3_INFO_COLLECTION_ONE.format(slug))
             self.take_collection(slug, link, records)
             self.walk_family(records)
+        except exceptions.StepSkippedException:
+            pass  # skipped from the debug panel: what was saved stays
         except exceptions.CancelledException:
             print(strings.INFO_CANCELLED)
         except Exception as e:
@@ -1704,7 +1729,7 @@ class Ao3:
                 if self.on_collection_page:
                     self.on_collection_page(slug, key, None, ids, done=True, externals=externals,
                                             series=series)
-            except exceptions.CancelledException:
+            except (exceptions.CancelledException, exceptions.StepSkippedException):
                 raise
             except Exception as e:
                 document[key] = []
