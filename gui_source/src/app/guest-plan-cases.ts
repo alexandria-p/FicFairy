@@ -1239,14 +1239,6 @@ export const GUEST_PLAN_CASES: { action: string; filetypes: string[]; options: R
     "Fetch work skins"
    ],
    [
-    "fichub",
-    "Try FicHub for works AO3 would not give us"
-   ],
-   [
-    "cleanup",
-    "Cleanup"
-   ],
-   [
     "report",
     "Report any failures"
    ]
@@ -2343,14 +2335,6 @@ export const GUEST_PLAN_CASES: { action: string; filetypes: string[]; options: R
     "Fetch work skins"
    ],
    [
-    "fichub",
-    "Try FicHub for works AO3 would not give us"
-   ],
-   [
-    "cleanup",
-    "Cleanup"
-   ],
-   [
     "report",
     "Report any failures"
    ]
@@ -2905,14 +2889,6 @@ export const GUEST_PLAN_CASES: { action: string; filetypes: string[]; options: R
    [
     "skins",
     "Fetch work skins"
-   ],
-   [
-    "fichub",
-    "Try FicHub for works AO3 would not give us"
-   ],
-   [
-    "cleanup",
-    "Cleanup"
    ],
    [
     "report",

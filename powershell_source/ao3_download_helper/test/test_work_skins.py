@@ -401,10 +401,19 @@ def skins_only(tmp_path, pages, options=None, works=('41822007',)):
     return ao3, job, build
 
 
-def run_only(monkeypatch, ao3, job, build):
+def run_only(monkeypatch, ao3, job, build, reported=None):
     monkeypatch.setattr(server, 'Ao3', build)
-    monkeypatch.setattr(server, 'finish_run', lambda *a: None)
-    server.run_custom(job, ao3.fileops, ao3.repo, None)
+
+    def never(*a, **k):
+        raise AssertionError('a skins-only run reached a step that indexes or downloads')
+
+    # FicHub, cleanup (collection links written into index entries) and the skins-for-html step
+    # are for runs that index or download: this one never reaches them
+    for name in ('finish_run', 'rescue_with_fichub', 'cleanup', 'fetch_pending_skins',
+                 'write_collection_links'):
+        monkeypatch.setattr(server, name, never)
+    server.run_custom(job, ao3.fileops, ao3.repo,
+                      reported.append if reported is not None else (lambda event: None))
 
 
 def test_fetching_skins_only_saves_each_skin_and_downloads_nothing(tmp_path, monkeypatch):
@@ -462,13 +471,65 @@ def test_fetching_skins_only_takes_the_works_picked(tmp_path, monkeypatch):
     assert (tmp_path / strings.SKINS_FOLDER_NAME / '7.none').exists()
 
 
+def files_in(folder) -> dict[str, bytes]:
+    found = {}
+    for root, _, names in os.walk(folder):
+        for name in names:
+            path = os.path.join(root, name)
+            with open(path, 'rb') as f:
+                found[os.path.relpath(path, folder)] = f.read()
+    return found
+
+
+@pytest.mark.parametrize('picked', [['41822007'], ['41822007', '7']])
+def test_fetching_skins_for_works_picked_writes_nothing_but_their_skins(tmp_path, monkeypatch, picked):
+    # the Works tab's [DEBUG] Download work skin, for one work or several: only each skin saved -
+    # no index entry, collection, downloaded file or run of anything else touched
+    pages = {f'https://archiveofourown.org/works/{n}': page('unlockedWork') for n in picked}
+    ao3, job, build = skins_only(tmp_path, pages, {'skinWorks': picked})
+    ao3.fileops.save_bytes.side_effect = lambda n, c: FileOps.save_bytes(ao3.fileops, n, c)
+    for folder, name, text in ((strings.INDEXING_FOLDER_NAME, '41822007 A Work - Writer.json', '{"id": "41822007"}'),
+                               (strings.COLLECTIONS_FOLDER_NAME, 'c.json', '{"name": "c", "work_ids": ["41822007"]}')):
+        (tmp_path / folder).mkdir(exist_ok=True)
+        (tmp_path / folder / name).write_text(text, encoding='utf-8')
+    before = files_in(tmp_path)
+    reported = []
+
+    run_only(monkeypatch, ao3, job, build, reported)
+
+    after = files_in(tmp_path)
+    changed = {k for k in set(before) | set(after) if before.get(k) != after.get(k)}
+    assert changed == {os.path.join(strings.SKINS_FOLDER_NAME, f'{n}.css') for n in picked}
+    assert [c.args[0] for c in ao3.repo.get_soup.call_args_list] == list(pages)
+    ao3.repo.download_file.assert_not_called()
+    ao3.fileops.save_json.assert_not_called()
+    ao3.fileops.rename_file.assert_not_called()
+    assert all(strings.SKINS_FOLDER_NAME in c.args[0] for c in ao3.fileops.save_bytes.call_args_list)
+    assert all(strings.SKINS_FOLDER_NAME in c.args[0] for c in ao3.fileops.delete_file.call_args_list)
+    # its one step is done, and stays done
+    job.steps.done.assert_called_once_with('skins')
+    job.steps.skip.assert_not_called()
+
+
+def test_a_skin_a_picked_work_will_not_give_is_reported_and_nothing_else_happens(tmp_path, monkeypatch):
+    ao3, job, build = skins_only(tmp_path, {}, {'skinWorks': ['7']})
+    ao3.repo.get_soup.side_effect = exceptions.InvalidStatusCodeException('503')
+    reported = []
+
+    run_only(monkeypatch, ao3, job, build, reported)
+
+    assert [x['id'] for x in ao3.skin_failures] == ['7']
+    assert any(e.get('type') == 'skinFailures' for e in reported)
+    assert not (tmp_path / strings.SKINS_FOLDER_NAME).exists()
+
+
 def test_fetching_skins_only_lists_only_its_own_steps():
     job = MagicMock()
     job.action = server.ACTION_CUSTOM
     job.filetypes = []
     job.options = {'skinsOnly': True}
 
-    assert [x[0] for x in server.step_plan(job)] == ['login', 'skins', 'fichub', 'cleanup', 'report']
+    assert [x[0] for x in server.step_plan(job)] == ['login', 'skins', 'report']
 
 
 def test_only_a_custom_run_can_fetch_skins_only():

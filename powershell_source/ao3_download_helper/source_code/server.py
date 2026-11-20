@@ -1210,8 +1210,8 @@ def step_plan(job: Job) -> list[tuple[str, str]]:
 
     if job.action == ACTION_CUSTOM and job.options.get('skinsOnly'):
         # nothing indexed and nothing downloaded: only each work's page read for its skin
-        return plan + [('skins', strings.STEP_SKINS_ONLY), ('fichub', strings.STEP_FICHUB),
-                       ('cleanup', strings.STEP_CLEANUP), ('report', strings.STEP_REPORT)]
+        # - and so no FicHub (it has no skins) and no cleanup (which writes into index entries)
+        return plan + [('skins', strings.STEP_SKINS_ONLY), ('report', strings.STEP_REPORT)]
 
     if job.action in COLLECTION_ACTIONS:
         works = bool(job.options.get('collectionWorks'))
@@ -5113,7 +5113,8 @@ def run_skins_only(job: Job, fileops: FileOps, repo: Repository, report) -> None
     them - they were asked for by name. Otherwise every work with html in the library is narrowed
     by what is saved for it (`skinScope`): never checked, a skin saved (to bring it up to date),
     noted as having none (has its author added one since?), or all of them. A page that will not
-    read saves nothing, and is not a failure: the work itself is untouched.
+    read saves nothing; it is listed with the skin failures (`skinFailures`), the work itself
+    untouched. The run ends with its report alone: no FicHub and no cleanup step.
     """
 
     ao3 = Ao3(repo, fileops, [], None, False, False, progress=report,
@@ -5133,7 +5134,7 @@ def run_skins_only(job: Job, fileops: FileOps, repo: Repository, report) -> None
     if not works:
         print(strings.AO3_INFO_SKINS_ONLY_NONE_LEFT)
         job.steps.skip('skins')
-        finish_run(job, fileops, ao3, report)
+        report_failures(ao3, report)
         return
     print(strings.AO3_INFO_SKINS_ONLY_START.format(len(works)))
     found = none = 0
@@ -5149,7 +5150,9 @@ def run_skins_only(job: Job, fileops: FileOps, repo: Repository, report) -> None
             else: none += 1
     print(strings.AO3_INFO_SKINS_ONLY_DONE.format(found, none, len(ao3.skins_unread)))
     job.steps.done('skins')
-    finish_run(job, fileops, ao3, report)
+    # not `finish_run`: its FicHub, cleanup (collection links written into index entries) and
+    # skins-for-html steps are for runs that index or download - this one only reads skins
+    report_failures(ao3, report)
 
 
 def fetch_pending_skins(job: Job, fileops: FileOps, ao3, report) -> None:

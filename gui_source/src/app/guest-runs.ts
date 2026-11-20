@@ -90,8 +90,7 @@ export function guestPlan(action: JobAction, filetypes: string[], options: Optio
   const plan: GuestStep[] = [step('login', L.STEP_LOGIN)];
   // a custom run fetching work skins only: no index, no download - see server.run_skins_only
   if (action === 'custom' && options['skinsOnly']) {
-    return [...plan, step('skins', L.STEP_SKINS_ONLY), step('fichub', L.STEP_FICHUB),
-      step('cleanup', L.STEP_CLEANUP), step('report', L.STEP_REPORT)];
+    return [...plan, step('skins', L.STEP_SKINS_ONLY), step('report', L.STEP_REPORT)];
   }
   const nonBookmarks =
     !!options['nonBookmarks'] &&
