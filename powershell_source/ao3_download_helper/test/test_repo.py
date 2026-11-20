@@ -622,6 +622,44 @@ def test_a_rate_limit_break_does_not_reset_the_maintenance_count(mock_repo, monk
     assert mock_repo.session.request.call_count == Repository.maintenance_retries + 2
 
 
+def test_a_timeout_waits_its_own_longer_wait_before_asking_again(mock_repo, monkeypatch, capsys):
+    waits = []
+    monkeypatch.setattr(mock_repo, 'wait', lambda s: waits.append(s))
+    mock_repo.max_retries = 30
+    mock_repo.max_timeouts = 3
+    mock_repo.timeout_retry_delay = 30
+    timeout = requests.exceptions.Timeout('boom')
+    succeeding = make_response(status_code=200, text='ok')
+    mock_repo.session.request.side_effect = [timeout, timeout, succeeding]
+
+    assert mock_repo.my_request('GET', AO3_URL) is succeeding
+    assert waits == [30, 30]
+    assert 'trying again in 30s (timeout 1 of 3)' in capsys.readouterr().out
+
+
+def test_a_server_error_keeps_the_doubling_wait(mock_repo, monkeypatch):
+    waits = []
+    monkeypatch.setattr(mock_repo, 'wait', lambda s: waits.append(s))
+    mock_repo.max_retries = 30
+    mock_repo.timeout_retry_delay = 30
+    failing = make_response(status_code=502)
+    mock_repo.session.request.side_effect = [failing, make_response(status_code=200, text='ok')]
+
+    mock_repo.my_request('GET', AO3_URL)
+    assert waits == [mock_repo.get_delay(0)]
+    assert waits[0] < 30
+
+
+def test_the_timeout_wait_is_read_from_settings():
+    from source_code.repo import Repository
+    fileops = MagicMock()
+    fileops.get_ini_value.side_effect = lambda key, default=None: (
+        '45' if key == 'TimeoutRetrySeconds' else default)
+    fileops.get_ini_value_integer = lambda key, default=None: (
+        45 if key == 'TimeoutRetrySeconds' else default)
+    assert Repository(fileops).timeout_retry_delay == 45
+
+
 def test_my_request_max_timeouts_zero_disables_cutoff(mock_repo):
     mock_repo.max_retries = 2
     mock_repo.max_timeouts = 0  # early cutoff disabled — behavior governed by max_retries
