@@ -382,7 +382,9 @@ COLLECTION_ACTIONS = (ACTION_COLLECTIONS, ACTION_COLLECTION)
 # sets that itself rather than taking it from the request.
 OVERWRITE_ACTIONS = (ACTION_BOOKMARKS, ACTION_CUSTOM)
 # the runs that can put work skins into their html: the scans and the fic runs
-SKIN_ACTIONS = (ACTION_BOOKMARKS, ACTION_QUICK, ACTION_CUSTOM, ACTION_WORK, ACTION_WORKS)
+# every run that can download html may fetch work skins with it, at no cost unless ticked. A
+# run fetching skins alone (`skinsOnly`) is the custom run's, and sets it aside (`do_POST`)
+SKIN_ACTIONS = ACTIONS
 # which works a run fetching skins alone takes, by what is saved for each in `skins/`: none yet
 # (never checked), a skin (`.css`), the note that it has none (`.none`), or every one
 SKIN_SCOPES = ('unchecked', 'saved', 'none', 'all')
@@ -5142,50 +5144,10 @@ def run_skins_only(job: Job, fileops: FileOps, repo: Repository, report) -> None
     finish_run(job, fileops, ao3, report)
 
 
-def skins_for_current_html(job: Job, fileops: FileOps, ao3) -> None:
-    """On a run that fetches work skins, the skin of every work it covered whose html is
-    already up to date - so it was not downloaded, and got no skin put in.
-
-    The html is not downloaded again and not rewritten: only the skin's CSS is saved,
-    `skins/<worknum>.css`, and the page puts it in as the work is opened. A work whose skin is
-    saved already is passed over, so this costs one request per work once (none where the run
-    read the work's page anyway), never on every run. A work with no skin is saved as an empty
-    file for the same reason. Works that failed are left out: FicHub keeps no skin. Anything
-    going wrong here costs the skin alone; a stop or a lapsed login still ends the run.
-    """
-
-    if getattr(ao3, 'skins', False) is not True: return
-    try:
-        failed = {str(x.get('id')) for x in (getattr(ao3, 'failures', None) or [])}
-        works = covered_works(job, ao3) - set(ao3.skins_saved) - failed
-        if not works: return
-        copies = shared.scan_downloaded_works(fileops.worksfolder, ['HTML'],
-                                              storage=fileops.storage)
-        works = {x for x in works if 'HTML' in (copies.get(x) or {})}
-        if not works: return
-        have = saved_skin_ids(fileops)
-        missing = sorted((x for x in works if x not in have), key=lambda x: int(x) if x.isdigit() else 0)
-    except (exceptions.CancelledException, exceptions.SessionExpiredException):
-        raise
-    except Exception:
-        return  # nothing to go by - the skins wait for the next run
-    if not missing:
-        print(strings.AO3_INFO_SKINS_ONLY_NONE)
-        return
-    print(strings.AO3_INFO_SKINS_ONLY.format(len(missing)))
-    for work in missing:
-        ao3.check_cancelled()
-        css = ao3.skin_for(work, saving_only=True)
-        # a page that would not read is no answer: saving nothing asks again next run
-        if work in ao3.skins_unread: continue
-        ao3.save_skin(work, css)
-
-
 def finish_run(job: Job, fileops: FileOps, ao3, report) -> None:
     """How every run ends: FicHub for what ao3 would not give us, the cleanup step, then
     the report of anything left undone."""
 
-    skins_for_current_html(job, fileops, ao3)
     rescue_with_fichub(job, fileops, ao3, report)
     cleanup(job, fileops, ao3)
     report_failures(ao3, report)

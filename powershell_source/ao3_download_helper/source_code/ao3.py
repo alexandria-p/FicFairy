@@ -925,28 +925,26 @@ class Ao3:
         return True
 
     def dress(self, work: str, filetype: str, name: str, content: bytes) -> bytes:
-        """A downloaded html file, its work's skin saved beside it - and put into it, when this
-        run was asked to (`skins`).
+        """A downloaded html file with its work's skin put in, when this run was asked to fetch
+        skins (`skins`) - and only then: a run not asked makes no request for a skin at all.
 
-        **Every html download or update fetches the work's skin and saves it** as
-        `skins/<worknum>.css`, over the one saved before, or `<worknum>.none` for a work with none -
-        whether or not the run fetches skins, at the owner's request: the html is the version the
-        author's skin belongs with, and an author may have added, changed or dropped one since. It
-        costs nothing where the run read the work's page anyway, and one request otherwise. The page
-        puts the saved skin into html with none as it is opened.
-
-        Put into the file only when the run was asked to: AO3's download leaves the skin out, and
-        its rules are all written `#workskin .<class>`, so the CSS goes into the `<head>` and the
-        body is wrapped in `<div id="workskin">`, as on the work page - before the file is saved,
-        so it is written once and every check on it sees the file as it is kept. Anything that does
-        not fit leaves the file exactly as AO3 sent it. A page that will not read saves nothing.
+        Only when html is downloaded - a new download, an update, or a copy overwritten - and
+        never otherwise: a work whose html is current is not looked at for a skin. The skin is
+        saved beside the works as `skins/<worknum>.css`, over the one saved before, or
+        `<worknum>.none` for a work with none (the author may have added, changed or dropped it).
+        AO3's download leaves the skin out, and its rules are all written `#workskin .<class>`,
+        so the CSS goes into the `<head>` and the body is wrapped in `<div id="workskin">`, as on
+        the work page - before the file is saved, so it is written once and every check on it sees
+        the file as it is kept. Anything that does not fit leaves the file exactly as AO3 sent it.
+        It costs nothing where the run read the work's page anyway, and one request otherwise; a
+        page that will not read saves nothing.
         """
 
-        if filetype.upper() != 'HTML': return content
-        css = self.skin_for(work, saving_only=not self.skins)
+        if not self.skins or filetype.upper() != 'HTML': return content
+        css = self.skin_for(work)
         if str(work) in self.skins_unread: return content
         self.save_skin(work, css)
-        if not self.skins or not css: return content
+        if not css: return content
         dressed = with_skin(content, css)
         if dressed is None:
             print(strings.AO3_INFO_SKIN_NOT_ADDED.format(work))

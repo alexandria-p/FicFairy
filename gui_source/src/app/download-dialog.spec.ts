@@ -431,16 +431,18 @@ describe('DownloadDialog', () => {
     expect(checkbox('EPUB')!.checked).toBe(false);
   });
 
-  it('offers work skins only in debug mode', async () => {
+  it('offers work skins unticked, outside debug mode too', async () => {
     await open('bookmarks');
     await advanceTo('filetypes');
 
-    expect(element.querySelector('input[name=skins]')).toBeNull();
+    expect(element.querySelector<HTMLInputElement>('input[name=skins]')!.checked).toBe(false);
+    expect(element.querySelector('.skins-option')?.textContent).not.toContain('DEBUG');
+    await advanceTo('running');
+    expect(jobs.started[0].options).toMatchObject({ skins: false });
   });
 
-  for (const action of ['bookmarks', 'quick', 'custom'] as const) {
-    it(`sends work skins on a ${action} run when ticked in debug mode`, async () => {
-      debugOn();
+  for (const action of ['bookmarks', 'quick', 'custom', 'update', 'sync', 'work'] as const) {
+    it(`sends work skins on a ${action} run when ticked`, async () => {
       await open(action);
       await advanceTo('filetypes');
       const box = element.querySelector<HTMLInputElement>('input[name=skins]')!;
@@ -454,10 +456,13 @@ describe('DownloadDialog', () => {
     });
   }
 
-  it('does not offer work skins on a run that cannot take them', async () => {
+  it('does not offer work skins with the run that fetches nothing but skins', async () => {
     debugOn();
-    await open('update');
-    await advanceTo('filetypes');
+    await open('custom');
+    await advanceTo('options');
+    checkbox('Just fetch work skins')!.click();
+    await fixture.whenStable();
+    await advanceTo('credentials');
 
     expect(element.querySelector('input[name=skins]')).toBeNull();
   });

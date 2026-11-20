@@ -213,25 +213,26 @@
           }
         </fieldset>
 
-        <!-- debug mode only for now: each work's skin, which AO3's download leaves out, put
-             into its html - see the helper's `Ao3.dress` -->
+        <!-- each work's skin, which AO3's download leaves out, fetched with its html - see the
+             helper's `Ao3.dress`. unticked, no skin is asked for at all -->
         @if (picksSkins()) {
           <label class="check skins-option" [class.locked]="!htmlTicked()">
             <input type="checkbox" name="skins" [checked]="skins()" [disabled]="!htmlTicked()"
                    (change)="skins.set($any($event.target).checked)" />
-            <span>[DEBUG] Fetch work skin for HTML downloads</span>
+            <span>Fetch work skin for HTML downloads</span>
           </label>
           <p class="hint skins-hint">
             @if (htmlTicked()) {
-              Every HTML file a run downloads has its work's skin - its author's own styling, which
-              AO3's download leaves out - saved beside it as <code>skins/&lt;work number&gt;.css</code>,
-              and shown when you open the work from FicFairy. Ticked, the skin also goes into the HTML
-              file itself, and works whose HTML is already up to date get their skin too, without being
-              downloaded again (once - a work checked before is not asked about again). A work whose
-              page this run does not read anyway costs one more request to AO3. A work this run has to
-              get from FicHub instead gets no work skin: FicHub does not keep its author's styling.
+              A work skin is the author's own styling for a work, which AO3's download leaves out.
+              Ticked, it is fetched whenever this run downloads a work's HTML - a new download, an
+              updated chapter, or HTML overwritten - put into the HTML file, and saved beside it as
+              <code>skins/&lt;work number&gt;.css</code>. A work whose HTML is not downloaded is not
+              checked for a skin. Each costs one more request to AO3, unless this run reads the
+              work's page anyway. Unticked, no skin is fetched and nothing extra is asked of AO3. A
+              work this run has to get from FicHub instead gets no work skin: FicHub does not keep
+              its author's styling.
             } @else {
-              Tick HTML to use this - a work skin only goes into HTML files.
+              Tick HTML to use this - a work skin only goes with HTML files.
             }
           </p>
         }

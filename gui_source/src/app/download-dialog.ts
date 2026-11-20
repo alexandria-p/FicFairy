@@ -96,8 +96,13 @@ type Step =
   | 'failed';
 
 /** how long the run page waits on the helper (and a quick scan's floor) before giving up */
-/** the runs that can put work skins into their html - the helper's `SKIN_ACTIONS` */
-export const SKIN_ACTIONS: readonly JobAction[] = ['bookmarks', 'quick', 'custom', 'work', 'works'];
+/**
+ * the runs that can fetch work skins with the html they download - every run with a file types
+ * page (the helper's `SKIN_ACTIONS` is every action); an import's formats are its own window's
+ */
+export const SKIN_ACTIONS: readonly JobAction[] = [
+  'bookmarks', 'quick', 'custom', 'work', 'works', 'new', 'sync', 'update', 'collections', 'collection',
+];
 
 export const START_WAIT_MS = 2 * 60 * 1000;
 const TIMED_OUT = Symbol('timed out');
@@ -885,12 +890,13 @@ export class DownloadDialog implements OnDestroy {
 
   /**
    * Work skins - the CSS an author gives a work, which AO3's own download leaves out - put into
-   * the html this run downloads (the helper's `Ao3.dress`). Debug mode only for now, on the scans
-   * and the fic runs (the helper's `SKIN_ACTIONS`), and only when HTML is ticked. A work page the
-   * run reads anyway gives the skin for nothing; otherwise each work's page is read once.
+   * the html this run downloads (the helper's `Ao3.dress`), on every run that has file types to
+   * pick (`SKIN_ACTIONS`), and only when HTML is ticked. Unticked, no skin is asked for at all. A
+   * work page the run reads anyway gives the skin for nothing; otherwise each work's page is read
+   * once, and only for a work whose HTML is downloaded.
    */
   protected readonly picksSkins = computed(() =>
-    this.debugTools() && !this.resuming() && SKIN_ACTIONS.includes(this.action()));
+    !this.resuming() && !this.skinsOnly() && SKIN_ACTIONS.includes(this.action()));
 
   /** whether HTML is among the file types - the only format a skin goes into */
   protected readonly htmlTicked = computed(() =>

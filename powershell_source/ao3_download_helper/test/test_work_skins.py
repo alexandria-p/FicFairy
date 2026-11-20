@@ -156,15 +156,15 @@ def test_no_work_page_is_read_when_the_run_writes_no_html(tmp_path):
     ao3.repo.get_soup.assert_not_called()
 
 
-def test_without_the_option_the_html_is_left_as_sent_but_its_skin_is_still_saved(tmp_path):
+def test_without_the_option_nothing_is_read_and_nothing_changed(tmp_path):
     ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWork')})
     ao3.skins = False
 
     ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
 
+    ao3.repo.get_soup.assert_not_called()
     assert saved(tmp_path, '.html') == downloaded()
-    css = (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').read_text(encoding='utf-8')
-    assert css.startswith('#workskin .centered')
+    assert not (tmp_path / strings.SKINS_FOLDER_NAME).exists()
 
 
 def test_a_page_that_will_not_read_costs_the_skin_and_nothing_else(tmp_path, capsys):
@@ -216,72 +216,13 @@ def current_html(tmp_path, pages, works=('41822007',)):
     return ao3, job
 
 
-def test_a_current_html_gets_its_skin_saved_without_being_downloaded_again(tmp_path, capsys):
+def test_a_work_whose_html_is_current_is_never_looked_at_for_a_skin(tmp_path):
     ao3, job = current_html(tmp_path, {WORK_PAGE: page('unlockedWork')})
 
-    server.skins_for_current_html(job, ao3.fileops, ao3)
-
-    ao3.repo.download_file.assert_not_called()
-    css = (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').read_text(encoding='utf-8')
-    assert css.startswith('#workskin .centered')
-    # the file itself is left exactly as it was
-    assert saved(tmp_path, '.html') == downloaded()
-    assert strings.AO3_INFO_SKIN_FOUND_SAVED.format('41822007') in capsys.readouterr().out
-
-
-def test_a_skin_already_saved_is_not_asked_for_again(tmp_path):
-    ao3, job = current_html(tmp_path, {WORK_PAGE: page('unlockedWork')})
-    (tmp_path / strings.SKINS_FOLDER_NAME).mkdir()
-    (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').write_text('#workskin p {}', encoding='utf-8')
-
-    server.skins_for_current_html(job, ao3.fileops, ao3)
-
-    ao3.repo.get_soup.assert_not_called()
-
-
-def test_a_work_with_no_skin_is_noted_so_it_is_not_asked_about_on_every_run(tmp_path):
-    ao3, job = current_html(tmp_path, {WORK_PAGE: page('unlockedWorkNoSkin')})
-
-    server.skins_for_current_html(job, ao3.fileops, ao3)
-
-    assert (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.none').exists()
-
-
-def test_a_page_that_will_not_read_saves_nothing_so_the_next_run_asks_again(tmp_path):
-    ao3, job = current_html(tmp_path, {})
-    ao3.repo.get_soup.side_effect = exceptions.InvalidStatusCodeException('503')
-
-    server.skins_for_current_html(job, ao3.fileops, ao3)
-
-    assert not (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').exists()
-
-
-def test_a_work_downloaded_this_run_or_with_no_html_or_that_failed_is_passed_over(tmp_path):
-    ao3, job = current_html(tmp_path, {})
-    ao3.reindexed |= {'2', '3'}
-    ao3.skins_saved.add('41822007')
-    (tmp_path / strings.WORKS_FOLDER_NAME / '2 Other - Writer 2024-12-14.epub').write_bytes(b'epub')
-    (tmp_path / strings.WORKS_FOLDER_NAME / '3 Gone - Writer 2024-12-14.html').write_bytes(b'x')
-    ao3.failures.append({'id': '3', 'link': 'https://archiveofourown.org/works/3', 'error': 'gone'})
-
-    server.skins_for_current_html(job, ao3.fileops, ao3)
-
-    ao3.repo.get_soup.assert_not_called()
-
-
-def test_without_the_option_no_skin_is_fetched(tmp_path):
-    ao3, job = current_html(tmp_path, {WORK_PAGE: page('unlockedWork')})
-    ao3.skins = False
-
-    server.skins_for_current_html(job, ao3.fileops, ao3)
-
-    ao3.repo.get_soup.assert_not_called()
-
-
-def test_every_run_ends_by_fetching_the_skins_of_current_html_before_ficHub():
     import inspect
-    source = inspect.getsource(server.finish_run)
-    assert source.index('skins_for_current_html') < source.index('rescue_with_fichub')
+    # nothing at the end of a run reaches for skins: only an html download does
+    assert 'skin' not in inspect.getsource(server.finish_run)
+    ao3.repo.get_soup.assert_not_called()
 
 # endregion
 
@@ -310,7 +251,7 @@ def test_a_skin_the_author_dropped_is_dropped_from_the_saved_one_too(tmp_path):
     assert (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.none').exists()
 
 
-def test_a_run_not_fetching_skins_brings_a_saved_skin_up_to_date_with_the_html(tmp_path):
+def test_a_run_not_fetching_skins_leaves_a_saved_skin_alone(tmp_path):
     ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWork')})
     ao3.skins = False
     (tmp_path / strings.SKINS_FOLDER_NAME).mkdir()
@@ -318,16 +259,12 @@ def test_a_run_not_fetching_skins_brings_a_saved_skin_up_to_date_with_the_html(t
 
     ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
 
-    # the author has added one since it was noted as having none
-    css = (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').read_text(encoding='utf-8')
-    assert css.startswith('#workskin .centered')
-    assert not (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.none').exists()
-    assert saved(tmp_path, '.html') == downloaded()
+    ao3.repo.get_soup.assert_not_called()
+    assert (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.none').exists()
 
 
 def test_no_skin_is_fetched_for_a_download_with_no_html(tmp_path):
     ao3 = skinning(tmp_path, {})
-    ao3.skins = False
     ao3.filetypes = ['EPUB']
 
     ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
@@ -436,10 +373,8 @@ def test_only_a_custom_run_can_fetch_skins_only():
 
 # region which runs offer it
 
-@pytest.mark.parametrize('action', list(server.SKIN_ACTIONS))
-def test_the_scans_and_the_fic_runs_keep_the_option(action):
-    assert action in (server.ACTION_BOOKMARKS, server.ACTION_QUICK, server.ACTION_CUSTOM,
-                      server.ACTION_WORK, server.ACTION_WORKS)
+def test_every_run_offers_the_option():
+    assert set(server.SKIN_ACTIONS) == set(server.ACTIONS)
 
 
 def test_the_option_reaches_the_runs_downloader():
@@ -463,15 +398,13 @@ def test_the_option_is_off_unless_sent():
 from test.test_server import started_options  # noqa: E402
 
 
-@pytest.mark.parametrize('action', [server.ACTION_SYNC, server.ACTION_NEW, server.ACTION_UPDATE,
-                                    server.ACTION_COLLECTIONS])
-def test_a_run_that_does_not_offer_skins_cannot_be_told_to(action):
-    assert started_options(action, {'skins': True})['skins'] is False
+def test_a_run_fetching_skins_alone_sets_the_option_aside():
+    assert started_options(server.ACTION_CUSTOM, {'skins': True, 'skinsOnly': True})['skins'] is False
 
 
-@pytest.mark.parametrize('action', [server.ACTION_BOOKMARKS, server.ACTION_QUICK,
-                                    server.ACTION_CUSTOM])
-def test_a_scan_that_offers_skins_is_taken_at_its_word(action):
+@pytest.mark.parametrize('action', [server.ACTION_BOOKMARKS, server.ACTION_QUICK, server.ACTION_CUSTOM,
+                                    server.ACTION_SYNC, server.ACTION_NEW, server.ACTION_UPDATE])
+def test_a_run_is_taken_at_its_word(action):
     assert started_options(action, {'skins': True})['skins'] is True
 
 # endregion
