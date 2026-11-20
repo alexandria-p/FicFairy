@@ -890,13 +890,14 @@ export class DownloadDialog implements OnDestroy {
 
   /**
    * Work skins - the CSS an author gives a work, which AO3's own download leaves out - put into
-   * the html this run downloads (the helper's `Ao3.dress`), on every run that has file types to
-   * pick (`SKIN_ACTIONS`), and only when HTML is ticked. Unticked, no skin is asked for at all. A
+   * the html this run downloads (the helper's `Ao3.dress`) - debug mode only, at the owner's
+   * request - on every run that has file types to pick (`SKIN_ACTIONS`), and only when HTML is
+   * ticked. Unticked, no skin is asked for at all. A
    * work page the run reads anyway gives the skin for nothing; otherwise each work's page is read
    * once, and only for a work whose HTML is downloaded.
    */
   protected readonly picksSkins = computed(() =>
-    !this.resuming() && !this.skinsOnly() && SKIN_ACTIONS.includes(this.action()));
+    this.debugTools() && !this.resuming() && !this.skinsOnly() && SKIN_ACTIONS.includes(this.action()));
 
   /** whether HTML is among the file types - the only format a skin goes into */
   protected readonly htmlTicked = computed(() =>

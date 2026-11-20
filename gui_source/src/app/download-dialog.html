@@ -213,13 +213,13 @@
           }
         </fieldset>
 
-        <!-- each work's skin, which AO3's download leaves out, fetched with its html - see the
-             helper's `Ao3.dress`. unticked, no skin is asked for at all -->
+        <!-- debug mode only: each work's skin, which AO3's download leaves out, fetched with its
+             html - see the helper's `Ao3.dress`. unticked, no skin is asked for at all -->
         @if (picksSkins()) {
           <label class="check skins-option" [class.locked]="!htmlTicked()">
             <input type="checkbox" name="skins" [checked]="skins()" [disabled]="!htmlTicked()"
                    (change)="skins.set($any($event.target).checked)" />
-            <span>Fetch work skin for HTML downloads</span>
+            <span>[DEBUG] Fetch work skin for HTML downloads</span>
           </label>
           <p class="hint skins-hint">
             @if (htmlTicked()) {

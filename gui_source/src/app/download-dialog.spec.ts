@@ -431,18 +431,27 @@ describe('DownloadDialog', () => {
     expect(checkbox('EPUB')!.checked).toBe(false);
   });
 
-  it('offers work skins unticked, outside debug mode too', async () => {
+  it('offers work skins only in debug mode', async () => {
     await open('bookmarks');
     await advanceTo('filetypes');
 
-    expect(element.querySelector<HTMLInputElement>('input[name=skins]')!.checked).toBe(false);
-    expect(element.querySelector('.skins-option')?.textContent).not.toContain('DEBUG');
+    expect(element.querySelector('input[name=skins]')).toBeNull();
     await advanceTo('running');
     expect(jobs.started[0].options).toMatchObject({ skins: false });
   });
 
+  it('offers work skins unticked in debug mode', async () => {
+    debugOn();
+    await open('bookmarks');
+    await advanceTo('filetypes');
+
+    expect(element.querySelector<HTMLInputElement>('input[name=skins]')!.checked).toBe(false);
+    expect(element.querySelector('.skins-option')?.textContent).toContain('[DEBUG]');
+  });
+
   for (const action of ['bookmarks', 'quick', 'custom', 'update', 'sync', 'work'] as const) {
-    it(`sends work skins on a ${action} run when ticked`, async () => {
+    it(`sends work skins on a ${action} run when ticked in debug mode`, async () => {
+      debugOn();
       await open(action);
       await advanceTo('filetypes');
       const box = element.querySelector<HTMLInputElement>('input[name=skins]')!;
