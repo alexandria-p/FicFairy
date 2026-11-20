@@ -8,6 +8,18 @@ import { DecimalPipe } from '@angular/common';
 import { ActiveRun, IndexGap, Jobs, RunChoice, RunHistory, RunRemoval } from './jobs';
 import { describeGap, fichubOlderWords, issueCount, issuesOf, issuesReport, repairClashWords, saveText } from './issues';
 import { Library } from './library';
+
+/** a run's fic lists, worded: new index entries apart from ones brought up to date */
+export function ficLists(run: Pick<RunHistory, 'reindexed' | 'newlyIndexed' | 'downloaded' | 'updated'>):
+    { label: string; ids: string[] }[] {
+  const newly = new Set(run.newlyIndexed ?? []);
+  return [
+    { label: 'Newly indexed', ids: (run.reindexed ?? []).filter((id) => newly.has(id)) },
+    { label: 'Re-indexed', ids: (run.reindexed ?? []).filter((id) => !newly.has(id)) },
+    { label: 'Downloaded', ids: run.downloaded ?? [] },
+    { label: 'Updated', ids: run.updated ?? [] },
+  ];
+}
 import { StorageChoice } from './storage-choice';
 import { VisitLog } from './visit-log';
 import { DummyData } from './dummy-data';
@@ -74,6 +86,12 @@ export class History {
    * slows the tab.
    */
   protected readonly openLists = signal<ReadonlySet<string>>(new Set());
+  /** a run's fic lists, folded under History's entry: an index entry the run made is *Newly
+   *  indexed*, one it brought up to date *Re-indexed* - a run from before they were told apart
+   *  lists every entry it wrote as re-indexed */
+  protected idGroups(run: RunHistory): { label: string; ids: string[] }[] {
+    return ficLists(run);
+  }
   protected toggleList(key: string, open: boolean): void {
     this.openLists.update((now) => {
       const next = new Set(now);

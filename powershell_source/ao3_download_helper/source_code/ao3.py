@@ -272,6 +272,9 @@ class Ao3:
         # because they answer different questions: what got a fresh index entry, what
         # arrived as a file, and what replaced a copy that was already on disk.
         self.reindexed: set[str] = set()
+        # the works among those whose entry this run made - it had no index file before.
+        # kept apart so a run can say which entries are new and which were brought up to date
+        self.newly_indexed: set[str] = set()
         # every file this run wrote, so the cleanup step can never remove one of them
         self.written: list[str] = []
         # when this run's readings were taken. `get_metadata` sets it as a walk starts; this
@@ -1876,7 +1879,9 @@ class Ao3:
             merged = indexing.merge(existing, document, self.indexed_on, run_id=self.run_id)
             self.fileops.save_json(path, merged)
             self.remember_entry(path)
-            if document.get('id'): self.reindexed.add(str(document['id']))
+            if document.get('id'):
+                self.reindexed.add(str(document['id']))
+                if not existing: self.newly_indexed.add(str(document['id']))
         except Exception as e:
             # one unwritable file shouldn't end the run
             self.log_error({'message': strings.ERROR_METADATA_SAVE, 'link': document.get('link')}, e)

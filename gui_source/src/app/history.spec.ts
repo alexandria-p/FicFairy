@@ -314,6 +314,16 @@ describe('History', () => {
     ]);
   });
 
+  it('lists the index entries a run made apart from the ones it brought up to date', async () => {
+    await show([
+      aRun({ reindexed: ['111', '222', '444'], newlyIndexed: ['111', '444'], downloaded: [], updated: [] }),
+    ]);
+
+    const groups = Array.from(element.querySelectorAll('.ids')).map((d) =>
+      d.querySelector('summary')?.textContent?.replace(/\s+/g, ' ').trim());
+    expect(groups).toEqual(['Newly indexed 2', 'Re-indexed 1']);
+  });
+
   it('links each work number to the work on AO3', async () => {
     await show([aRun({ downloaded: ['1234567'] })]);
     await openFold(element.querySelector<HTMLDetailsElement>('details.ids')!);

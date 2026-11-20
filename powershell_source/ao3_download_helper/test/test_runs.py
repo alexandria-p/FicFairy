@@ -91,6 +91,7 @@ def test_the_fic_lists_are_kept_apart(tmp_path):
     # what replaced a copy that was already there
     ao3 = MagicMock()
     ao3.reindexed = {'111', '222'}
+    ao3.newly_indexed = {'111'}
     ao3.downloaded = {'222'}
     ao3.updated = {'333'}
     ao3.failures = [{'id': '444', 'link': 'x', 'error': 'timed out'}]
@@ -102,6 +103,7 @@ def test_the_fic_lists_are_kept_apart(tmp_path):
 
     saved = written(tmp_path)[0]
     assert saved['reindexed'] == ['111', '222']
+    assert saved['newlyIndexed'] == ['111']
     assert saved['downloaded'] == ['222']
     assert saved['updated'] == ['333']
     assert saved['failures'][0]['id'] == '444'
