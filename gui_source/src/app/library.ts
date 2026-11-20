@@ -1,4 +1,4 @@
-import { hasWorkSkin, shownWork } from './skin-html';
+import { hasWorkSkin, shownWork, withSavedSkin } from './skin-html';
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import {
   Bookmark,
@@ -30,6 +30,9 @@ import { VisitLog } from './visit-log';
  * local folder, or where to fetch it from for Dropbox - fetched only when clicked, since
  * reading every work up front would mean downloading the whole library to show a list.
  */
+
+/** where a run saves each work's skin, `<work number>.css` - the helper's `SKINS_FOLDER_NAME` */
+const SKINS_FOLDER = 'skins';
 
 /** how the visit log names where a Dropbox check took something from, when not Dropbox */
 const CACHE = "this browser's cache";
@@ -609,10 +612,17 @@ export class Library {
         // the reading skin - only what is shown; a file that cannot be read as text is shown as it
         // is, never not at all
         if (format === 'html') {
-          blob = await read.text().then((text) => {
-            if (!skin && !hasWorkSkin(text)) return read;
-            return new Blob([shownWork(text, skin, this.layerReadingSkin())], { type: read.type });
-          }, () => read);
+          try {
+            let text = await read.text();
+            // a work whose html was current when a run fetched its skin has it saved beside
+            // the works instead of in the file
+            if (!hasWorkSkin(text)) text = withSavedSkin(text, await this.savedSkin(copy));
+            if (skin || hasWorkSkin(text)) {
+              blob = new Blob([shownWork(text, skin, this.layerReadingSkin())], { type: read.type });
+            }
+          } catch {
+            blob = read;
+          }
         }
         const url = URL.createObjectURL(blob);
         if (tab) tab.location.href = url;
@@ -625,6 +635,22 @@ export class Library {
         else tab?.close();
       },
     );
+  }
+
+  /**
+   * The work skin a run saved for this copy's work (`skins/<work number>.css`), or '' when there
+   * is none, it is empty (the run found the work has no skin), or it cannot be read.
+   */
+  private async savedSkin(copy: LocalCopy): Promise<string> {
+    const store = this.store();
+    const name = copy instanceof Blob ? (copy as File).name ?? '' : copy.dropboxPath.split('/').pop() ?? '';
+    const id = name ? workIdFromFilename(name) : null;
+    if (!store || !id) return '';
+    try {
+      return (await store.read(`${SKINS_FOLDER}/${id}.css`)) ?? '';
+    } catch {
+      return '';
+    }
   }
 
   /**

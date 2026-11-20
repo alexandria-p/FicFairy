@@ -225,8 +225,10 @@
             @if (htmlTicked()) {
               Puts each work's skin - its author's own styling, which AO3's download leaves out -
               into the HTML file, and saves it as <code>skins/&lt;work number&gt;.css</code>. Only
-              HTML can take one. A work whose page this run does not read anyway costs one more
-              request to AO3. A work this run has to get from FicHub instead gets no
+              HTML can take one. A work whose HTML is already up to date is not downloaded again:
+              only its skin is saved, and it is shown when you open the work from FicFairy. A work
+              whose page this run does not read anyway costs one more request to AO3, once - a
+              work whose skin is saved already is not asked about again. A work this run has to get from FicHub instead gets no
               work skin: FicHub does not keep its author's styling.
             } @else {
               Tick HTML to use this - a work skin only goes into HTML files.

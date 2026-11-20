@@ -346,6 +346,10 @@ class Ao3:
         # the run reads anyway (`note_skin`), so a work it has already read costs nothing more
         self.skins = False
         self.skin_css: dict[str, str] = {}
+        # works whose skin this run saved to `skins/` while putting it into their html
+        self.skins_saved: set[str] = set()
+        # works whose page would not read for their skin this run
+        self.skins_unread: set[str] = set()
         # how far the collection listing being read has got: its first page, the last page
         # read in full, and the works found - said when one breaks off
         self.listing_read: dict = {}
@@ -860,7 +864,7 @@ class Ao3:
             pass # a page that cannot be read for a skin is a work with none, for this run
 
 
-    def skin_for(self, work: str) -> str:
+    def skin_for(self, work: str, saving_only: bool = False) -> str:
         """A work's skin, '' for none: from a page this run already read, or else its own page,
         read once (the first chapter is enough - the skin is the same on every one).
 
@@ -877,12 +881,14 @@ class Ao3:
             raise
         except Exception as e:
             self.skin_css[work] = ''
+            self.skins_unread.add(work)
             self.log_error({'message': strings.AO3_INFO_SKIN_UNREADABLE.format(work, e),
                             'link': f'{strings.AO3_BASE_URL}/works/{work}'}, e)
             print(strings.AO3_INFO_SKIN_UNREADABLE.format(work, e))
             return ''
         css = self.skin_css.setdefault(work, '')
-        print((strings.AO3_INFO_SKIN_FOUND if css else strings.AO3_INFO_SKIN_NONE).format(work))
+        found = strings.AO3_INFO_SKIN_FOUND_SAVED if saving_only else strings.AO3_INFO_SKIN_FOUND
+        print((found if css else strings.AO3_INFO_SKIN_NONE).format(work))
         return css
 
 
@@ -904,6 +910,7 @@ class Ao3:
         try:
             self.fileops.save_bytes(os.path.join(strings.SKINS_FOLDER_NAME, f'{work}.css'),
                                     css.encode('utf-8'))
+            self.skins_saved.add(str(work))
         except Exception as e:
             self.log_error({'message': strings.AO3_INFO_SKIN_NOT_ADDED.format(work)}, e)
         dressed = with_skin(content, css)

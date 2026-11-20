@@ -14,6 +14,8 @@ from bs4 import BeautifulSoup
 
 from source_code import exceptions, parse_soup, server, strings
 from source_code.ao3 import with_skin
+from source_code.fileio import FileOps
+from source_code.storage import LocalStorage
 from test.test_ao3 import saving_for_real
 
 FIXTURES = os.path.join(os.path.dirname(__file__), 'fixtures')
@@ -188,6 +190,95 @@ def test_ficHubs_html_is_never_given_an_ao3_skin(tmp_path):
 
     ao3.repo.get_soup.assert_not_called()
     assert saved(tmp_path, '.html') == downloaded()
+
+# endregion
+
+
+# region a work whose html is already current
+
+def current_html(tmp_path, pages, works=('41822007',)):
+    """A run that fetches skins, over works whose html is on disk and up to date - so none of
+    them is downloaded."""
+    ao3 = skinning(tmp_path, pages)
+    fileops = ao3.fileops
+    fileops.worksfolder = str(tmp_path / strings.WORKS_FOLDER_NAME)
+    fileops.storage = LocalStorage(str(tmp_path))
+    fileops.list_files.side_effect = lambda folder: FileOps.list_files(fileops, folder)
+    for work in works:
+        (tmp_path / strings.WORKS_FOLDER_NAME / f'{work} A Work - Writer 2024-12-14.html').write_bytes(downloaded())
+    ao3.reindexed = set(works)
+    job = MagicMock()
+    job.progress.return_value = {}
+    job.earlier_progress.return_value = None
+    return ao3, job
+
+
+def test_a_current_html_gets_its_skin_saved_without_being_downloaded_again(tmp_path, capsys):
+    ao3, job = current_html(tmp_path, {WORK_PAGE: page('unlockedWork')})
+
+    server.skins_for_current_html(job, ao3.fileops, ao3)
+
+    ao3.repo.download_file.assert_not_called()
+    css = (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').read_text(encoding='utf-8')
+    assert css.startswith('#workskin .centered')
+    # the file itself is left exactly as it was
+    assert saved(tmp_path, '.html') == downloaded()
+    assert strings.AO3_INFO_SKIN_FOUND_SAVED.format('41822007') in capsys.readouterr().out
+
+
+def test_a_skin_already_saved_is_not_asked_for_again(tmp_path):
+    ao3, job = current_html(tmp_path, {WORK_PAGE: page('unlockedWork')})
+    (tmp_path / strings.SKINS_FOLDER_NAME).mkdir()
+    (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').write_text('#workskin p {}', encoding='utf-8')
+
+    server.skins_for_current_html(job, ao3.fileops, ao3)
+
+    ao3.repo.get_soup.assert_not_called()
+
+
+def test_a_work_with_no_skin_is_noted_so_it_is_not_asked_about_on_every_run(tmp_path):
+    ao3, job = current_html(tmp_path, {WORK_PAGE: page('unlockedWorkNoSkin')})
+
+    server.skins_for_current_html(job, ao3.fileops, ao3)
+
+    assert (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').read_text(encoding='utf-8') == ''
+
+
+def test_a_page_that_will_not_read_saves_nothing_so_the_next_run_asks_again(tmp_path):
+    ao3, job = current_html(tmp_path, {})
+    ao3.repo.get_soup.side_effect = exceptions.InvalidStatusCodeException('503')
+
+    server.skins_for_current_html(job, ao3.fileops, ao3)
+
+    assert not (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').exists()
+
+
+def test_a_work_downloaded_this_run_or_with_no_html_or_that_failed_is_passed_over(tmp_path):
+    ao3, job = current_html(tmp_path, {})
+    ao3.reindexed |= {'2', '3'}
+    ao3.skins_saved.add('41822007')
+    (tmp_path / strings.WORKS_FOLDER_NAME / '2 Other - Writer 2024-12-14.epub').write_bytes(b'epub')
+    (tmp_path / strings.WORKS_FOLDER_NAME / '3 Gone - Writer 2024-12-14.html').write_bytes(b'x')
+    ao3.failures.append({'id': '3', 'link': 'https://archiveofourown.org/works/3', 'error': 'gone'})
+
+    server.skins_for_current_html(job, ao3.fileops, ao3)
+
+    ao3.repo.get_soup.assert_not_called()
+
+
+def test_without_the_option_no_skin_is_fetched(tmp_path):
+    ao3, job = current_html(tmp_path, {WORK_PAGE: page('unlockedWork')})
+    ao3.skins = False
+
+    server.skins_for_current_html(job, ao3.fileops, ao3)
+
+    ao3.repo.get_soup.assert_not_called()
+
+
+def test_every_run_ends_by_fetching_the_skins_of_current_html_before_ficHub():
+    import inspect
+    source = inspect.getsource(server.finish_run)
+    assert source.index('skins_for_current_html') < source.index('rescue_with_fichub')
 
 # endregion
 

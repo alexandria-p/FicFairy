@@ -5021,10 +5021,58 @@ def ask_yes_no(job, name: str, default: str, details: dict, work: str,
     return choice == 'yes' and not job.cancel.is_set()
 
 
+def skins_for_current_html(job: Job, fileops: FileOps, ao3) -> None:
+    """On a run that fetches work skins, the skin of every work it covered whose html is
+    already up to date - so it was not downloaded, and got no skin put in.
+
+    The html is not downloaded again and not rewritten: only the skin's CSS is saved,
+    `skins/<worknum>.css`, and the page puts it in as the work is opened. A work whose skin is
+    saved already is passed over, so this costs one request per work once (none where the run
+    read the work's page anyway), never on every run. A work with no skin is saved as an empty
+    file for the same reason. Works that failed are left out: FicHub keeps no skin. Anything
+    going wrong here costs the skin alone; a stop or a lapsed login still ends the run.
+    """
+
+    if getattr(ao3, 'skins', False) is not True: return
+    try:
+        failed = {str(x.get('id')) for x in (getattr(ao3, 'failures', None) or [])}
+        works = covered_works(job, ao3) - set(ao3.skins_saved) - failed
+        if not works: return
+        copies = shared.scan_downloaded_works(fileops.worksfolder, ['HTML'],
+                                              storage=fileops.storage)
+        works = {x for x in works if 'HTML' in (copies.get(x) or {})}
+        if not works: return
+        folder = os.path.join(fileops.downloadfolder, strings.SKINS_FOLDER_NAME)
+        try:
+            have = {os.path.splitext(x)[0] for x in fileops.list_files(folder)}
+        except Exception:
+            have = set()
+        missing = sorted((x for x in works if x not in have), key=lambda x: int(x) if x.isdigit() else 0)
+    except (exceptions.CancelledException, exceptions.SessionExpiredException):
+        raise
+    except Exception:
+        return  # nothing to go by - the skins wait for the next run
+    if not missing:
+        print(strings.AO3_INFO_SKINS_ONLY_NONE)
+        return
+    print(strings.AO3_INFO_SKINS_ONLY.format(len(missing)))
+    for work in missing:
+        ao3.check_cancelled()
+        css = ao3.skin_for(work, saving_only=True)
+        # a page that would not read is no answer: saving nothing asks again next run
+        if work in ao3.skins_unread: continue
+        try:
+            fileops.save_bytes(os.path.join(strings.SKINS_FOLDER_NAME, f'{work}.css'),
+                               css.encode('utf-8'))
+        except Exception as e:
+            print(strings.AO3_INFO_SKIN_NOT_SAVED.format(work, e))
+
+
 def finish_run(job: Job, fileops: FileOps, ao3, report) -> None:
     """How every run ends: FicHub for what ao3 would not give us, the cleanup step, then
     the report of anything left undone."""
 
+    skins_for_current_html(job, fileops, ao3)
     rescue_with_fichub(job, fileops, ao3, report)
     cleanup(job, fileops, ao3)
     report_failures(ao3, report)
