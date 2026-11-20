@@ -568,6 +568,14 @@ describe('History', () => {
     expect(pinned.textContent).toContain('Index bookmarks added since your last run');
   });
 
+  it('puts the pinned run\'s pill in the card\'s corner, as every other card has it', async () => {
+    jobs.activeRuns.set([going]);
+    await show([]);
+
+    const corner = element.querySelector('[data-active-run] .run-head .run-corner')!;
+    expect(corner.firstElementChild?.classList).toContain('run-status');
+  });
+
   it('says a paused run is paused', async () => {
     jobs.activeRuns.set([{ ...going, paused: true }]);
     await show([]);
