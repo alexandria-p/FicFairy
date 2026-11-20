@@ -165,6 +165,12 @@ export interface JobOptions {
   reindex: boolean;
   /** skipping the indexing, look every indexed work up on AO3 (a custom run's alone) */
   recheck?: boolean;
+  /** a custom run that only fetches work skins - nothing indexed or downloaded (debug) */
+  skinsOnly?: boolean;
+  /** fetching skins only: fetch those already saved again too */
+  overwriteSkins?: boolean;
+  /** fetching skins only: the works picked, by number; none is every work with html */
+  skinWorks?: string[];
   /**
    * Whether to cover a date window instead of a slice of the listing.
    *
@@ -740,6 +746,12 @@ export class Jobs {
    * the index question, for those works or every work with none.
    */
   readonly lookUpAsked = signal<string[] | null>(null);
+  /**
+   * Works' skins asked to be fetched from a listing, by work number - an entry's ⋯ menu or the
+   * selection bar's *Download work skin* (debug mode). `App` takes it and opens a custom run set
+   * to fetch work skins only, for those works.
+   */
+  readonly skinsAsked = signal<string[] | null>(null);
 
   async loadConfig(): Promise<ServerConfig | null> {
     try {

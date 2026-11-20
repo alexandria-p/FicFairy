@@ -31,7 +31,7 @@ import requests
 
 from source_code import access, dropbox_library, exceptions, fichub, settings_file, indexing, naming, parse_soup, parse_text, progress, runs, strings, updater as updates
 from source_code.actions import shared
-from source_code.ao3 import REASON_MAINTENANCE, SORT_DATE_SELECTORS, failure_reason, Ao3, index_gaps, was_bookmark
+from source_code.ao3 import REASON_MAINTENANCE, SKIN_NOTES, SORT_DATE_SELECTORS, failure_reason, Ao3, index_gaps, was_bookmark
 from source_code.fileio import FileOps
 from source_code.repo import Repository
 from source_code.storage import PageStorage
@@ -542,6 +542,15 @@ def resolve_options(requested) -> dict:
         # at a time, and judge its files against what AO3 says now (`rechecks`) rather than
         # against the index as it stands
         'recheck': bool(given.get('recheck')),
+        # a custom run that only fetches work skins: no index, no download - each work's page
+        # read for its author's skin, saved as `skins/<worknum>.css` (`run_skins_only`)
+        'skinsOnly': bool(given.get('skinsOnly')),
+        # and whether a skin already saved is fetched again, in case it is damaged or old
+        'overwriteSkins': bool(given.get('overwriteSkins')),
+        # the works to fetch skins for, by number - picked in the Works tab. none is every work
+        # with html in the library
+        'skinWorks': [str(x) for x in given.get('skinWorks') if str(x).isdigit()]
+        if isinstance(given.get('skinWorks'), list) else [],
         # any run may go without logging in - see USERNAME_ACTIONS for what it still needs
         'skipLogin': bool(given.get('skipLogin')),
         # a typed range: the page sends each end as the UTC moment it begins (from) or ends
@@ -1182,6 +1191,11 @@ def step_plan(job: Job) -> list[tuple[str, str]]:
     downloads = [x for x in job.filetypes if x != strings.AO3_DOWNLOAD_TYPE_METADATA]
     metadata = strings.AO3_DOWNLOAD_TYPE_METADATA in job.filetypes
     plan: list[tuple[str, str]] = [('login', strings.STEP_LOGIN)]
+
+    if job.action == ACTION_CUSTOM and job.options.get('skinsOnly'):
+        # nothing indexed and nothing downloaded: only each work's page read for its skin
+        return plan + [('skins', strings.STEP_SKINS_ONLY), ('fichub', strings.STEP_FICHUB),
+                       ('cleanup', strings.STEP_CLEANUP), ('report', strings.STEP_REPORT)]
 
     if job.action in COLLECTION_ACTIONS:
         works = bool(job.options.get('collectionWorks'))
@@ -3906,6 +3920,10 @@ def run_custom(job: Job, fileops: FileOps, repo: Repository, report) -> None:
     walking a listing and not walking it.
     """
 
+    if job.options.get('skinsOnly'):
+        run_skins_only(job, fileops, repo, report)
+        return
+
     downloadtypes = [x for x in job.filetypes if x != strings.AO3_DOWNLOAD_TYPE_METADATA]
     metadata = strings.AO3_DOWNLOAD_TYPE_METADATA in job.filetypes
     pages = job.options['pages'] or None
@@ -5021,6 +5039,67 @@ def ask_yes_no(job, name: str, default: str, details: dict, work: str,
     return choice == 'yes' and not job.cancel.is_set()
 
 
+def saved_skin_ids(fileops: FileOps) -> set[str]:
+    """The works with a skin saved, or noted as having none - `skins/<worknum>.css` - by number.
+    Nothing when the folder is not there yet."""
+    try:
+        names = fileops.list_files(os.path.join(fileops.downloadfolder, strings.SKINS_FOLDER_NAME))
+        return {os.path.splitext(os.path.basename(str(x)))[0] for x in names
+                if str(x).lower().endswith(SKIN_NOTES)}
+    except Exception:
+        return set()
+
+
+def run_skins_only(job: Job, fileops: FileOps, repo: Repository, report) -> None:
+    """A custom run that only fetches work skins: each work's page read for its author's skin,
+    saved as `skins/<worknum>.css` - an empty file for a work with none - and nothing else. No
+    index entry is written, no format downloaded, no html rewritten: the page puts the skin in
+    as a work is opened from FicFairy.
+
+    The works are the ones picked (`skinWorks`), or every work with html in the library. A work
+    whose skin is saved already is passed over unless the run overwrites them
+    (`overwriteSkins`), so a run left to itself costs one request per work once. A page that
+    will not read saves nothing, and is not a failure: the work itself is untouched.
+    """
+
+    ao3 = Ao3(repo, fileops, [], None, False, False, progress=report,
+              cancelled=job.cancel.is_set)
+    ao3.skins = True
+    job.ao3 = ao3
+    job.steps.start('skins')
+    picked = list(job.options.get('skinWorks') or [])
+    if picked:
+        works = picked
+    else:
+        copies = shared.scan_downloaded_works(fileops.worksfolder, ['HTML'], storage=fileops.storage)
+        works = sorted(copies, key=lambda x: int(x) if str(x).isdigit() else 0)
+    if not job.options.get('overwriteSkins'):
+        have = saved_skin_ids(fileops)
+        for work in [x for x in works if x in have]:
+            if picked: print(strings.AO3_INFO_SKINS_ONLY_KEPT.format(work))
+        works = [x for x in works if x not in have]
+    if not works:
+        print(strings.AO3_INFO_SKINS_ONLY_NONE_LEFT)
+        job.steps.skip('skins')
+        finish_run(job, fileops, ao3, report)
+        return
+    print(strings.AO3_INFO_SKINS_ONLY_START.format(len(works)))
+    found = none = 0
+    for done, work in enumerate(works, 1):
+        ao3.check_cancelled()
+        progress.report(report, progress.WORK, title=f'work {work}',
+                        link=f'{strings.AO3_BASE_URL}/works/{work}', filetype='skin',
+                        phase=progress.DOWNLOADING, done=done - 1, total=len(works))
+        css = ao3.skin_for(work, saving_only=True)
+        if work in ao3.skins_unread: continue
+        if ao3.save_skin(work, css):
+            if css: found += 1
+            else: none += 1
+    print(strings.AO3_INFO_SKINS_ONLY_DONE.format(found, none, len(ao3.skins_unread)))
+    job.steps.done('skins')
+    finish_run(job, fileops, ao3, report)
+
+
 def skins_for_current_html(job: Job, fileops: FileOps, ao3) -> None:
     """On a run that fetches work skins, the skin of every work it covered whose html is
     already up to date - so it was not downloaded, and got no skin put in.
@@ -5042,11 +5121,7 @@ def skins_for_current_html(job: Job, fileops: FileOps, ao3) -> None:
                                               storage=fileops.storage)
         works = {x for x in works if 'HTML' in (copies.get(x) or {})}
         if not works: return
-        folder = os.path.join(fileops.downloadfolder, strings.SKINS_FOLDER_NAME)
-        try:
-            have = {os.path.splitext(x)[0] for x in fileops.list_files(folder)}
-        except Exception:
-            have = set()
+        have = saved_skin_ids(fileops)
         missing = sorted((x for x in works if x not in have), key=lambda x: int(x) if x.isdigit() else 0)
     except (exceptions.CancelledException, exceptions.SessionExpiredException):
         raise
@@ -5061,11 +5136,7 @@ def skins_for_current_html(job: Job, fileops: FileOps, ao3) -> None:
         css = ao3.skin_for(work, saving_only=True)
         # a page that would not read is no answer: saving nothing asks again next run
         if work in ao3.skins_unread: continue
-        try:
-            fileops.save_bytes(os.path.join(strings.SKINS_FOLDER_NAME, f'{work}.css'),
-                               css.encode('utf-8'))
-        except Exception as e:
-            print(strings.AO3_INFO_SKIN_NOT_SAVED.format(work, e))
+        ao3.save_skin(work, css)
 
 
 def finish_run(job: Job, fileops: FileOps, ao3, report) -> None:
@@ -6513,7 +6584,9 @@ class Handler(BaseHTTPRequestHandler):
             # no password is used, so none is kept. a run reading your own listing is found
             # by your username; any other has no use for one either
             password = ''
-            if action not in USERNAME_ACTIONS: username = ''
+            # fetching work skins reads work pages alone, never your listing
+            if action not in USERNAME_ACTIONS or (action == ACTION_CUSTOM and options['skinsOnly']):
+                username = ''
             elif not username:
                 self.send_json(400, {'error': 'a username is required to read your bookmarks '
                                               'or collections, even without logging in'})
@@ -6574,6 +6647,17 @@ class Handler(BaseHTTPRequestHandler):
         # re-reading a non-bookmark writes its entry, which a run told not to index has ruled out
         # (and one looking every indexed work up re-reads the non-bookmarks among them anyway)
         if not indexing_run or options['recheck']: options['nonBookmarks'] = False
+
+        # fetching work skins is the custom run's alone, and does nothing else: no index, no
+        # download, no walk - so its record says nothing it did not do
+        if action != ACTION_CUSTOM: options['skinsOnly'] = False
+        if options['skinsOnly']:
+            filetypes = []
+            for key in ('series', 'nonBookmarks', 'overwrite', 'images', 'recheck', 'dates', 'skins'):
+                options[key] = False
+        else:
+            options['overwriteSkins'] = False
+            options['skinWorks'] = []
 
         url = (body.get('url') or '').strip()
         # checked here rather than on the thread, so a bad link is a straight answer to the

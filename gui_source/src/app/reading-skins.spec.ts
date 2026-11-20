@@ -347,6 +347,20 @@ describe('ReadingSkins', () => {
     expect(await file.text()).toBe(DOWNLOADED);
   });
 
+  it('knows which works have a skin saved, and not those noted as having none', async () => {
+    const store = new MemoryStore();
+    await store.write('skins/1.css', new Response('#workskin p {}'));
+    await store.write('skins/2.none', new Response(''));
+    await store.write('skins/custom/3.css', new Response('#workskin p {}'));
+    const { library } = setUp(store);
+
+    library.lastRead.set({ store, at: Date.now() });
+    TestBed.tick();
+    await settle();
+
+    expect([...library.skinnedWorks()]).toEqual(['1']);
+  });
+
   it('shows a work as it is when the run found it has no skin', async () => {
     const store = new MemoryStore();
     await store.write('skins/1.css', new Response(''));

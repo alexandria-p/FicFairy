@@ -4,6 +4,7 @@ import { Bookmark, flattenRecord, isBookmarkEntry } from './bookmarks';
 import { Library, emptyCopies, markedBookmarked } from './library';
 import { LibraryStore } from './library-store';
 import { Jobs } from './jobs';
+import { DebugMode } from './debug-mode';
 import { WorkList } from './work-list';
 
 /**
@@ -310,6 +311,28 @@ describe('downloading or updating from the Works tab', () => {
     await listing([work('11')]);
     ((await menuOf('Work 11')).querySelector('button.fetch-now') as HTMLButtonElement).click();
     expect(TestBed.inject(Jobs).fetchWorksAsked()).toEqual(['11']);
+  });
+
+  it("asks for a work's skin from its menu, in debug mode only", async () => {
+    await listing([work('11')]);
+    expect((await menuOf('Work 11')).querySelector('button.skin-now')).toBeNull();
+
+    TestBed.inject(DebugMode).chosen.set(true);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await settle();
+    ((await menuOf('Work 11')).querySelector('button.skin-now') as HTMLButtonElement).click();
+    expect(TestBed.inject(Jobs).skinsAsked()).toEqual(['11']);
+  });
+
+  it('marks a work with a work skin saved', async () => {
+    await listing([work('11'), work('12')]);
+    TestBed.inject(Library).skinnedWorks.set(new Set(['12']));
+    await settle();
+
+    const marked = [...element.querySelectorAll('li.blurb')]
+      .filter((li) => li.querySelector('.skin-icon'))
+      .map((li) => li.querySelector('a.title')?.textContent?.trim());
+    expect(marked).toEqual(['Work 12']);
   });
 
   it('offers no download/update item for a series or an external work', async () => {

@@ -51,6 +51,7 @@ export const GUEST_STEP_LABELS = {
   STEP_UPDATE: 'Re-index each fic, then download or update as necessary',
   STEP_FILL_GAPS: 'Fetch any format still missing',
   STEP_IMAGES: 'Save embedded images separately',
+  STEP_SKINS_ONLY: 'Fetch work skins',
   STEP_REPORT: 'Report any failures',
   STEP_SERIES: 'Index works in series marked for walkthrough',
   STEP_NON_BOOKMARKS: 'Check remaining non-bookmarks for updates',
@@ -86,6 +87,11 @@ export function guestPlan(action: JobAction, filetypes: string[], options: Optio
   const metadata = filetypes.includes('JSON');
   const step = (id: string, label: string): GuestStep => ({ id, label });
   const plan: GuestStep[] = [step('login', L.STEP_LOGIN)];
+  // a custom run fetching work skins only: no index, no download - see server.run_skins_only
+  if (action === 'custom' && options['skinsOnly']) {
+    return [...plan, step('skins', L.STEP_SKINS_ONLY), step('fichub', L.STEP_FICHUB),
+      step('cleanup', L.STEP_CLEANUP), step('report', L.STEP_REPORT)];
+  }
   const nonBookmarks =
     !!options['nonBookmarks'] &&
     ['bookmarks', 'quick', 'custom'].includes(action) &&

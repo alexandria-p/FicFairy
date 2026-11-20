@@ -462,6 +462,47 @@ describe('DownloadDialog', () => {
     expect(element.querySelector('input[name=skins]')).toBeNull();
   });
 
+  it('lets a custom run in debug mode only fetch work skins, with no file types to pick', async () => {
+    debugOn();
+    await open('custom');
+    await advanceTo('options');
+    checkbox('Just fetch work skins')!.click();
+    await fixture.whenStable();
+    expect(element.querySelector('.skins-only-hint')?.textContent).toContain('every work with HTML');
+    element.querySelector<HTMLInputElement>('input[name=overwriteSkins]')!.click();
+    await fixture.whenStable();
+
+    await advanceTo('credentials');
+    expect(element.querySelector('input[name=skins]')).toBeNull();
+    await advanceTo('running');
+
+    expect(jobs.started[0].filetypes).toEqual([]);
+    expect(jobs.started[0].options).toMatchObject({ skinsOnly: true, overwriteSkins: true, skinWorks: [] });
+  });
+
+  it('does not offer fetching work skins only outside debug mode', async () => {
+    await open('custom');
+    await advanceTo('options');
+
+    expect(checkbox('Just fetch work skins')).toBeUndefined();
+  });
+
+  it('opens set to fetch the skins of the works picked in a listing', async () => {
+    debugOn();
+    fixture = TestBed.createComponent(DownloadDialog);
+    fixture.componentRef.setInput('action', 'custom');
+    fixture.componentRef.setInput('skinWorks', ['12', '34']);
+    await fixture.whenStable();
+    element = fixture.nativeElement as HTMLElement;
+    await advanceTo('options');
+
+    expect(checkbox('Just fetch work skins')!.checked).toBe(true);
+    expect(element.querySelector('.skins-only-hint')?.textContent).toContain('2 works you picked');
+    await advanceTo('running');
+
+    expect(jobs.started[0].options).toMatchObject({ skinsOnly: true, overwriteSkins: false, skinWorks: ['12', '34'] });
+  });
+
   it('says a work got from FicHub gets no work skin', async () => {
     debugOn();
     await open('bookmarks');
@@ -1109,6 +1150,9 @@ describe('DownloadDialog', () => {
       reindex: true,
       // a custom run skipping its indexing may look each work up; nothing else may
       recheck: false,
+      skinsOnly: false,
+      overwriteSkins: false,
+      skinWorks: [],
       // offered on a full scan, but off unless it is asked for
       overwrite: false,
       // offered on a full scan too, and off unless it is asked for

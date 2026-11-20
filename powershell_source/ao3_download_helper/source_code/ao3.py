@@ -350,6 +350,8 @@ class Ao3:
         self.skins_saved: set[str] = set()
         # works whose page would not read for their skin this run
         self.skins_unread: set[str] = set()
+        # the works `skins/` held a skin for, listed when first asked (`has_saved_skin`)
+        self.saved_skins: set[str] | None = None
         # how far the collection listing being read has got: its first page, the last page
         # read in full, and the works found - said when one breaks off
         self.listing_read: dict = {}
@@ -853,9 +855,10 @@ class Ao3:
 
     def note_skin(self, url: str, soup) -> None:
         """Remember the skin on a work page this run read anyway - the fic runs, the update
-        pass and every other re-read - so `skin_for` never asks AO3 for the same page twice."""
+        pass and every other re-read - so `skin_for` never asks AO3 for the same page twice. Kept
+        whether or not the run fetches skins: one downloading a work's html brings a saved skin up
+        to date either way."""
 
-        if not self.skins: return
         work = parse_text.get_work_number(url or '')
         if not work: return
         try:
@@ -892,6 +895,41 @@ class Ao3:
         return css
 
 
+    def save_skin(self, work: str, css: str) -> bool:
+        """Save a work's skin as `skins/<worknum>.css`, over any saved before - or, for a work with
+        none, note that as `skins/<worknum>.none` (empty), so it is not asked about again and the
+        page can tell a work with a skin from one without by name alone. Whichever of the two it
+        is not is removed. Says whether it was saved; a write that fails costs the skin alone."""
+
+        work = str(work)
+        kept, gone = ('css', 'none') if css else ('none', 'css')
+        try:
+            self.fileops.save_bytes(os.path.join(strings.SKINS_FOLDER_NAME, f'{work}.{kept}'),
+                                    (css or '').encode('utf-8'))
+            other = os.path.join(self.fileops.downloadfolder, strings.SKINS_FOLDER_NAME, f'{work}.{gone}')
+            if self.fileops.exists(other) is True: self.fileops.delete_file(other)
+        except Exception as e:
+            self.log_error({'message': strings.AO3_INFO_SKIN_NOT_SAVED.format(work, e)}, e)
+            print(strings.AO3_INFO_SKIN_NOT_SAVED.format(work, e))
+            return False
+        self.skins_saved.add(work)
+        if self.saved_skins is not None: self.saved_skins.add(work)
+        return True
+
+    def has_saved_skin(self, work: str) -> bool:
+        """Whether `skins/` holds this work's skin (or the note that it has none) - the folder
+        listed once a run."""
+
+        if self.saved_skins is None:
+            try:
+                names = self.fileops.list_files(
+                    os.path.join(self.fileops.downloadfolder, strings.SKINS_FOLDER_NAME))
+                self.saved_skins = {os.path.splitext(os.path.basename(str(x)))[0]
+                                    for x in names if str(x).lower().endswith(SKIN_NOTES)}
+            except Exception:
+                self.saved_skins = set()
+        return str(work) in self.saved_skins
+
     def dress(self, work: str, filetype: str, name: str, content: bytes) -> bytes:
         """A downloaded file with its work's skin put in, when this run was asked to - html only.
 
@@ -899,20 +937,26 @@ class Ao3:
         so the CSS goes into the `<head>` and the body is wrapped in `<div id="workskin">`, as on
         the work page. Done before the file is saved, so it is written once and every check on
         it (`saved_intact`, its name and date) sees the file as it is kept. The skin is saved
-        beside the works too, `skins/<worknum>.css`. Anything that does not fit leaves the file
-        exactly as AO3 sent it.
+        beside the works too, `skins/<worknum>.css` - over the one saved before, '' for none, since
+        an author may have changed or dropped it with the update. Anything that does not fit
+        leaves the file exactly as AO3 sent it.
+
+        A run not fetching skins still brings a saved one up to date when it downloads that
+        work's html (`AO3_INFO_SKIN_REFRESHED`): the page puts the saved skin into html with none
+        as it opens, and the new html should not be shown with an old skin.
         """
 
-        if not self.skins or filetype.upper() != 'HTML':
+        if filetype.upper() != 'HTML': return content
+        if not self.skins:
+            if self.has_saved_skin(work):
+                css = self.skin_for(work, saving_only=True)
+                if str(work) not in self.skins_unread:
+                    self.save_skin(work, css)
+                    print(strings.AO3_INFO_SKIN_REFRESHED.format(work))
             return content
         css = self.skin_for(work)
+        if str(work) not in self.skins_unread: self.save_skin(work, css)
         if not css: return content
-        try:
-            self.fileops.save_bytes(os.path.join(strings.SKINS_FOLDER_NAME, f'{work}.css'),
-                                    css.encode('utf-8'))
-            self.skins_saved.add(str(work))
-        except Exception as e:
-            self.log_error({'message': strings.AO3_INFO_SKIN_NOT_ADDED.format(work)}, e)
         dressed = with_skin(content, css)
         if dressed is None:
             print(strings.AO3_INFO_SKIN_NOT_ADDED.format(work))
@@ -2800,6 +2844,10 @@ class Ao3:
 
 
 SKIN_OPEN = '<div id="workskin">'
+
+
+# a work's saved skin, or the note that it has none
+SKIN_NOTES = ('.css', '.none')
 
 
 def with_skin(content: bytes, css: str) -> bytes | None:

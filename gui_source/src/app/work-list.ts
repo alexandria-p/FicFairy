@@ -4,6 +4,7 @@ import { LOOSE_PREFIX } from './unindexed-works';
 import { Component, computed, inject, input, linkedSignal, signal } from '@angular/core';
 import { WorkLink } from './work-link';
 import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
+import { DebugMode } from './debug-mode';
 import { Library, LocalCopy, OPENABLE_FORMATS, OpenableFormat, copyName, hiddenKey, viewableInBrowser } from './library';
 import { safeGet, safeSet } from './storage';
 import { Jobs } from './jobs';
@@ -430,6 +431,34 @@ export class WorkList {
   // region marking entries as bookmarks by hand
 
   private readonly jobs = inject(Jobs);
+  private readonly debugMode = inject(DebugMode);
+  /** fetching work skins is a debug tool for now, as the run window's own option is */
+  protected readonly offersSkins = computed(() => this.debugMode.on());
+
+  /** whether a work skin is saved for this entry's work - shown as an icon in its corner */
+  protected hasSkin(work: Bookmark): boolean {
+    return !!work.id && this.library.skinnedWorks().has(work.id);
+  }
+
+  /** the ticked works whose skins can be fetched - works only, as for downloading */
+  protected readonly tickedForSkins = computed(() => this.tickedToFetch());
+
+  protected readonly skinsTickedLabel = computed(() => {
+    const n = this.tickedForSkins().length;
+    return `[DEBUG] Download work skin for ${n.toLocaleString()} ${n === 1 ? 'work' : 'works'}`;
+  });
+
+  /** a custom run set to fetch these works' skins and nothing else */
+  protected downloadSkin(work: Bookmark): void {
+    this.menuFor.set(null);
+    const works = this.worksToFetch(work);
+    if (works.length && !this.runGoing()) this.jobs.skinsAsked.set(works);
+  }
+
+  protected downloadTickedSkins(): void {
+    const works = this.tickedForSkins();
+    if (works.length && !this.runGoing()) this.jobs.skinsAsked.set(works);
+  }
   /** a run reads and writes the index: marking by hand waits until it has ended */
   protected readonly runGoing = computed(() => this.jobs.activeRuns().length > 0);
   protected readonly markProblem = signal('');

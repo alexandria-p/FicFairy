@@ -708,6 +708,38 @@ export const GUEST_PLAN_CASES: { action: string; filetypes: string[]; options: R
    "HTML"
   ],
   "options": {
+   "skinsOnly": true
+  },
+  "plan": [
+   [
+    "login",
+    "Log in to AO3"
+   ],
+   [
+    "skins",
+    "Fetch work skins"
+   ],
+   [
+    "fichub",
+    "Try FicHub for works AO3 would not give us"
+   ],
+   [
+    "cleanup",
+    "Cleanup"
+   ],
+   [
+    "report",
+    "Report any failures"
+   ]
+  ]
+ },
+ {
+  "action": "custom",
+  "filetypes": [
+   "JSON",
+   "HTML"
+  ],
+  "options": {
    "reindex": false
   },
   "plan": [
@@ -1235,6 +1267,37 @@ export const GUEST_PLAN_CASES: { action: string; filetypes: string[]; options: R
    "JSON"
   ],
   "options": {
+   "skinsOnly": true
+  },
+  "plan": [
+   [
+    "login",
+    "Log in to AO3"
+   ],
+   [
+    "skins",
+    "Fetch work skins"
+   ],
+   [
+    "fichub",
+    "Try FicHub for works AO3 would not give us"
+   ],
+   [
+    "cleanup",
+    "Cleanup"
+   ],
+   [
+    "report",
+    "Report any failures"
+   ]
+  ]
+ },
+ {
+  "action": "custom",
+  "filetypes": [
+   "JSON"
+  ],
+  "options": {
    "reindex": false
   },
   "plan": [
@@ -1700,6 +1763,37 @@ export const GUEST_PLAN_CASES: { action: string; filetypes: string[]; options: R
    [
     "download",
     "Download or update works as necessary"
+   ],
+   [
+    "fichub",
+    "Try FicHub for works AO3 would not give us"
+   ],
+   [
+    "cleanup",
+    "Cleanup"
+   ],
+   [
+    "report",
+    "Report any failures"
+   ]
+  ]
+ },
+ {
+  "action": "custom",
+  "filetypes": [
+   "HTML"
+  ],
+  "options": {
+   "skinsOnly": true
+  },
+  "plan": [
+   [
+    "login",
+    "Log in to AO3"
+   ],
+   [
+    "skins",
+    "Fetch work skins"
    ],
    [
     "fichub",

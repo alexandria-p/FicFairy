@@ -207,6 +207,8 @@ export class DownloadDialog implements OnDestroy {
   readonly importing = input<ImportRequest | null>(null);
   /** what the link box starts with - a work number, when the window was opened from a listing */
   readonly prefill = input('');
+  /** works whose skins were asked for from a listing: the custom run opens fetching only those */
+  readonly skinWorks = input<string[]>([]);
   /** roughly how many requests an import makes - over `LONG_IMPORT_REQUESTS` it says to leave the window open */
   protected readonly importRequestCount = computed(() => {
     const importing = this.importing();
@@ -314,7 +316,22 @@ export class DownloadDialog implements OnDestroy {
    * could. A quick scan uses the same signal for its own pair: 'all' there means back to
    * its last completed run.
    */
-  protected readonly coverage = signal<'all' | 'pages' | 'dates' | 'run' | 'resume' | 'existing'>('all');
+  protected readonly coverage = signal<'all' | 'pages' | 'dates' | 'run' | 'resume' | 'existing' | 'skins'>('all');
+  /**
+   * A custom run that only fetches work skins (`coverage` 'skins', debug mode): each work's page
+   * read for its author's skin and saved beside the works - nothing indexed, nothing downloaded,
+   * so it has no file types and no other options (the helper's `run_skins_only`)
+   */
+  protected readonly skinsOnly = computed(
+    () => this.action() === 'custom' && this.coverage() === 'skins' && !this.resuming());
+  /** fetching skins only: fetch the skins already saved again too */
+  protected readonly overwriteSkins = signal(false);
+  /** what a run fetching skins only covers, in words */
+  protected readonly skinsCover = computed(() => {
+    const picked = this.skinWorks().length;
+    return picked ? `the work skins of the ${picked === 1 ? 'work' : `${picked} works`} you picked`
+      : 'the work skin of every work with HTML in your library';
+  });
   /**
    * A custom run picking up where an unfinished run left off. It then runs as that run -
    * its workflow, file types and options - so nothing else on the way in is a choice.
@@ -909,7 +926,8 @@ export class DownloadDialog implements OnDestroy {
    */
   protected readonly picksFiletypes = computed(
     // an import's formats were chosen in the import window
-    () => this.action() !== 'import' && (!this.picksCollectionWorks() || this.collectionWorks()),
+    () => this.action() !== 'import' && !this.skinsOnly() &&
+      (!this.picksCollectionWorks() || this.collectionWorks()),
   );
   protected readonly needsLink = computed(
     () => this.action() === 'collection' || this.action() === 'work' || this.action() === 'works',
@@ -935,7 +953,8 @@ export class DownloadDialog implements OnDestroy {
    * bookmarks or collections, found by your name. The helper's `USERNAME_ACTIONS`.
    */
   protected readonly needsUsername = computed(() =>
-    USERNAME_ACTIONS.includes(
+    // fetching work skins reads each work's page, never your listing
+    !this.skinsOnly() && USERNAME_ACTIONS.includes(
       // a retry is sent as custom when it is not one of the scans, so the run it retries
       // says whether it reads your own listing - a fic run's retry needs no username
       this.resuming() ? (this.chosenResume()?.action ?? this.sentAction()) : this.sentAction(),
@@ -1008,6 +1027,7 @@ export class DownloadDialog implements OnDestroy {
     () =>
       this.splitOptions() &&
       !this.resuming() &&
+      !this.skinsOnly() &&
       (this.picksSeries() || this.picksNonBookmarks() || this.picksOverwrite() || this.picksImages()),
   );
 
@@ -1127,7 +1147,7 @@ export class DownloadDialog implements OnDestroy {
 
     rows.push({
       label: 'File types',
-      value: this.chosenFiletypes().join(', ') || 'nothing - indexing only',
+      value: this.chosenFiletypes().join(', ') || (this.skinsOnly() ? 'nothing - work skins only' : 'nothing - indexing only'),
     });
 
     if (this.resuming()) {
@@ -1153,6 +1173,12 @@ export class DownloadDialog implements OnDestroy {
     } else if (this.picksPages()) {
       rows.push({ label: 'Covers', value: this.pageRange() });
       rows.push({ label: 'Ordered by', value: `date ${this.listingOrder()}` });
+    } else if (this.skinsOnly()) {
+      rows.push({ label: 'Covers', value: this.skinsCover() });
+      rows.push({
+        label: 'Work skins already saved',
+        value: this.overwriteSkins() ? 'fetched again, and replaced' : 'kept',
+      });
     } else if (this.action() === 'custom' && this.coverage() === 'existing') {
       rows.push({ label: 'Covers', value: 'every work already in your index' });
     } else if (this.picksDates() || this.action() === 'quick') {
@@ -1407,6 +1433,8 @@ export class DownloadDialog implements OnDestroy {
    */
   protected readonly backgroundQuestions = computed<QuestionName[]>(() => {
     if (this.resuming()) return ['fichub', 'overwrite-older'];
+    // fetching work skins asks nothing: no work it reads can fail to download
+    if (this.skinsOnly()) return [];
     const asked: QuestionName[] = [];
     if (this.action() === 'quick' && this.coverage() !== 'run' && this.coverage() !== 'dates') {
       asked.push('quick-floor');
@@ -1528,6 +1556,14 @@ export class DownloadDialog implements OnDestroy {
 
   constructor() {
     void this.init();
+    // works whose skins were asked for from a listing: the custom run opens set to fetch those
+    let skinsSet = false;
+    effect(() => {
+      const works = this.skinWorks();
+      if (skinsSet || !works.length) return;
+      skinsSet = true;
+      untracked(() => this.coverage.set('skins'));
+    });
     // a work number handed over from a listing goes in the box once, as if typed
     let prefilled = false;
     effect(() => {
@@ -1709,6 +1745,8 @@ export class DownloadDialog implements OnDestroy {
     // a window opened onto a run already going shows what the run said it was saving
     if (this.attachedTo()) return this.announcedFiletypes();
     if (this.resuming()) return this.chosenResume()?.filetypes ?? [];
+    // fetching work skins saves no format, the index included
+    if (this.skinsOnly()) return [];
     const importing = this.importing();
     if (this.action() === 'import' && importing) return importing.filetypes;
     // collections on their own are only ever indexed
@@ -2238,6 +2276,10 @@ export class DownloadDialog implements OnDestroy {
         reindex: this.picksReindex() ? this.reindex() : true,
         // skipping the indexing, every indexed work may still be looked up on AO3
         recheck: this.recheck(),
+        // a custom run fetching work skins and nothing else - the helper clears the rest
+        skinsOnly: this.skinsOnly(),
+        overwriteSkins: this.skinsOnly() && this.overwriteSkins(),
+        skinWorks: this.skinsOnly() ? this.skinWorks() : [],
         // a window of time and a slice of the listing are alternatives, so the one not
         // chosen is not sent at all rather than sent and ignored
         dates: this.picksDates() && this.useDates(),

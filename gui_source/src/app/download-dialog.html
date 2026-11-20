@@ -369,6 +369,42 @@
               </label>
             }
 
+            <!-- debug only: nothing but each work's skin - no index, no download -->
+            @if (action() === 'custom' && (debugTools() || skinWorks().length)) {
+              <label class="check">
+                <input type="radio" name="coverage" [checked]="coverage() === 'skins'"
+                       (change)="coverage.set('skins')" />
+                <span>[DEBUG] Just fetch work skins</span>
+              </label>
+              @if (coverage() === 'skins') {
+                <div class="skins-only-options">
+                  <p class="hint skins-only-hint">
+                    Opens each work's page on AO3 and saves its creator's work skin, if it has one,
+                    beside your works - nothing is indexed and nothing is downloaded again. The skin
+                    shows when you open the work's HTML from FicFairy.
+                    @if (skinWorks().length) {
+                      For the {{ skinWorks().length === 1 ? 'work' : skinWorks().length + ' works' }} you picked.
+                    } @else {
+                      For every work with HTML in your library. One request to AO3 per work.
+                    }
+                  </p>
+                  <label class="check">
+                    <input type="checkbox" name="overwriteSkins" [checked]="overwriteSkins()"
+                           (change)="overwriteSkins.set($any($event.target).checked)" />
+                    <span>Overwrite existing work skins</span>
+                  </label>
+                  <p class="hint nested">
+                    @if (overwriteSkins()) {
+                      Every work's skin is fetched again and replaces the one saved - in case one is
+                      damaged or out of date.
+                    } @else {
+                      A work whose skin is saved already is passed over, so this costs nothing for it.
+                    }
+                  </p>
+                </div>
+              }
+            }
+
             <!-- no listing at all: the works already in the index (it skips the indexing) -->
             @if (action() === 'custom') {
               <label class="check">

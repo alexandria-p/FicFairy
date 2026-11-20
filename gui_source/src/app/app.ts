@@ -132,6 +132,8 @@ export class App {
   protected readonly attachTo = signal<ActiveRun | null>(null);
   /** a work number for the single-fic run's link box, when it was opened from a listing */
   protected readonly prefillLink = signal('');
+  /** works whose skins were asked for from a listing, for the custom run that fetches them */
+  protected readonly skinWorks = signal<string[]>([]);
   /** an import's works and choices, for the run window it opens */
   protected readonly importing = signal<ImportRequest | null>(null);
 
@@ -321,6 +323,7 @@ export class App {
     this.resumeFrom.set('');
     this.attachTo.set(null);
     this.prefillLink.set('');
+    this.skinWorks.set([]);
     void this.jobs.refreshActiveRuns();
   }
 
@@ -467,6 +470,17 @@ export class App {
         if (this.activeRun() || this.dialogAction()) return;
         this.setView('bookmarks');
         this.openRun(works.length === 1 ? 'work' : 'works', works.join('\n'));
+      });
+    });
+    // 'download work skin' from a listing: a custom run set to fetch those works' skins alone
+    effect(() => {
+      const works = this.jobs.skinsAsked();
+      if (!works?.length) return;
+      untracked(() => {
+        this.jobs.skinsAsked.set(null);
+        if (this.activeRun() || this.dialogAction()) return;
+        this.skinWorks.set(works);
+        this.openRun('custom');
       });
     });
     // 'look up its index' on a file no index entry matches: Resolve issues, as the reminder opens it

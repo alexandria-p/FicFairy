@@ -141,7 +141,9 @@ def test_a_work_without_a_skin_is_saved_as_ao3_sent_it_and_asked_about_once(tmp_
 
     assert ao3.repo.get_soup.call_count == 1
     assert saved(tmp_path, '.html') == downloaded()
-    assert not (tmp_path / strings.SKINS_FOLDER_NAME).exists()
+    # noted as having none, so the next run does not ask
+    assert (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.none').exists()
+    assert not (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').exists()
     assert strings.AO3_INFO_SKIN_NONE.format('41822007') in capsys.readouterr().out
 
 
@@ -241,7 +243,7 @@ def test_a_work_with_no_skin_is_noted_so_it_is_not_asked_about_on_every_run(tmp_
 
     server.skins_for_current_html(job, ao3.fileops, ao3)
 
-    assert (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').read_text(encoding='utf-8') == ''
+    assert (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.none').exists()
 
 
 def test_a_page_that_will_not_read_saves_nothing_so_the_next_run_asks_again(tmp_path):
@@ -279,6 +281,139 @@ def test_every_run_ends_by_fetching_the_skins_of_current_html_before_ficHub():
     import inspect
     source = inspect.getsource(server.finish_run)
     assert source.index('skins_for_current_html') < source.index('rescue_with_fichub')
+
+# endregion
+
+
+# region an update brings the saved skin up to date
+
+def test_an_update_overwrites_the_saved_skin_with_the_latest(tmp_path):
+    ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWork')})
+    (tmp_path / strings.SKINS_FOLDER_NAME).mkdir()
+    (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').write_text('#workskin .old {}', encoding='utf-8')
+
+    ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
+
+    css = (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').read_text(encoding='utf-8')
+    assert css.startswith('#workskin .centered')
+
+
+def test_a_skin_the_author_dropped_is_dropped_from_the_saved_one_too(tmp_path):
+    ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWorkNoSkin')})
+    (tmp_path / strings.SKINS_FOLDER_NAME).mkdir()
+    (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').write_text('#workskin .old {}', encoding='utf-8')
+
+    ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
+
+    assert not (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').exists()
+    assert (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.none').exists()
+
+
+def saved_skin_listed(ao3, tmp_path):
+    ao3.fileops.list_files.side_effect = lambda folder: os.listdir(folder) if os.path.isdir(folder) else []
+
+
+def test_a_run_not_fetching_skins_still_refreshes_a_saved_one_when_the_html_is_downloaded(tmp_path, capsys):
+    ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWork')})
+    ao3.skins = False
+    saved_skin_listed(ao3, tmp_path)
+    (tmp_path / strings.SKINS_FOLDER_NAME).mkdir()
+    (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').write_text('#workskin .old {}', encoding='utf-8')
+
+    ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
+
+    css = (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').read_text(encoding='utf-8')
+    assert css.startswith('#workskin .centered')
+    # the html is left as AO3 sent it: the page puts the saved skin in as it opens
+    assert saved(tmp_path, '.html') == downloaded()
+    assert strings.AO3_INFO_SKIN_REFRESHED.format('41822007') in capsys.readouterr().out
+
+
+def test_a_run_not_fetching_skins_reads_no_page_for_a_work_with_no_saved_skin(tmp_path):
+    ao3 = skinning(tmp_path, {})
+    ao3.skins = False
+    saved_skin_listed(ao3, tmp_path)
+
+    ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
+
+    ao3.repo.get_soup.assert_not_called()
+
+# endregion
+
+
+# region a custom run that only fetches work skins
+
+def skins_only(tmp_path, pages, options=None, works=('41822007',)):
+    ao3, job = current_html(tmp_path, pages, works)
+    job.options = {'skinsOnly': True, 'overwriteSkins': False, 'skinWorks': [], **(options or {})}
+    job.cancel.is_set.return_value = False
+    made = []
+
+    def build(*args, **kwargs):
+        ao3.skins = False
+        made.append(ao3)
+        return ao3
+
+    return ao3, job, build
+
+
+def run_only(monkeypatch, ao3, job, build):
+    monkeypatch.setattr(server, 'Ao3', build)
+    monkeypatch.setattr(server, 'finish_run', lambda *a: None)
+    server.run_custom(job, ao3.fileops, ao3.repo, None)
+
+
+def test_fetching_skins_only_saves_each_skin_and_downloads_nothing(tmp_path, monkeypatch):
+    ao3, job, build = skins_only(tmp_path, {WORK_PAGE: page('unlockedWork')})
+
+    run_only(monkeypatch, ao3, job, build)
+
+    ao3.repo.download_file.assert_not_called()
+    ao3.fileops.save_json.assert_not_called()
+    css = (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').read_text(encoding='utf-8')
+    assert css.startswith('#workskin .centered')
+    assert saved(tmp_path, '.html') == downloaded()
+
+
+def test_fetching_skins_only_keeps_a_saved_skin_unless_told_to_overwrite(tmp_path, monkeypatch):
+    for overwrite in (False, True):
+        folder = tmp_path / str(overwrite)
+        folder.mkdir()
+        ao3, job, build = skins_only(folder, {WORK_PAGE: page('unlockedWork')},
+                                     {'overwriteSkins': overwrite})
+        ao3.fileops.list_files.side_effect = lambda f: os.listdir(f) if os.path.isdir(f) else []
+        (folder / strings.SKINS_FOLDER_NAME).mkdir()
+        (folder / strings.SKINS_FOLDER_NAME / '41822007.css').write_text('#workskin .old {}', encoding='utf-8')
+
+        run_only(monkeypatch, ao3, job, build)
+
+        css = (folder / strings.SKINS_FOLDER_NAME / '41822007.css').read_text(encoding='utf-8')
+        assert css.startswith('#workskin .centered') == overwrite
+
+
+def test_fetching_skins_only_takes_the_works_picked(tmp_path, monkeypatch):
+    other = 'https://archiveofourown.org/works/7'
+    ao3, job, build = skins_only(tmp_path, {other: page('unlockedWorkNoSkin')}, {'skinWorks': ['7']})
+
+    run_only(monkeypatch, ao3, job, build)
+
+    assert [c.args[0] for c in ao3.repo.get_soup.call_args_list] == [other]
+    assert (tmp_path / strings.SKINS_FOLDER_NAME / '7.none').exists()
+
+
+def test_fetching_skins_only_lists_only_its_own_steps():
+    job = MagicMock()
+    job.action = server.ACTION_CUSTOM
+    job.filetypes = []
+    job.options = {'skinsOnly': True}
+
+    assert [x[0] for x in server.step_plan(job)] == ['login', 'skins', 'fichub', 'cleanup', 'report']
+
+
+def test_only_a_custom_run_can_fetch_skins_only():
+    options = server.resolve_options({'skinsOnly': True, 'overwriteSkins': True, 'skinWorks': ['12', 'x', 3]})
+    assert options['skinsOnly'] and options['overwriteSkins']
+    assert options['skinWorks'] == ['12', '3']
 
 # endregion
 

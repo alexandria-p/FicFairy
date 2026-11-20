@@ -1089,7 +1089,8 @@
 }
 
 /* a private bookmark: a lock just left of the bookmark icon, in the dim text colour */
-.private-icon {
+.private-icon,
+.skin-icon {
   display: inline-flex;
   width: 14px;
   height: 14px;
@@ -1100,6 +1101,11 @@
   width: 100%;
   height: 100%;
   fill: currentColor;
+}
+
+.skin-icon svg {
+  width: 100%;
+  height: 100%;
 }
 
 /* a file no index entry matches: shown from its name, said so */
