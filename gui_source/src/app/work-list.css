@@ -621,6 +621,36 @@
   margin-left: 0;
 }
 
+.part-summary {
+  margin-top: 4px;
+  font-size: 0.8rem;
+}
+
+.part-summary > summary {
+  width: fit-content;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.part-summary > summary:hover {
+  text-decoration: underline;
+}
+
+.part-summary blockquote {
+  margin: 4px 0 2px;
+  padding: 4px 0 4px 10px;
+  border-left: 2px solid var(--border-strong);
+  color: var(--text);
+}
+
+.part-summary blockquote p {
+  margin: 0 0 4px;
+}
+
+.part-summary blockquote p:last-child {
+  margin-bottom: 0;
+}
+
 .part-meta {
   display: block;
   margin-top: 2px;

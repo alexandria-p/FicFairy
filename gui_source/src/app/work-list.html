@@ -874,6 +874,17 @@
               {{ chapterCount(part) }} chapters
               @if (part.date_updated) { &middot; updated {{ part.date_updated }} }
             </span>
+            <!-- the work's summary, folded away: the series' card stays short until it is wanted -->
+            @if (part.summary) {
+              <details class="part-summary">
+                <summary>Summary</summary>
+                <blockquote>
+                  @for (line of paragraphs(part.summary); track $index) {
+                    <p>{{ line }}</p>
+                  }
+                </blockquote>
+              </details>
+            }
             @if (part.id === current) {
               <span class="badge">This work</span>
             } @else if (part.bookmarked) {

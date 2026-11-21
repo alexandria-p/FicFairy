@@ -465,6 +465,27 @@ describe('WorkList, bookmarks of every kind', () => {
     expect(element.querySelector('.series-list')).toBeNull();
   });
 
+  it("folds each part's summary away under the part, and leaves it out of a part with none", async () => {
+    TestBed.inject(Library).worksById.set(new Map([
+      ['111', { ...partOne, summary: 'A lighthouse.\nAnd the keeper.' } as Bookmark],
+      ['222', { ...partTwo, summary: '' } as Bookmark],
+      ['555', single],
+    ]));
+    await listing([series]);
+    element.querySelector<HTMLButtonElement>('.series-toggle')!.click();
+    await fixture.whenStable();
+
+    const parts = Array.from(element.querySelectorAll('.series-list li'));
+    const folded = parts[0].querySelector<HTMLDetailsElement>('details.part-summary')!;
+    expect(folded.open).toBe(false);
+    expect(folded.querySelector('summary')!.textContent!.trim()).toBe('Summary');
+    expect(Array.from(folded.querySelectorAll('blockquote p')).map((p) => p.textContent!.trim())).toEqual(
+      ['A lighthouse.', 'And the keeper.']);
+    expect(parts[1].querySelector('.part-summary')).toBeNull();
+    // the placeholder knows nothing but its number
+    expect(parts[2].querySelector('.part-summary')).toBeNull();
+  });
+
   it('says so when a series has not been read for its works yet', async () => {
     await listing([{ ...series, work_ids: [] } as Bookmark]);
     element.querySelector<HTMLButtonElement>('.series-toggle')!.click();
