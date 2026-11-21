@@ -256,7 +256,7 @@ async function advanceTo(target: 'options' | 'more-options' | 'filetypes' | 'cre
         password.dispatchEvent(new Event('input'));
         await fixture.whenStable();
       }
-      (button('Start download') ?? button('Start repair'))!.click();
+      (button('Start download') ?? button('Start repair') ?? button('Fetch work skins'))!.click();
       await fixture.whenStable();
       continue;
     }
@@ -535,24 +535,39 @@ describe('DownloadDialog', () => {
     expect(checkbox('Just fetch work skins')).toBeUndefined();
   });
 
-  it('opens set to fetch the skins of the works picked in a listing', async () => {
-    debugOn();
-    fixture = TestBed.createComponent(DownloadDialog);
-    fixture.componentRef.setInput('action', 'custom');
-    fixture.componentRef.setInput('skinWorks', ['12', '34']);
-    await fixture.whenStable();
-    element = fixture.nativeElement as HTMLElement;
-    await advanceTo('options');
+  for (const [picked, title] of [
+    [['12'], 'Download work skin'],
+    [['12', '34'], 'Download work skins (2 works)'],
+  ] as [string[], string][]) {
+    it(`opens a window of its own for the skins of ${picked.length} work(s) picked in a listing`, async () => {
+      debugOn();
+      fixture = TestBed.createComponent(DownloadDialog);
+      fixture.componentRef.setInput('action', 'custom');
+      fixture.componentRef.setInput('skinWorks', picked);
+      await fixture.whenStable();
+      element = fixture.nativeElement as HTMLElement;
+      for (let i = 0; i < 20 && element.querySelector('[data-step]')?.getAttribute('data-step') === 'preparing'; i++) {
+        await new Promise((r) => setTimeout(r, 10));
+        await fixture.whenStable();
+      }
 
-    expect(checkbox('Just fetch work skins')!.checked).toBe(true);
-    // no hint under it: the choice says what it does
-    expect(element.querySelector('.skins-only-hint')).toBeNull();
-    // works picked are always checked: no choice of which
-    expect(element.querySelector('input[name=skinScope]')).toBeNull();
-    await advanceTo('running');
+      // titled for it, and straight to the login: no custom-run page to choose from
+      expect(element.textContent).toContain(title);
+      expect(element.textContent).not.toContain('Custom run');
+      expect(element.querySelector('[data-step]')?.getAttribute('data-step')).toBe('credentials');
+      expect(element.querySelector('input[name=coverage]')).toBeNull();
+      const said = element.textContent?.replace(/\s+/g, ' ') ?? '';
+      expect(said).toContain(picked.length === 1 ? 'in case this work is restricted' : 'in case some of these works are restricted');
+      expect(said).not.toContain('your own bookmarks');
+      expect(said).toContain('Fetch work skins');
+      expect(said).not.toContain('Start download');
+      await advanceTo('running');
 
-    expect(jobs.started[0].options).toMatchObject({ skinsOnly: true, skinWorks: ['12', '34'] });
-  });
+      expect(jobs.started[0].action).toBe('custom');
+      expect(jobs.started[0].filetypes).toEqual([]);
+      expect(jobs.started[0].options).toMatchObject({ skinsOnly: true, skinWorks: picked });
+    });
+  }
 
   it('says in one line what work skins cost, and that they only come from AO3 - once ticked', async () => {
     debugOn();

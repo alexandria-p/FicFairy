@@ -329,7 +329,9 @@ export class DownloadDialog implements OnDestroy {
    * so it has no file types and no other options (the helper's `run_skins_only`)
    */
   protected readonly skinsOnly = computed(
-    () => this.action() === 'custom' && this.coverage() === 'skins' && !this.resuming());
+    () => this.action() === 'custom' && !this.resuming() &&
+      // works picked in a listing are this run from the start, whatever the coverage says yet
+      (this.coverage() === 'skins' || this.skinWorks().length > 0));
   /** fetching skins only, over the whole library: which works, by what is saved for each */
   protected readonly skinScope = signal<SkinScope>('unchecked');
   protected readonly skinScopes: { value: SkinScope; label: string; hint: string }[] = [
@@ -342,6 +344,12 @@ export class DownloadDialog implements OnDestroy {
     { value: 'all', label: 'All works',
       hint: 'Every work with HTML in your library, whatever is saved for it. One request to AO3 per work.' },
   ];
+  /**
+   * Opened from the Works tab for the skins of the works picked there (`skinWorks`): a window of
+   * its own, titled for it, with no custom-run page to choose from - it goes straight to the
+   * login, since a work picked by hand has nothing left to choose.
+   */
+  protected readonly pickedSkins = computed(() => this.action() === 'custom' && this.skinWorks().length > 0);
   /** what a run fetching skins only covers, in words */
   protected readonly skinsCover = computed(() => {
     const picked = this.skinWorks().length;
@@ -722,6 +730,10 @@ export class DownloadDialog implements OnDestroy {
   private unloadGuard: ((event: BeforeUnloadEvent) => void) | null = null;
 
   protected readonly title = computed(() => {
+    if (this.pickedSkins()) {
+      const picked = this.skinWorks().length;
+      return picked === 1 ? 'Download work skin' : `Download work skins (${picked} works)`;
+    }
     switch (this.action()) {
       case 'bookmarks':
         return '(Full scan) Reindex & Update All';
@@ -1022,7 +1034,7 @@ export class DownloadDialog implements OnDestroy {
    */
   protected readonly hasOptions = computed(
     () =>
-      this.picksPages() ||
+      !this.pickedSkins() && (this.picksPages() ||
       // a run that has swapped pages for a date window still has that choice to offer
       this.picksDates() ||
       this.picksSeries() ||
@@ -1032,7 +1044,7 @@ export class DownloadDialog implements OnDestroy {
       this.picksNonBookmarks() ||
       this.picksCollectionWorks() ||
       // it can always be pointed at an earlier scan, so it always has a choice to offer
-      this.action() === 'quick',
+      this.action() === 'quick'),
   );
 
   /**

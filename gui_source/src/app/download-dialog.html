@@ -1401,6 +1401,11 @@
             Log in to AO3 in case some of these works are restricted to AO3 users - logged out,
             AO3 will not show them, and they cannot be indexed or downloaded from there.
           </p>
+        } @else if (skinsOnly()) {
+          <p>
+            Log in to AO3 in case {{ skinWorks().length === 1 ? 'this work is' : 'some of these works are' }}
+            restricted to AO3 users - logged out, AO3 will not show {{ skinWorks().length === 1 ? 'its page' : 'their pages' }}.
+          </p>
         } @else {
           <p>Log in to AO3 so restricted works and your own {{ listingWord() }} are visible.</p>
         }
@@ -1519,6 +1524,8 @@
                 (click)="submit($event)">
           @if (action() === 'import') {
             {{ background() ? 'Start repair in the background' : 'Start repair' }}
+          } @else if (skinsOnly()) {
+            {{ background() ? 'Fetch work skins in the background' : 'Fetch work skins' }}
           } @else {
             {{ background() ? 'Start in the background' : 'Start download' }}
           }

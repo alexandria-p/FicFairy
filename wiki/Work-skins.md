@@ -31,7 +31,7 @@ There are two ways a run gets a skin:
 ## Fetching skins on their own (debug mode)
 
 - **Custom run > [DEBUG] Just fetch work skins** - for works with HTML in your library: works *never checked for a skin* (the default), works *that already have a skin saved*, works *last known to have no skin*, or *all works*.
-- **[DEBUG] Download work skin** - in a work's **⋯** menu, or on the selection bar for the works you've ticked. It opens the same run for just those works, and checks each again whatever is saved for it.
+- **[DEBUG] Download work skin** - in a work's **⋯** menu, or on the selection bar for the works you've ticked. It opens a window of its own, **Download work skin** (or **Download work skins** for several), straight on the AO3 login - there is nothing else to choose. **Fetch work skins** starts it, and each work picked is checked again whatever is saved for it.
 
 A work with a skin saved shows a brush button on the Works tab, just left of the eye at the bottom of its entry. Hover says **Open downloaded workskin**; clicking it opens the saved CSS in a new tab.
 
