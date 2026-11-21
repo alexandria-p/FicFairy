@@ -3372,24 +3372,56 @@ describe('DownloadDialog', () => {
       ]);
     });
 
-    it('says it saves each work skin it reads, and sends the option, only when the window asked', async () => {
-      await openImport({ ...IMPORT, filetypes: ['JSON', 'HTML'], skins: true });
-      const lines = [...element.querySelectorAll('.import-summary li')].map((li) => li.textContent?.trim());
-      expect(lines).toEqual([
-        'Look-up 2 works with missing index',
-        'Search 1 work for updates',
-        'Save the work skin of each work it reads from AO3, as css - no extra requests',
-      ]);
-      // the run window's own skins box is not offered on an import: its window chose
+    it('offers no work skins page outside debug mode, and sends none', async () => {
+      await openImport();
+      expect(currentStep()).toBe('credentials');
       expect(element.querySelector('input[name="skins"]')).toBeNull();
       await advanceTo('running');
-      expect(jobs.started[0].options.skins).toBe(true);
+      expect(jobs.started[0].options.skins).toBe(false);
     });
 
-    it('sends no work skins when the window did not ask', async () => {
+    it('asks about work skins on a page of its own just before the login, in debug mode', async () => {
+      TestBed.overrideProvider(DebugMode, { useValue: { on: () => true } });
       await openImport();
+      expect(currentStep()).toBe('work-skins');
+      // the first page says what the repair will do; the login no longer does
+      expect([...element.querySelectorAll('.import-summary li')].map((li) => li.textContent?.trim())).toEqual([
+        'Look-up 2 works with missing index',
+        'Search 1 work for updates',
+      ]);
+      const box = element.querySelector<HTMLInputElement>('input[name="skins"]')!;
+      expect(box.closest('label')!.textContent!.trim()).toBe('[DEBUG] Fetch work skins');
+      expect(box.checked).toBe(false);
+      expect(box.disabled).toBe(false);
+      expect(element.querySelector('.skins-hint')).toBeNull();
+      expect(button('Cancel')).toBeTruthy();
+
+      box.click();
+      await fixture.whenStable();
+      expect(element.querySelector('.skins-hint')!.textContent!.replace(/\s+/g, ' ').trim()).toBe(
+        "No extra requests to AO3 in this run - it opens each work's page anyway. Work skins are only fetched from AO3.");
+      expect([...element.querySelectorAll('.import-summary li')].map((li) => li.textContent?.trim())).toContain(
+        'Save the work skin of each work it reads from AO3, as css - no extra requests');
+
+      button('Continue')!.click();
+      await fixture.whenStable();
+      expect(currentStep()).toBe('credentials');
+      expect(element.querySelector('.import-summary')).toBeNull();
+      button('Back')!.click();
+      await fixture.whenStable();
+      expect(currentStep()).toBe('work-skins');
+      expect(element.querySelector<HTMLInputElement>('input[name="skins"]')!.checked).toBe(true);
+    });
+
+    it('sends work skins with no HTML among the formats - an import reads every work anyway', async () => {
+      TestBed.overrideProvider(DebugMode, { useValue: { on: () => true } });
+      // only looking works up: JSON alone
+      await openImport({ ...IMPORT, filetypes: ['JSON'], replaceOutdated: false, scope: 'skip' });
+      element.querySelector<HTMLInputElement>('input[name="skins"]')!.click();
+      await fixture.whenStable();
       await advanceTo('running');
-      expect(jobs.started[0].options.skins).toBe(false);
+      expect(jobs.started[0].filetypes).toEqual(['JSON']);
+      expect(jobs.started[0].options.skins).toBe(true);
     });
 
     it('keeps every copy you have unless told to replace outdated ones', async () => {

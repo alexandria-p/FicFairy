@@ -35,7 +35,6 @@ import { LibraryStore } from './library-store';
 import { DropboxError } from './dropbox';
 import { VisitLog } from './visit-log';
 import { Chime } from './chime';
-import { DebugMode } from './debug-mode';
 import { inAo3Zone, writtenDate } from './preferences';
 
 type Step = 'overview' | 'leftovers' | 'rename' | 'renaming' | 'duplicates' | 'choose' | 'removing' | 'dates' | 'repair' | 'dating' | 'index' | 'formats' | 'filetypes';
@@ -92,7 +91,6 @@ export class ImportDialog implements OnInit {
   private readonly imports = inject(LibraryImports);
   private readonly visit = inject(VisitLog);
   private readonly chime = inject(Chime);
-  protected readonly debugMode = inject(DebugMode);
 
   readonly worksFound = input.required<FoundWork[]>({ alias: 'works' });
   /** undated files of works the index does have - offered for dating beside the rest */
@@ -1140,13 +1138,6 @@ export class ImportDialog implements OnInit {
   protected readonly overwrite = signal(false);
   /** the formats to fetch for works without them - none ticked to begin with */
   protected readonly picked = signal<string[]>([]);
-  /**
-   * *[DEBUG] Fetch work skins* - debug mode only, unticked to begin with. An import reads each
-   * work's page on AO3 to index it, so each skin is saved as css beside the works for no extra
-   * request - **never put into the html**. Like every run, it needs HTML ticked (`skinsHeld`).
-   */
-  protected readonly skins = signal(false);
-  protected readonly skinsHeld = computed(() => !this.picked().some((x) => x.toUpperCase() === 'HTML'));
   /** every downloadable format the helper offers, JSON aside (always written: it is the index) */
   protected readonly offered = computed(() => this.formats().filter((x) => x !== 'JSON'));
   /** the formats the found files are already in, so the page can say so */
@@ -1585,7 +1576,6 @@ export class ImportDialog implements OnInit {
         filetypes: ['JSON', ...(updates ? this.picked() : [])],
         replaceOutdated: updates,
         overwrite: updates && this.overwrite(),
-        skins: updates && this.debugMode.on() && this.skins() && !this.skinsHeld(),
         // every work not updated is only looked up - one with a file to repair gets that alone
         indexOnly: [...taken].filter((id) => !updating.has(id)),
         lookups: this.lookups().filter((id) => taken.has(id)).length,

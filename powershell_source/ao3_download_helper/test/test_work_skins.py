@@ -757,14 +757,25 @@ def test_a_collection_run_not_indexing_its_works_saves_no_skins(action, url):
 
 # region resolve issues (an import)
 
-def test_an_import_keeps_work_skins_only_with_html_among_its_formats():
-    assert started_options(server.ACTION_IMPORT, {'skins': True}, '1 2',
-                           filetypes=['JSON', 'HTML'])['skins'] is True
-    # only looking works up, or adding no html, there is no html for a skin to go with
-    assert started_options(server.ACTION_IMPORT, {'skins': True}, '1 2',
-                           filetypes=['JSON'])['skins'] is False
-    assert started_options(server.ACTION_IMPORT, {'skins': True}, '1 2',
-                           filetypes=['JSON', 'EPUB'])['skins'] is False
+def test_an_import_keeps_work_skins_whatever_its_formats():
+    # every work it takes in is read on AO3 to index it, so the skin is free with or without html
+    for filetypes in (['JSON'], ['JSON', 'EPUB'], ['JSON', 'HTML']):
+        assert started_options(server.ACTION_IMPORT, {'skins': True}, '1 2',
+                               filetypes=filetypes)['skins'] is True
+    assert started_options(server.ACTION_IMPORT, {}, '1 2', filetypes=['JSON'])['skins'] is False
+
+
+def test_only_an_import_keeps_work_skins_without_html():
+    assert started_options(server.ACTION_WORKS, {'skins': True}, '1 2', filetypes=['JSON'])['skins'] is False
+
+
+def test_an_import_looking_works_up_only_saves_their_skins_and_lists_no_skins_step():
+    job = MagicMock()
+    job.action = server.ACTION_IMPORT
+    job.filetypes = ['JSON']
+    job.options = server.resolve_options({'skins': True, 'indexOnly': ['1']})
+    # nothing waits for a step of its own: each skin was saved as its page was read
+    assert 'skins' not in [x for x, _ in server.step_plan(job)]
 
 
 def test_an_import_fetching_skins_hands_the_option_to_its_downloader():

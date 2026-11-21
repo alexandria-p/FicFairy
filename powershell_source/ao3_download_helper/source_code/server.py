@@ -6797,8 +6797,11 @@ class Handler(BaseHTTPRequestHandler):
             options['skinScope'] = 'unchecked'
             options['skinWorks'] = []
             # work skins go with html, on every run - the ones that read each work's page anyway
-            # included, at the owner's request: no HTML ticked, no skin saved
-            if 'HTML' not in [str(x).upper() for x in filetypes]: options['skins'] = False
+            # included, at the owner's request: no HTML ticked, no skin saved. But for an import
+            # (Resolve issues), which reads every work's page to index it, so its skin is free:
+            # offered whenever it indexes or updates, at the owner's request
+            if action != ACTION_IMPORT and 'HTML' not in [str(x).upper() for x in filetypes]:
+                options['skins'] = False
 
         url = (body.get('url') or '').strip()
         # checked here rather than on the thread, so a bad link is a straight answer to the

@@ -129,16 +129,6 @@ legend {
   margin: 2px 0 0;
 }
 
-/* the work skins box while HTML is unticked */
-.check.locked {
-  cursor: default;
-  color: var(--text-dim);
-}
-
-.skins-hint {
-  margin: 0 0 6px 26px;
-}
-
 .hint,
 .dim {
   color: var(--text-dim);

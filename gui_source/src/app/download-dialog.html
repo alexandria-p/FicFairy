@@ -1378,16 +1378,50 @@
           {{ hasStepBefore('background') ? 'Back' : 'Cancel' }}
         </button>
         <button type="button" class="button primary" [disabled]="!backgroundAnswersReady()"
-                (click)="step.set('credentials')">
+                (click)="step.set(afterBackground())">
           Continue
         </button>
+      </footer>
+    }
+
+    <!-- Resolve issues: whether to save each work's skin as its page is read - debug mode only -->
+    @if (step() === 'work-skins') {
+      <section class="body">
+        @if (firstStep() === 'work-skins') {
+          @if (importRequestCount() > longImport && !background()) {
+            <p class="long-run-note" role="note">
+              This may take a long time, with ~{{ importRequestCount() | number }} requests to work through.
+              Please leave this window open until it finishes.
+            </p>
+          }
+          <ul class="import-summary">
+            @for (line of importPlan(); track line) { <li>{{ line }}</li> }
+          </ul>
+        }
+        <label class="check skins-option">
+          <input type="checkbox" name="skins" [checked]="importSkins()"
+                 (change)="importSkins.set($any($event.target).checked)" />
+          <span>[DEBUG] Fetch work skins</span>
+        </label>
+        @if (importSkins()) {
+          <p class="hint skins-hint">
+            No extra requests to AO3 in this run - it opens each work's page anyway. Work skins
+            are only fetched from AO3.
+          </p>
+        }
+      </section>
+      <footer>
+        <button type="button" class="button subtle" (click)="backFrom('work-skins')">
+          {{ hasStepBefore('work-skins') ? 'Back' : 'Cancel' }}
+        </button>
+        <button type="button" class="button primary" (click)="step.set('credentials')">Continue</button>
       </footer>
     }
 
     <!-- step 2: who you are, or that you are going without logging in -->
     @if (step() === 'credentials') {
       <form class="body" (submit)="submit($event)">
-        @if (action() === 'import' && !offersBackground()) {
+        @if (action() === 'import' && firstStep() === 'credentials') {
           @if (importRequestCount() > longImport && !background()) {
             <p class="long-run-note" role="note">
               This may take a long time, with ~{{ importRequestCount() | number }} requests to work through.
