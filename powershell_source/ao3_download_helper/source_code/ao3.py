@@ -876,8 +876,8 @@ class Ao3:
     def note_skin(self, url: str, soup) -> None:
         """Remember the skin on a work page this run read anyway - the fic runs, the update
         pass and every other re-read - so `skin_for` never asks AO3 for the same page twice. Kept
-        whether or not the run fetches skins: one downloading a work's html brings a saved skin up
-        to date either way."""
+        whether or not the run fetches skins: the html it downloads for that work then takes the
+        skin, and saves it, ticked or not (`dress`) - it is free, and AO3's latest."""
 
         work = parse_text.get_work_number(url or '')
         if not work: return
@@ -966,8 +966,17 @@ class Ao3:
         return True
 
     def dress(self, work: str, filetype: str, name: str, content: bytes) -> bytes:
-        """A downloaded html file with its work's skin put in, when this run was asked to fetch
-        skins (`skins`) - and only then: a run not asked makes no request for a skin at all.
+        """A downloaded html file with its work's skin put in.
+
+        **Whenever the run read the work's page anyway, ticked or not** - the fic runs (one fic
+        or several), the update pass and every other re-read (`note_skin`, from
+        `fetch_page(work=True)` and `try_download`): the skin is on that page, so it costs no
+        request, and it is AO3's latest, since the page was just read. Otherwise only when this
+        run was asked to fetch skins (`skins`): the work is noted (`skins_pending`) and its page
+        read after every download is done, in a step of its own (`server.fetch_pending_skins`),
+        which puts the skin into the file then - so the skins never hold a download up, and a run
+        stopped or skipped there has every file it fetched. A run not asked makes no request for
+        a skin at all.
 
         Only when html is downloaded - a new download, an update, or a copy overwritten - and
         never otherwise: a work whose html is current is not looked at for a skin. The skin is
@@ -977,22 +986,19 @@ class Ao3:
         so the CSS goes into the `<head>` and the body is wrapped in `<div id="workskin">`, as on
         the work page - before the file is saved, so it is written once and every check on it sees
         the file as it is kept. Anything that does not fit leaves the file exactly as AO3 sent it.
-        It costs nothing where the run read the work's page anyway. Otherwise the work is noted
-        (`skins_pending`) and its page read after every download is done, in a step of its own
-        (`server.fetch_pending_skins`), which puts the skin into the file then - so the skins never
-        hold a download up, and a run stopped or skipped there has every file it fetched.
         """
 
-        if not self.skins or filetype.upper() != 'HTML': return content
+        if filetype.upper() != 'HTML': return content
         work = str(work)
         if work not in self.skin_css:
-            # not to hand: read after the downloads, in a step of its own, and put in then
-            if work not in self.skins_pending:
+            # not to hand: only a run asked for skins reads it - after the downloads, in a
+            # step of its own, and puts it in then
+            if self.skins and work not in self.skins_pending:
                 self.skins_pending.append(work)
                 self.skins_pending_changed()
             return content
-        css = self.skin_for(work)
         if work in self.skins_unread: return content
+        css = self.skin_css[work]
         self.save_skin(work, css)
         if not css: return content
         dressed = with_skin(content, css)

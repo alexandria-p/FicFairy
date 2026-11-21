@@ -169,6 +169,35 @@ def test_a_work_page_the_run_already_read_costs_no_second_request(tmp_path):
     job.steps.skip.assert_called_once_with('skins')
 
 
+def test_a_work_page_the_run_read_gives_its_html_the_skin_even_unticked(tmp_path):
+    # the fic runs and the update pass read each work's page anyway: its skin is free, and
+    # AO3's latest, so their html takes it whether or not the box was ticked
+    ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWork')})
+    ao3.skins = False
+    ao3.fetch_page(WORK_PAGE, work=True)
+
+    ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
+
+    assert ao3.repo.get_soup.call_count == 1
+    assert '<div id="workskin">' in saved(tmp_path, '.html').decode('utf-8')
+    assert (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').exists()
+    # nothing left for a skins step - and none is listed, unticked
+    assert ao3.skins_pending == []
+
+
+def test_unticked_a_work_whose_page_was_not_read_gets_no_skin_and_no_request(tmp_path):
+    ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWork')})
+    ao3.skins = False
+    ao3.fetch_page(WORK_PAGE, work=True)
+    other = dict(RECORD, id='7', link='https://archiveofourown.org/works/7')
+
+    ao3.download_one_indexed(other, 100, {}, 1, 1)
+
+    assert ao3.repo.get_soup.call_count == 1  # only the page read for the other work
+    assert ao3.skins_pending == []
+    assert not (tmp_path / strings.SKINS_FOLDER_NAME / '7.css').exists()
+
+
 def test_the_work_dates_pass_gives_the_skin_for_nothing_too(tmp_path):
     ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWork')})
     ao3.note_skin(WORK_PAGE, page('unlockedWork'))  # as any work page read does

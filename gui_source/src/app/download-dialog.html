@@ -214,7 +214,8 @@
         </fieldset>
 
         <!-- debug mode only: each work's skin, which AO3's download leaves out, fetched with its
-             html - see the helper's `Ao3.dress`. unticked, no skin is asked for at all -->
+             html - see the helper's `Ao3.dress`. unticked, no skin is asked for, but html from a
+             work page the run read anyway (fic runs, the update pass) takes its skin, free -->
         @if (picksSkins()) {
           <label class="check skins-option" [class.locked]="!htmlTicked()">
             <input type="checkbox" name="skins" [checked]="skins()" [disabled]="!htmlTicked()"
@@ -228,7 +229,9 @@
               updated chapter, or HTML overwritten - put into the HTML file, and saved beside it as
               <code>skins/&lt;work number&gt;.css</code>. A work whose HTML is not downloaded is not
               checked for a skin. Each costs one more request to AO3, unless this run reads the
-              work's page anyway. Unticked, no skin is fetched and nothing extra is asked of AO3. A
+              work's page anyway - the fic runs and the update pass do, and their HTML takes the
+              skin from it whether or not this is ticked, since it is free and AO3's latest.
+              Unticked, nothing extra is asked of AO3. A
               work this run has to get from FicHub instead gets no work skin: FicHub does not keep
               its author's styling.
             } @else {
