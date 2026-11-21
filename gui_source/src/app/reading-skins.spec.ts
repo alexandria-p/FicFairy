@@ -257,13 +257,16 @@ describe('ReadingSkins', () => {
     expect(library.readingSkin()).toBe(SKIN);
   });
 
-  it('shows no skin with debug mode off', async () => {
+  it('shows the default skin with debug mode off too, and none with no default', async () => {
     debugOn = false;
     const { library, skins } = setUp(new MemoryStore());
     await skins.add('Cosy', SKIN, 'browser');
     skins.setDefault('browser:Cosy');
     TestBed.tick();
+    expect(library.readingSkin()).toBe(SKIN);
 
+    skins.setDefault('');
+    TestBed.tick();
     expect(library.readingSkin()).toBe('');
   });
 

@@ -213,28 +213,11 @@
           }
         </fieldset>
 
-        <!-- debug mode only: each work's skin, which AO3's download leaves out, saved as css beside
-             the works - never put into the html. ticked or not decides whether any is saved -->
-        @if (picksSkins()) {
-          <label class="check skins-option" [class.locked]="skinsHeld()">
-            <input type="checkbox" name="skins" [checked]="skins()" [disabled]="skinsHeld()"
-                   (change)="skins.set($any($event.target).checked)" />
-            <span>[DEBUG] Fetch work skin for HTML downloads</span>
-          </label>
-          <!-- said only once ticked (or while it is held, to say why) -->
-          @if (skinsHeld()) {
-            <p class="hint skins-hint">Tick HTML to use this - work skins go with HTML files.</p>
-          } @else if (skins() && freeSkins()) {
-            <p class="hint skins-hint">
-              No extra requests to AO3 in this run - it opens each work's page anyway. Work skins
-              are only fetched from AO3.
-            </p>
-          } @else if (skins()) {
-            <p class="hint skins-hint">
-              At most one extra request to AO3 per fic the run picks up. Work skins are only
-              fetched from AO3.
-            </p>
-          }
+        <!-- the work skins box is on the options page; here only what it needs from the file types -->
+        @if (picksSkins() && skins() && skinsHeld()) {
+          <p class="hint skins-hint skins-need-html">
+            Work skins are only fetched with HTML downloads - tick HTML to get them.
+          </p>
         }
 
         <!-- JSON is only listed in debug mode, so only then is there anything to say about it -->
@@ -370,12 +353,12 @@
               </label>
             }
 
-            <!-- debug only: nothing but each work's skin - no index, no download -->
-            @if (action() === 'custom' && (debugTools() || skinWorks().length)) {
+            <!-- nothing but each work's skin - no index, no download -->
+            @if (action() === 'custom') {
               <label class="check">
                 <input type="radio" name="coverage" [checked]="coverage() === 'skins'"
                        (change)="coverage.set('skins')" />
-                <span>[DEBUG] Just fetch work skins</span>
+                <span>Just fetch work skins</span>
               </label>
               @if (coverage() === 'skins') {
                 <div class="skins-only-options">
@@ -788,6 +771,29 @@
               downloaded works, and display when you read them. This option just also exports
               any images to their own folder in your downloads directory, for you to look at
               separately. It will make the download longer.
+            </p>
+          }
+        }
+
+        <!-- each work's skin, which AO3's download leaves out, saved as css beside the works -
+             never put into the html. it can be ticked whatever file types come next, but a skin
+             is only fetched with HTML -->
+        @if (picksSkins()) {
+          <label class="check skins-option">
+            <input type="checkbox" name="skins" [checked]="skins()"
+                   (change)="skins.set($any($event.target).checked)" />
+            <span>Fetch work skin for HTML downloads</span>
+          </label>
+          <!-- said only once ticked -->
+          @if (skins() && freeSkins()) {
+            <p class="hint skins-hint">
+              No extra requests to AO3 in this run - it opens each work's page anyway. Work skins
+              are only fetched from AO3, and only with HTML downloads.
+            </p>
+          } @else if (skins()) {
+            <p class="hint skins-hint">
+              At most one extra request to AO3 per fic the run picks up. Work skins are only
+              fetched from AO3, and only with HTML downloads.
             </p>
           }
         }
@@ -1384,7 +1390,7 @@
       </footer>
     }
 
-    <!-- Resolve issues: whether to save each work's skin as its page is read - debug mode only -->
+    <!-- Resolve issues: whether to save each work's skin as its page is read -->
     @if (step() === 'work-skins') {
       <section class="body">
         @if (firstStep() === 'work-skins') {
@@ -1401,7 +1407,7 @@
         <label class="check skins-option">
           <input type="checkbox" name="skins" [checked]="importSkins()"
                  (change)="importSkins.set($any($event.target).checked)" />
-          <span>[DEBUG] Fetch work skins</span>
+          <span>Fetch work skins</span>
         </label>
         @if (importSkins()) {
           <p class="hint skins-hint">

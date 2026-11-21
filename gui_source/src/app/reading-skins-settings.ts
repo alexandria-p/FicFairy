@@ -4,7 +4,7 @@ import { ReadingSkin, ReadingSkins, skinId } from './reading-skins';
 /**
  * User settings' *Reading skins* section (inside its `details`, which User settings draws): your
  * skins, where each is saved, which is the default, and a form to add one - pasted, or from a
- * `.css` file. Debug mode only for now.
+ * `.css` file.
  */
 @Component({
   selector: 'app-reading-skins-settings',

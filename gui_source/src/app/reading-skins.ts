@@ -1,5 +1,4 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
-import { DebugMode } from './debug-mode';
 import { Library } from './library';
 import { LibraryStore } from './library-store';
 import { AO3_READING_SKIN } from './ao3-reading-skin';
@@ -11,7 +10,7 @@ import { safeGet, safeRemove, safeSet } from './storage';
  * the part a site skin plays on AO3, so on a work with its own work skin it goes underneath it
  * (`withAo3Shape`). Nothing is written into the work's file and AO3 is never asked for anything -
  * the skin is put in as the work is opened (`Library.openCopy`, through `shownWork`), so a new
- * default shows on every work at once. Debug mode only, for now.
+ * default shows on every work at once.
  */
 
 /** skins kept in this browser, as a list of {name, css} */
@@ -82,7 +81,6 @@ function libraryPath(name: string): string {
 @Injectable({ providedIn: 'root' })
 export class ReadingSkins {
   private readonly library = inject(Library);
-  private readonly debugMode = inject(DebugMode);
 
   readonly browserSkins = signal<ReadingSkin[]>(readBrowserSkins());
   readonly librarySkins = signal<ReadingSkin[]>([]);
@@ -106,9 +104,9 @@ export class ReadingSkins {
       const store = this.library.store();
       void this.readLibrarySkins(store);
     });
-    // what the library shows: the default skin while debug mode is on, nothing otherwise
+    // what the library shows: the default skin, or nothing with none chosen
     effect(() => {
-      this.library.readingSkin.set(this.debugMode.on() ? this.defaultSkin()?.css ?? '' : '');
+      this.library.readingSkin.set(this.defaultSkin()?.css ?? '');
       this.library.layerReadingSkin.set(this.layer());
     });
   }

@@ -162,12 +162,8 @@ describe('UserSettings', () => {
     expect(TestBed.inject(GuestMode).loginOpen()).toBe(false);
   });
 
-  it('offers reading skins only in debug mode, after Appearance', async () => {
+  it('offers reading skins outside debug mode too, after Appearance', async () => {
     await open();
-    expect(element.querySelector('details.reading-skins')).toBeNull();
-
-    TestBed.inject(DebugMode).set(true);
-    await settle();
 
     const section = element.querySelector('details.reading-skins')!;
     expect(section.querySelector('app-reading-skins-settings')).not.toBeNull();
@@ -729,7 +725,7 @@ describe('UserSettings', () => {
     expect(questions.open).toBe(false);
     // under Appearance, above Prompts
     const order = [...element.querySelectorAll('.group')].map((g) => g.classList[1]);
-    expect(order.slice(0, 7)).toEqual(['formats', 'ao3-zone', 'appearance', 'questions', 'question-waits', 'always-answers', 'prompts']);
+    expect(order.slice(0, 8)).toEqual(['formats', 'ao3-zone', 'appearance', 'reading-skins', 'questions', 'question-waits', 'always-answers', 'prompts']);
     // the waits are a section of their own, apart from the answers taken
     const waits = element.querySelector<HTMLDetailsElement>('details.question-waits')!;
     expect(waits.querySelector('summary h3')?.textContent?.trim()).toBe('How long a question waits during a run');

@@ -4,7 +4,6 @@ import { LOOSE_PREFIX } from './unindexed-works';
 import { Component, computed, inject, input, linkedSignal, signal } from '@angular/core';
 import { WorkLink } from './work-link';
 import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
-import { DebugMode } from './debug-mode';
 import { Library, LocalCopy, OPENABLE_FORMATS, OpenableFormat, copyName, hiddenKey, viewableInBrowser } from './library';
 import { safeGet, safeSet } from './storage';
 import { Jobs } from './jobs';
@@ -431,9 +430,6 @@ export class WorkList {
   // region marking entries as bookmarks by hand
 
   private readonly jobs = inject(Jobs);
-  private readonly debugMode = inject(DebugMode);
-  /** fetching work skins is a debug tool for now, as the run window's own option is */
-  protected readonly offersSkins = computed(() => this.debugMode.on());
 
   /** whether a work skin is saved for this entry's work - shown as an icon in its corner */
   protected hasSkin(work: Bookmark): boolean {
@@ -445,7 +441,7 @@ export class WorkList {
 
   protected readonly skinsTickedLabel = computed(() => {
     const n = this.tickedForSkins().length;
-    return `[DEBUG] Download work skin for ${n.toLocaleString()} ${n === 1 ? 'work' : 'works'}`;
+    return `Download work skin for ${n.toLocaleString()} ${n === 1 ? 'work' : 'works'}`;
   });
 
   /** a custom run set to fetch these works' skins and nothing else */

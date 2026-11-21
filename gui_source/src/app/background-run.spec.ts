@@ -173,9 +173,12 @@ function questionsOffered(): string[] {
 }
 
 async function startIt(label = 'Start in the background'): Promise<void> {
-  if (currentStep() === 'background') {
-    button('Continue')!.click();
-    await fixture.whenStable();
+  // past the background step, and Resolve issues' work skins page after it
+  for (const step of ['background', 'work-skins']) {
+    if (currentStep() === step) {
+      button('Continue')!.click();
+      await fixture.whenStable();
+    }
   }
   const password = element.querySelector<HTMLInputElement>('input[name="password"]')!;
   password.value = 'a-password';

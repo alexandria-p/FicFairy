@@ -268,7 +268,7 @@ export class Library {
   readonly store = signal<LibraryStore | null>(null);
   /**
    * The reading skin to show on a work with no skin of its own as it is opened - set by
-   * `ReadingSkins` (the default chosen in User settings, while debug mode is on), '' for none.
+   * `ReadingSkins` (the default chosen in User settings), '' for none.
    * Never written into the file.
    */
   readonly readingSkin = signal('');
