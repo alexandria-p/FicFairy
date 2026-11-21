@@ -623,6 +623,8 @@ export interface ImportRequest {
   replaceOutdated: boolean;
   /** *Overwrite existing downloads*: every dated copy of the works updated fetched again, current or not */
   overwrite?: boolean;
+  /** *[DEBUG] Fetch work skins*: each work's skin saved as css as its page is read - only with HTML */
+  skins?: boolean;
   /** the works among `links` only looked up for their index entry - nothing downloaded */
   indexOnly: string[];
   /** how many of the works are looked up for a missing index entry */

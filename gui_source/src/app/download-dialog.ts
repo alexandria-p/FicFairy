@@ -825,6 +825,8 @@ export class DownloadDialog implements OnDestroy {
     if (updated && importing.overwrite) {
       lines.push('Will re-download and overwrite existing files to repair them');
     }
+    // every work the import reads gives its skin for nothing - saved as css, never into the html
+    if (importing.skins) lines.push('Save the work skin of each work it reads from AO3, as css - no extra requests');
     const repairs = importing.repair?.length ?? 0;
     if (repairs) {
       const files = `${repairs.toLocaleString()} ${repairs === 1 ? 'file' : 'files'} with no date`;
@@ -2315,7 +2317,9 @@ export class DownloadDialog implements OnDestroy {
         subcollections: this.picksCollectionWorks() && this.subcollections(),
         parentCollections: this.picksCollectionWorks() && this.parentCollections(),
         images: this.images(),
-        skins: this.picksSkins() && this.skins() && !this.skinsHeld(),
+        // an import's from its own window's *[DEBUG] Fetch work skins*
+        skins: this.action() === 'import' ? !!this.importing()?.skins
+          : this.picksSkins() && this.skins() && !this.skinsHeld(),
         workdates: this.workdates(),
         // only offered on the runs that can be pointed at a known set of works
         // an import's from its own window's *Overwrite existing downloads*

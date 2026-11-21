@@ -9,6 +9,7 @@ import { DuplicateGroup, IMPORT_EXCLUDED_FILE, LibraryImports, duplicateGroups }
 import { Bookmark } from './bookmarks';
 import { LibraryStore } from './library-store';
 import { ChimePlayer } from './chime';
+import { DebugMode } from './debug-mode';
 
 class MemoryStore implements LibraryStore {
   readonly label = 'memory';
@@ -1996,6 +1997,7 @@ describe('ImportDialog', () => {
       filetypes: ['JSON', 'EPUB'],
       replaceOutdated: true,
       overwrite: false,
+      skins: false,
       indexOnly: [],
       lookups: 1,
       scope: 'all',
@@ -2127,6 +2129,62 @@ describe('ImportDialog', () => {
     await tick('overwrite');
     await click('Continue');
     expect(started[0].request.overwrite).toBe(true);
+  });
+
+  it('offers work skins in debug mode alone, held until HTML is ticked, and sends them only with it', async () => {
+    await open(ALL_DATED);
+    await click('Continue');
+    await click('Continue');
+    await click('Continue');
+    expect(element.querySelector('input[name="skins"]')).toBeNull();
+    await click('Continue');
+    expect(started[0].request.skins).toBe(false);
+  });
+
+  it('saves the work skin of each work read when ticked with HTML, saying it costs no requests', async () => {
+    const debug = TestBed.inject(DebugMode);
+    debug.set(true);
+    try {
+      await open(ALL_DATED);
+      await click('Continue');
+      await click('Continue');
+      await click('Continue');
+      const box = element.querySelector<HTMLInputElement>('input[name="skins"]')!;
+      expect(box.closest('label')!.textContent!.trim()).toBe('[DEBUG] Fetch work skins');
+      expect(box.checked).toBe(false);
+      expect(box.disabled).toBe(true);
+      expect(element.querySelector('.skins-hint')!.textContent!.trim()).toBe(
+        'Tick HTML to use this - work skins go with HTML files.');
+      await tick('format-HTML');
+      expect(box.disabled).toBe(false);
+      expect(element.querySelector('.skins-hint')).toBeNull();
+      await tick('skins');
+      expect(element.querySelector('.skins-hint')!.textContent!.replace(/\s+/g, ' ').trim()).toBe(
+        "No extra requests to AO3 in this run - it opens each work's page anyway. Work skins are only fetched from AO3.");
+      await click('Continue');
+      expect(started[0].request.skins).toBe(true);
+      expect(started[0].request.filetypes).toEqual(['JSON', 'HTML']);
+    } finally {
+      debug.set(false);
+    }
+  });
+
+  it('sends no work skins once HTML is unticked again', async () => {
+    const debug = TestBed.inject(DebugMode);
+    debug.set(true);
+    try {
+      await open(ALL_DATED);
+      await click('Continue');
+      await click('Continue');
+      await click('Continue');
+      await tick('format-HTML');
+      await tick('skins');
+      await tick('format-HTML');
+      await click('Continue');
+      expect(started[0].request.skins).toBe(false);
+    } finally {
+      debug.set(false);
+    }
   });
 
   it('hides the formats and replacing when the step is skipped, and does neither', async () => {

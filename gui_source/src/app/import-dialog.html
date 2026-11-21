@@ -1093,6 +1093,22 @@
           </label>
         }
       </fieldset>
+      <!-- debug only: the skin of every work the import reads, saved as css - never into the html -->
+      @if (debugMode.on()) {
+        <label class="check skins-option" [class.locked]="skinsHeld()">
+          <input type="checkbox" name="skins" [checked]="skins()" [disabled]="skinsHeld()"
+                 (change)="skins.set($any($event.target).checked)" />
+          <span>[DEBUG] Fetch work skins</span>
+        </label>
+        @if (skinsHeld()) {
+          <p class="hint skins-hint">Tick HTML to use this - work skins go with HTML files.</p>
+        } @else if (skins()) {
+          <p class="hint skins-hint">
+            No extra requests to AO3 in this run - it opens each work's page anyway. Work skins
+            are only fetched from AO3.
+          </p>
+        }
+      }
       <label class="check overwrite">
         <input type="checkbox" name="overwrite" [checked]="overwrite()" (change)="overwrite.set($any($event.target).checked)" />
         <span>

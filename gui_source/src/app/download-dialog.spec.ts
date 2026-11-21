@@ -3372,6 +3372,26 @@ describe('DownloadDialog', () => {
       ]);
     });
 
+    it('says it saves each work skin it reads, and sends the option, only when the window asked', async () => {
+      await openImport({ ...IMPORT, filetypes: ['JSON', 'HTML'], skins: true });
+      const lines = [...element.querySelectorAll('.import-summary li')].map((li) => li.textContent?.trim());
+      expect(lines).toEqual([
+        'Look-up 2 works with missing index',
+        'Search 1 work for updates',
+        'Save the work skin of each work it reads from AO3, as css - no extra requests',
+      ]);
+      // the run window's own skins box is not offered on an import: its window chose
+      expect(element.querySelector('input[name="skins"]')).toBeNull();
+      await advanceTo('running');
+      expect(jobs.started[0].options.skins).toBe(true);
+    });
+
+    it('sends no work skins when the window did not ask', async () => {
+      await openImport();
+      await advanceTo('running');
+      expect(jobs.started[0].options.skins).toBe(false);
+    });
+
     it('keeps every copy you have unless told to replace outdated ones', async () => {
       await openImport({ ...IMPORT, filetypes: ['JSON'], replaceOutdated: false, scope: 'skip' });
       const lines = [...element.querySelectorAll('.import-summary li')].map((li) => li.textContent?.trim());

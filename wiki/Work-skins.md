@@ -10,7 +10,7 @@ Each skin is saved beside your works as `skins/<work number>.css`. A work checke
 
 **A skin is never put into an HTML file.** It is only ever saved as CSS beside your works.
 
-Only a run with **[DEBUG] Fetch work skin for HTML downloads** ticked saves skins. That box is on the file types page of every run (every custom run too, whatever it covers - all but *Just fetch work skins*, and not on a retry). It is in debug mode only and off to begin with, and **only works with HTML ticked**, on every run - without HTML it is greyed out. Unticked, a run saves no skin and asks AO3 nothing extra.
+Only a run with **[DEBUG] Fetch work skin for HTML downloads** ticked saves skins. That box is on the file types page of every run (every custom run too, whatever it covers - all but *Just fetch work skins*, and not on a retry). A repair from **Resolve issues** has its own, **[DEBUG] Fetch work skins**, on the window's File types page. It is in debug mode only and off to begin with, and **only works with HTML ticked**, on every run - without HTML it is greyed out. Unticked, a run saves no skin and asks AO3 nothing extra.
 
 Ticked, a run gets a skin in one of two ways:
 
@@ -30,7 +30,7 @@ Ticked, a run gets a skin in one of two ways:
 | **Custom run - all bookmarks, a page range or a date range** | Its own step. Only works whose HTML is downloaded. | Up to one request per work |
 | **Index my collections / Index collection by URL** (with *Index and download encountered works*) | Its own step. Only works whose HTML is downloaded. | Up to one request per work |
 | **Retry** | As for the run being retried - the box stays as it was. It also goes back for the skins the earlier attempt didn't get (failed, or still waiting), whether or not their HTML is downloaded again. | As for that run, plus up to one request per missed skin |
-| **Resolve issues** | Not offered - no skin is saved. | - |
+| **Resolve issues** (a repair run) | Its own box, **[DEBUG] Fetch work skins**, on the window's **File types** page, beside the formats - debug mode only, and only with HTML ticked there. Saved for every work the repair reads from AO3: each one looked up, updated or repaired. Every time. Never from FicHub. | Free |
 | **[DEBUG] Just fetch work skins** (custom run) | The whole run: each work's page is read for its skin, every time the run is started. Nothing is indexed or downloaded. | One request per work |
 
 ## Fetching skins on their own (debug mode)
