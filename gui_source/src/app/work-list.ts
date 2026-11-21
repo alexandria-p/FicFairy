@@ -1040,6 +1040,32 @@ export class WorkList {
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }
 
+  /**
+   * The work skin saved for it (`skins/<work number>.css`), as text in a tab of its own - opened at
+   * once, as View index history is, since a tab opened after waiting is blocked as a pop-up.
+   */
+  protected async openSkin(work: Bookmark): Promise<void> {
+    const tab = window.open('', '_blank');
+    if (!tab) return;
+    tab.opener = null;
+    let css: string | null = null;
+    try {
+      css = work.id ? await this.library.skinText(work.id) : null;
+    } catch {
+      css = null;
+    }
+    this.visit.note(css === null ? 'Open downloaded workskin: no skin file found' : 'Open downloaded workskin: shown in a new tab');
+    if (css === null) {
+      tab.document.title = 'No work skin';
+      tab.document.body.textContent = `No work skin was found for ${work.title || work.id}.`;
+      return;
+    }
+    // plain text, so the browser shows it rather than offering to save a stylesheet
+    const url = URL.createObjectURL(new Blob([css], { type: 'text/plain;charset=utf-8' }));
+    tab.location.href = url;
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }
+
   /** a row for a file whose name holds no work number: nothing to hide, tick or fetch it by */
   protected isLoose(work: Bookmark): boolean {
     return !!work.unindexed && !!work.id?.startsWith(LOOSE_PREFIX);

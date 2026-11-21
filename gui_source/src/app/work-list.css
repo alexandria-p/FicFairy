@@ -849,7 +849,8 @@
   align-items: center;
 }
 
-.hide-toggle {
+.hide-toggle,
+.skin-open {
   display: inline-flex;
   gap: 4px;
   align-items: center;
@@ -864,7 +865,9 @@
 }
 
 .hide-toggle:hover,
-.hide-toggle:focus-visible {
+.hide-toggle:focus-visible,
+.skin-open:hover,
+.skin-open:focus-visible {
   border-color: var(--border-strong);
   color: var(--text-strong);
 }
@@ -1089,8 +1092,7 @@
 }
 
 /* a private bookmark: a lock just left of the bookmark icon, in the dim text colour */
-.private-icon,
-.skin-icon {
+.private-icon {
   display: inline-flex;
   width: 14px;
   height: 14px;
@@ -1103,10 +1105,6 @@
   fill: currentColor;
 }
 
-.skin-icon svg {
-  width: 100%;
-  height: 100%;
-}
 
 /* a file no index entry matches: shown from its name, said so */
 .badge.not-in-index {

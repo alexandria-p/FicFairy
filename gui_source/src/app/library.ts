@@ -1212,6 +1212,13 @@ export class Library {
     return path ? store.read(path) : null;
   }
 
+  /** a work's saved work skin (`skins/<work number>.css`) as it is, or null when it has none */
+  async skinText(id: string): Promise<string | null> {
+    const store = this.store();
+    if (!store || !id) return null;
+    return store.read(`${SKINS_FOLDER}/${id}.css`);
+  }
+
   async setBookmarked(given: Bookmark | Bookmark[], bookmarked: boolean): Promise<number> {
     const store = this.store();
     if (!store) throw new Error('this library can only be read, so nothing can be marked in it');

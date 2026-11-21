@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Bookmark, flattenRecord, isBookmarkEntry } from './bookmarks';
 import { Library, emptyCopies, markedBookmarked } from './library';
 import { LibraryStore } from './library-store';
@@ -330,9 +330,37 @@ describe('downloading or updating from the Works tab', () => {
     await settle();
 
     const marked = [...element.querySelectorAll('li.blurb')]
-      .filter((li) => li.querySelector('.skin-icon'))
+      .filter((li) => li.querySelector('.entry-actions .skin-open'))
       .map((li) => li.querySelector('a.title')?.textContent?.trim());
     expect(marked).toEqual(['Work 12']);
+    // just left of the eye, with what it does on hover
+    const actions = [...element.querySelectorAll('li.blurb')][1].querySelector('.entry-actions')!;
+    const buttons = [...actions.querySelectorAll(':scope > button')];
+    expect(buttons[0].classList).toContain('skin-open');
+    expect(buttons[1].classList).toContain('hide-toggle');
+    expect(buttons[0].getAttribute('title')).toBe('Open downloaded workskin');
+  });
+
+  it('opens the saved work skin in a new tab', async () => {
+    await listing([work('12')]);
+    const library = TestBed.inject(Library);
+    library.skinnedWorks.set(new Set(['12']));
+    const asked: string[] = [];
+    library.skinText = async (id: string) => { asked.push(id); return '#workskin .x { color: red; }'; };
+    const tab = { opener: {}, location: { href: '' }, document: { title: '', body: { textContent: '' } } };
+    const open = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+    const made = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:skin');
+    await settle();
+
+    (element.querySelector('.entry-actions .skin-open') as HTMLButtonElement).click();
+    await settle();
+
+    expect(open).toHaveBeenCalledWith('', '_blank');
+    expect(asked).toEqual(['12']);
+    expect(tab.opener).toBeNull();
+    expect(tab.location.href).toBe('blob:skin');
+    open.mockRestore();
+    made.mockRestore();
   });
 
   it('offers no download/update item for a series or an external work', async () => {

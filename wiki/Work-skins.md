@@ -33,7 +33,7 @@ There are two ways a run gets a skin:
 - **Custom run > [DEBUG] Just fetch work skins** - for works with HTML in your library: works *never checked for a skin* (the default), works *that already have a skin saved*, works *last known to have no skin*, or *all works*.
 - **[DEBUG] Download work skin** - in a work's **⋯** menu, or on the selection bar for the works you've ticked. It opens the same run for just those works, and checks each again whatever is saved for it.
 
-A work with a skin saved shows a small brush icon in its top right corner on the Works tab.
+A work with a skin saved shows a brush button on the Works tab, just left of the eye at the bottom of its entry. Hover says **Open downloaded workskin**; clicking it opens the saved CSS in a new tab.
 
 ## If a skin can't be fetched
 
