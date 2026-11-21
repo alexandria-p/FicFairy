@@ -79,6 +79,8 @@
 .collection .heading .title {
   font-weight: 600;
   font-size: 1.05rem;
+  /* a button centres its text, which showed only once a long title wrapped */
+  text-align: left;
 }
 
 .collection .heading .by {
@@ -114,11 +116,16 @@
 }
 
 .flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   margin: 8px 0 0;
 }
 
 .badge {
-  margin-right: 6px;
+  /* a pill wraps as a whole, never inside itself */
+  display: inline-block;
+  white-space: nowrap;
   padding: 1px 8px;
   border: 1px solid var(--border-strong);
   border-radius: 10px;
