@@ -143,13 +143,6 @@ h4 {
   color: var(--text-dim);
 }
 
-.default {
-  margin-left: 8px;
-  color: var(--text-dim);
-  font-size: 0.8rem;
-  font-weight: 400;
-}
-
 .hint {
   margin: 0 0 10px;
   color: var(--text-dim);
