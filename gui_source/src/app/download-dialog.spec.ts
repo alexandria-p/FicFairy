@@ -582,7 +582,7 @@ describe('DownloadDialog', () => {
     });
   }
 
-  it('lets work skins be ticked whatever file types come next, saying they need HTML, and sends none without it', async () => {
+  it('lets work skins be ticked whatever file types come next, and sends none without HTML', async () => {
     await open('bookmarks');
     await advanceTo('options');
     const box = element.querySelector<HTMLInputElement>('input[name=skins]')!;
@@ -590,11 +590,11 @@ describe('DownloadDialog', () => {
     box.click();
     await fixture.whenStable();
     await advanceTo('filetypes');
-    expect(element.querySelector('.skins-need-html')).toBeNull();
 
     checkbox('HTML')!.click();
     await fixture.whenStable();
-    expect(element.querySelector('.skins-need-html')?.textContent).toContain('tick HTML to get them');
+    // nothing said about it on the file types page
+    expect(element.textContent).not.toContain('Work skins');
     await advanceTo('running');
     expect(jobs.started[0].options).toMatchObject({ skins: false });
   });

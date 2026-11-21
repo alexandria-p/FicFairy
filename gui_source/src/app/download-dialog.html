@@ -213,13 +213,6 @@
           }
         </fieldset>
 
-        <!-- the work skins box is on the options page; here only what it needs from the file types -->
-        @if (picksSkins() && skins() && skinsHeld()) {
-          <p class="hint skins-hint skins-need-html">
-            Work skins are only fetched with HTML downloads - tick HTML to get them.
-          </p>
-        }
-
         <!-- JSON is only listed in debug mode, so only then is there anything to say about it -->
         @if (!debugMode.on()) {
         } @else if (picksReindex()) {
