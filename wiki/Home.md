@@ -11,6 +11,7 @@ A fork of [nianeyna/ao3downloader](https://github.com/nianeyna/ao3downloader) th
 
 ## Everything else
 
+- [[Work skins]] - the author's own styling for a work: when each run fetches it, and where it is kept.
 - [[History and resuming]] - what the History tab says, and retrying a run: every choice, and how each workflow picks up again.
 - [[Settings]] - every line in `settings.ini`.
 - [[Updating and versions]] - new releases, and what happens to your settings.
