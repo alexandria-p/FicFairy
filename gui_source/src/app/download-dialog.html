@@ -222,14 +222,15 @@
                    (change)="skins.set($any($event.target).checked)" />
             <span>[DEBUG] Fetch work skin for HTML downloads</span>
           </label>
-          <p class="hint skins-hint">
-            @if (htmlTicked()) {
+          <!-- said only once ticked (or while HTML is unticked, to say why it is held) -->
+          @if (!htmlTicked()) {
+            <p class="hint skins-hint">Tick HTML to use this - a work skin only goes with HTML files.</p>
+          } @else if (skins()) {
+            <p class="hint skins-hint">
               At most one extra request to AO3 per fic the run picks up. Work skins are only
               fetched from AO3.
-            } @else {
-              Tick HTML to use this - a work skin only goes with HTML files.
-            }
-          </p>
+            </p>
+          }
         }
 
         <!-- JSON is only listed in debug mode, so only then is there anything to say about it -->
@@ -374,15 +375,6 @@
               </label>
               @if (coverage() === 'skins') {
                 <div class="skins-only-options">
-                  <p class="hint skins-only-hint">
-                    Opens each work's page on AO3 and saves its creator's work skin, if it has one,
-                    beside your works - nothing is indexed and nothing is downloaded again. The skin
-                    shows when you open the work's HTML from FicFairy.
-                    @if (skinWorks().length) {
-                      For the {{ skinWorks().length === 1 ? 'work' : skinWorks().length + ' works' }} you
-                      picked - each is checked again, whatever is saved for it.
-                    }
-                  </p>
                   @if (!skinWorks().length) {
                     <fieldset class="skin-scope">
                       <legend>Which works with HTML in your library</legend>

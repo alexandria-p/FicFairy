@@ -545,7 +545,8 @@ describe('DownloadDialog', () => {
     await advanceTo('options');
 
     expect(checkbox('Just fetch work skins')!.checked).toBe(true);
-    expect(element.querySelector('.skins-only-hint')?.textContent).toContain('2 works you');
+    // no hint under it: the choice says what it does
+    expect(element.querySelector('.skins-only-hint')).toBeNull();
     // works picked are always checked: no choice of which
     expect(element.querySelector('input[name=skinScope]')).toBeNull();
     await advanceTo('running');
@@ -553,10 +554,13 @@ describe('DownloadDialog', () => {
     expect(jobs.started[0].options).toMatchObject({ skinsOnly: true, skinWorks: ['12', '34'] });
   });
 
-  it('says in one line what work skins cost, and that they only come from AO3', async () => {
+  it('says in one line what work skins cost, and that they only come from AO3 - once ticked', async () => {
     debugOn();
     await open('bookmarks');
     await advanceTo('filetypes');
+    expect(element.querySelector('.skins-hint')).toBeNull();
+    element.querySelector<HTMLInputElement>('input[name=skins]')!.click();
+    await fixture.whenStable();
 
     const said = element.querySelector('.skins-hint')?.textContent?.replace(/\s+/g, ' ').trim();
     expect(said).toBe('At most one extra request to AO3 per fic the run picks up. Work skins are only fetched from AO3.');
