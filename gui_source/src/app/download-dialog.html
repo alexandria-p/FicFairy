@@ -224,16 +224,8 @@
           </label>
           <p class="hint skins-hint">
             @if (htmlTicked()) {
-              A work skin is the author's own styling for a work, which AO3's download leaves out.
-              Ticked, it is fetched whenever this run downloads a work's HTML - a new download, an
-              updated chapter, or HTML overwritten - put into the HTML file, and saved beside it as
-              <code>skins/&lt;work number&gt;.css</code>. A work whose HTML is not downloaded is not
-              checked for a skin. Each costs one more request to AO3, unless this run reads the
-              work's page anyway - the fic runs and the update pass do, and save the skin as
-              <code>skins/&lt;work number&gt;.css</code> whether or not this is ticked, since it is
-              free; ticked, it also goes into their HTML. Unticked, nothing extra is asked of AO3. A
-              work this run has to get from FicHub instead gets no work skin: FicHub does not keep
-              its author's styling.
+              At most one extra request to AO3 per fic the run picks up. Work skins are only
+              fetched from AO3.
             } @else {
               Tick HTML to use this - a work skin only goes with HTML files.
             }

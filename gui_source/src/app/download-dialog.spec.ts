@@ -553,12 +553,13 @@ describe('DownloadDialog', () => {
     expect(jobs.started[0].options).toMatchObject({ skinsOnly: true, skinWorks: ['12', '34'] });
   });
 
-  it('says a work got from FicHub gets no work skin', async () => {
+  it('says in one line what work skins cost, and that they only come from AO3', async () => {
     debugOn();
     await open('bookmarks');
     await advanceTo('filetypes');
 
-    expect(element.querySelector('.skins-hint')?.textContent).toContain('FicHub');
+    const said = element.querySelector('.skins-hint')?.textContent?.replace(/\s+/g, ' ').trim();
+    expect(said).toBe('At most one extra request to AO3 per fic the run picks up. Work skins are only fetched from AO3.');
   });
 
   it('holds work skins while HTML is unticked, and sends none', async () => {
