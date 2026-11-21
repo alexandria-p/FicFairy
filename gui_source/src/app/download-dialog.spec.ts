@@ -557,7 +557,10 @@ describe('DownloadDialog', () => {
       expect(element.querySelector('[data-step]')?.getAttribute('data-step')).toBe('credentials');
       expect(element.querySelector('input[name=coverage]')).toBeNull();
       const said = element.textContent?.replace(/\s+/g, ' ') ?? '';
-      expect(said).toContain(picked.length === 1 ? 'in case this work is restricted' : 'in case some of these works are restricted');
+      expect(said).toContain(picked.length === 1
+        ? 'Log in to AO3 in case this work is restricted to AO3 users.'
+        : 'Log in to AO3 in case these works are restricted to AO3 users.');
+      expect(said).not.toContain('will not show');
       expect(said).not.toContain('your own bookmarks');
       expect(said).toContain('Fetch work skins');
       expect(said).not.toContain('Start download');
