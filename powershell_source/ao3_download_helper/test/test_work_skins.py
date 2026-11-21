@@ -169,20 +169,45 @@ def test_a_work_page_the_run_already_read_costs_no_second_request(tmp_path):
     job.steps.skip.assert_called_once_with('skins')
 
 
-def test_a_work_page_the_run_read_gives_its_html_the_skin_even_unticked(tmp_path):
+def test_a_work_page_the_run_read_has_its_skin_saved_as_css_even_unticked(tmp_path):
     # the fic runs and the update pass read each work's page anyway: its skin is free, and
-    # AO3's latest, so their html takes it whether or not the box was ticked
+    # AO3's latest, so it is saved as css whether or not the box was ticked
+    ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWork')})
+    ao3.skins = False
+
+    ao3.fetch_page(WORK_PAGE, work=True)
+
+    css = (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').read_text(encoding='utf-8')
+    assert css.startswith('#workskin .centered')
+
+
+def test_unticked_the_saved_skin_is_not_put_into_the_html(tmp_path):
     ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWork')})
     ao3.skins = False
     ao3.fetch_page(WORK_PAGE, work=True)
 
     ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
 
-    assert ao3.repo.get_soup.call_count == 1
-    assert '<div id="workskin">' in saved(tmp_path, '.html').decode('utf-8')
-    assert (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').exists()
-    # nothing left for a skins step - and none is listed, unticked
+    assert saved(tmp_path, '.html') == downloaded()
     assert ao3.skins_pending == []
+
+
+def test_a_page_read_without_a_skin_is_noted_as_having_none(tmp_path):
+    ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWorkNoSkin')})
+    ao3.skins = False
+
+    ao3.fetch_page(WORK_PAGE, work=True)
+
+    assert (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.none').exists()
+
+
+def test_a_page_read_twice_in_a_run_saves_its_skin_once(tmp_path):
+    ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWork')})
+    ao3.fetch_page(WORK_PAGE, work=True)
+    ao3.fetch_page(WORK_PAGE, work=True)
+
+    skin_writes = [c for c in ao3.fileops.save_bytes.call_args_list if strings.SKINS_FOLDER_NAME in c.args[0]]
+    assert len(skin_writes) == 1
 
 
 def test_unticked_a_work_whose_page_was_not_read_gets_no_skin_and_no_request(tmp_path):

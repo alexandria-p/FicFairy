@@ -20,6 +20,18 @@ SERIES_URL = 'https://archiveofourown.org/series/456'
 LISTING_URL = 'https://archiveofourown.org/users/test/bookmarks'
 
 
+@pytest.fixture(autouse=True)
+def skins_not_written_for_stand_in_pages(request):
+    """The try_download tests read a stand-in work page (a MagicMock), whose skin is a mock too:
+    saving it as css (`note_skin`) would be one more `save_bytes` than the work's own files these
+    tests count. `test_work_skins.py` holds the saving, against real pages."""
+    if not request.node.name.startswith('test_try_download'):
+        yield
+        return
+    with patch.object(Ao3, 'save_skin', lambda self, work, css: True):
+        yield
+
+
 def make_ao3(
     filetypes: list[str] | None = None,
     pages: int = 0,
