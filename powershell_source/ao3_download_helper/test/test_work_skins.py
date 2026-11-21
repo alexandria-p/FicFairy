@@ -412,6 +412,26 @@ def test_the_skins_step_comes_after_the_downloads_and_before_fichub():
     assert 'skins' not in [x for x, _ in server.step_plan(job)]
 
 
+@pytest.mark.parametrize('options', [
+    {},                                              # all bookmarks
+    {'pages': 3},                                    # a page range
+    {'dates': True, 'dateFrom': '2026-01-01'},       # a date range
+    {'reindex': False, 'recheck': True},             # existing works, against AO3
+    {'reindex': False},                              # existing works, against the index
+], ids=['all', 'pages', 'dates', 'existing-ao3', 'existing-index'])
+def test_every_custom_run_but_the_skins_only_one_lists_the_skins_step_when_asked(options):
+    job = MagicMock()
+    job.action = server.ACTION_CUSTOM
+    job.filetypes = ['HTML', 'JSON'] if options.get('reindex', True) else ['HTML']
+    job.options = server.resolve_options({'skins': True, **options})
+
+    steps = [x for x, _ in server.step_plan(job)]
+
+    assert 'skins' in steps
+    assert steps.index('skins') == steps.index('fichub') - 1
+    assert dict(server.step_plan(job))['skins'] == strings.STEP_SKINS_FOR_HTML
+
+
 def test_skins_that_failed_are_reported_and_kept_with_the_run():
     from source_code import progress, runs
     ao3 = MagicMock()
@@ -709,5 +729,14 @@ def test_a_run_fetching_skins_alone_sets_the_option_aside():
                                     server.ACTION_SYNC, server.ACTION_NEW, server.ACTION_UPDATE])
 def test_a_run_is_taken_at_its_word(action):
     assert started_options(action, {'skins': True})['skins'] is True
+
+
+@pytest.mark.parametrize('options', [
+    {'pages': 3}, {'dates': True, 'dateFrom': '2026-01-01'},
+    {'reindex': False, 'recheck': True}, {'reindex': False},
+], ids=['pages', 'dates', 'existing-ao3', 'existing-index'])
+def test_a_custom_run_keeps_work_skins_whatever_it_covers(options):
+    sent = started_options(server.ACTION_CUSTOM, {'skins': True, **options})
+    assert sent['skins'] is True and sent['skinsOnly'] is False
 
 # endregion

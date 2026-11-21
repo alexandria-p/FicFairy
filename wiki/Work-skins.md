@@ -11,7 +11,7 @@ Each skin is saved beside your works as `skins/<work number>.css`. A work checke
 There are two ways a run gets a skin:
 
 - **Saved for free** - a run that already opens a work's page on AO3 (to index it or check it for updates) saves that page's skin as CSS at the same time. It costs no extra request, and it is AO3's latest. This happens whatever you tick, **every time the page is read**, whether or not the work's HTML is downloaded. The skin is **never** put into the HTML file.
-- **[DEBUG] Fetch work skin for HTML downloads** - a box on the file types page, in debug mode only, off to begin with. Ticked, the skin is also put into the HTML file - but **only when the run downloads that work's HTML** (a new download, an updated chapter, or HTML overwritten). A work whose HTML is already current is not checked. Where the run hasn't opened the work's page, that costs one more request, made in a step of its own after the downloads: **Fetch work skins for the HTML downloaded**. Unticked, nothing extra is asked of AO3.
+- **[DEBUG] Fetch work skin for HTML downloads** - a box on the file types page of every run (every custom run too, whatever it covers - all but *Just fetch work skins*, and not on a retry), in debug mode only, off to begin with. Ticked, the skin is also put into the HTML file - but **only when the run downloads that work's HTML** (a new download, an updated chapter, or HTML overwritten). A work whose HTML is already current is not checked. Where the run hasn't opened the work's page, that costs one more request, made in a step of its own after the downloads: **Fetch work skins for the HTML downloaded**. Unticked, nothing extra is asked of AO3.
 
 | Run | Saved for free (always) | With the debug box ticked |
 | --- | --- | --- |
@@ -23,7 +23,7 @@ There are two ways a run gets a skin:
 | **Resolve issues** (importing works in your library) | While looking up each work on AO3. Every time. | Not offered. |
 | **Quick Scan** | None - it reads your bookmarks listing, which carries no skin. | Its own step after the downloads. Only works whose HTML is downloaded. |
 | **(Full scan) Reindex & Update All** | None, except: with *Check all non-bookmarks for updates too*, while checking each non-bookmark; with JSON unticked, while downloading each work (that run opens each work's page). | Its own step after the downloads, for the rest. Only works whose HTML is downloaded. |
-| **Custom run - a slice, or all bookmarks** | None, except with *Check all non-bookmarks for updates too*, as above. | Its own step after the downloads. Only works whose HTML is downloaded. |
+| **Custom run - all bookmarks, a page range or a date range** | None, except with *Check all non-bookmarks for updates too*, as above. | Its own step after the downloads. Only works whose HTML is downloaded. |
 | **Index my collections / Index collection by URL** (with *Index and download encountered works*) | None - they read collection listings. | Its own step after the downloads. Only works whose HTML is downloaded. |
 | **Retry** that re-reads the works it carries on with | While re-reading each one. | As for the run being retried. |
 | **[DEBUG] Just fetch work skins** (custom run) | Its own step - the whole run. Each work's page is read for its skin, every time the run is started. Nothing is indexed or downloaded, and no HTML is changed. | - |

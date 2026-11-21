@@ -465,6 +465,39 @@ describe('DownloadDialog', () => {
     });
   }
 
+  // every custom run that is not the skins-only one offers the box, whatever it covers
+  const clickOn = (selector: string) => element.querySelector<HTMLInputElement>(selector)!.click();
+  for (const [what, labels, nested, sent] of [
+    ['all bookmarks', [], '', { reindex: true, dates: false }],
+    ['a page range', ['A slice of your bookmarks listing'], '', { dates: false }],
+    ['a date range', ['A slice of your bookmarks listing'], 'input[name=sliceBy][value=dates]', { dates: true }],
+    ['existing works, checked against AO3', ['Just update existing works'],
+      'input[name=existingCheck][value=ao3]', { reindex: false, recheck: true }],
+    ['existing works, checked against the index', ['Just update existing works'],
+      'input[name=existingCheck][value=index]', { reindex: false, recheck: false }],
+  ] as [string, string[], string, Record<string, unknown>][]) {
+    it(`offers work skins on a custom run over ${what}, and sends them when ticked`, async () => {
+      debugOn();
+      await open('custom');
+      await advanceTo('options');
+      for (const label of labels) checkbox(label)!.click();
+      await fixture.whenStable();
+      // the choices nested under one show once it is picked
+      if (nested) clickOn(nested);
+      await fixture.whenStable();
+      await advanceTo('filetypes');
+
+      const box = element.querySelector<HTMLInputElement>('input[name=skins]')!;
+      expect(box).not.toBeNull();
+      expect(box.checked).toBe(false);
+      box.click();
+      await fixture.whenStable();
+      await advanceTo('running');
+
+      expect(jobs.started[0].options).toMatchObject({ skins: true, skinsOnly: false, ...sent });
+    });
+  }
+
   it('does not offer work skins with the run that fetches nothing but skins', async () => {
     debugOn();
     await open('custom');
