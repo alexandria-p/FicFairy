@@ -972,6 +972,8 @@ class Job:
         if real: value.run_id = self.id
         # the debug panel's Skip this step lands in a listing walk too, between pages
         if real: value.skip_requested = self.skipping
+        # the works waiting for their skin go into the run record as the list grows
+        if real: value.on_skins_pending = self.note_skins_pending
         done = self.earlier_progress().get('formatsDone') if getattr(self, 'resume', None) else None
         if value is not None and isinstance(done, dict):
             value.formats_done = {str(work): {str(x).upper() for x in formats or []}
@@ -988,6 +990,13 @@ class Job:
 
     def checkpoint(self, **fields) -> None:
         if self.record: self.record.checkpoint(**fields)
+
+    def note_skins_pending(self, works: list[str]) -> None:
+        """The works whose html is waiting for its skin, kept in the record as they are added and
+        taken off as the skins step reads each - in memory at once (what the page reads of a run
+        still going), and on disk with the record's next save, which a stop, a failure and the
+        end of a run all make at once."""
+        if self.record: self.record.data['skinsPending'] = list(works)
 
 
     def skipping(self) -> bool:
@@ -2557,7 +2566,7 @@ def run_bookmarks(job: Job, fileops: FileOps, repo: Repository, report) -> None:
             finally:
                 ao3.existing_copies = None
                 ao3.judge_copy = None
-        job.steps.done('download')
+        finish_download_step(job, ao3)
     else:
         # a metadata-only run, or one stopped during indexing: these never start
         job.steps.skip('check')
@@ -2886,7 +2895,17 @@ def download_planned(job: Job, fileops: FileOps, ao3: Ao3, records: list[dict],
     ao3.download_indexed(newest_first(records), visited, plan['existing'],
                          forced=set(overwrite) if overwrite is not None
                          else bool(job.options.get('overwrite')))
-    job.steps.done('download')
+    finish_download_step(job, ao3)
+
+
+def finish_download_step(job: Job, ao3) -> None:
+    """Done, or skipped when Skip this step cut the downloads short (`Ao3.download_cut`):
+    what it would have fetched after that did not happen, so it is never marked done."""
+
+    if getattr(ao3, 'download_cut', False) is True:
+        job.steps.skip('download')
+    else:
+        job.steps.done('download')
 
 
 def fill_missing_formats(job: Job, fileops: FileOps, ao3: Ao3, skip: set[str],
@@ -5191,9 +5210,12 @@ def fetch_pending_skins(job: Job, fileops: FileOps, ao3, report) -> None:
                         link=f'{strings.AO3_BASE_URL}/works/{work}', filetype='skin',
                         phase=progress.DOWNLOADING, done=done - 1, total=len(pending))
         css = ao3.skin_for(work)
-        if work in ao3.skins_unread: continue
-        if not ao3.save_skin(work, css) or not css: continue
-        put_in_skin(fileops, ao3, work, css, ((copies.get(work) or {}).get('HTML') or {}).get('path'))
+        if work not in ao3.skins_unread and ao3.save_skin(work, css) and css:
+            put_in_skin(fileops, ao3, work, css, ((copies.get(work) or {}).get('HTML') or {}).get('path'))
+        # dealt with: had, or listed as a failure - no longer waiting
+        if work in ao3.skins_pending:
+            ao3.skins_pending.remove(work)
+            ao3.skins_pending_changed()
     job.steps.done('skins')
 
 
@@ -6265,6 +6287,11 @@ def report_failures(ao3: Ao3, report) -> None:
     if isinstance(clashes, list) and clashes:
         print(strings.AO3_INFO_REPAIR_CLASHES.format(len(clashes)))
         progress.report(report, progress.REPAIR_CLASHES, repairClashes=clashes)
+
+    waiting = getattr(ao3, 'skins_pending', None) if getattr(ao3, 'skins', False) is True else None
+    if isinstance(waiting, list) and waiting:
+        print(strings.AO3_INFO_SKINS_LEFT_PENDING.format(len(waiting)))
+        progress.report(report, progress.SKINS_PENDING, skinsPending=list(waiting))
 
     skins = getattr(ao3, 'skin_failures', None)
     if isinstance(skins, list) and skins:

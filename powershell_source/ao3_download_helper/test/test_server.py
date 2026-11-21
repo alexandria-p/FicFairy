@@ -3887,3 +3887,69 @@ def test_a_skip_lands_mid_request_and_is_never_retried():
     repo.check_cancelled()
 
 # endregion
+
+
+# region the debug panel's Skip this step, on a download step
+
+def skip_after(n):
+    """A Skip this step pressed once `n` works have been started."""
+    asked = []
+
+    def skipping():
+        asked.append(1)
+        return len(asked) > n
+    return skipping
+
+
+def test_skipping_the_download_step_fetches_no_work_after_it():
+    ao3 = server.Ao3(MagicMock(), MagicMock(), ['HTML'], None, False, False)
+    ao3.skip_requested = skip_after(1)
+    got = []
+    records = [{'id': str(n), 'link': f'https://archiveofourown.org/works/{n}'} for n in (1, 2, 3)]
+    with patch.object(server.Ao3, 'download_one_indexed',
+                      lambda self, record, *a, **k: got.append(record['id'])):
+        ao3.download_pending(records, 50)
+
+    assert got == ['1']
+    assert ao3.download_cut is True
+    assert ao3.failures == []
+
+
+def test_the_long_way_round_reads_no_more_listing_pages_once_skipped():
+    ao3 = server.Ao3(MagicMock(), MagicMock(), ['HTML'], None, False, False)
+    ao3.skip_requested = skip_after(2)
+    page = MagicMock()  # read through the patched parsers below
+    ao3.repo.get_soup.return_value = page
+    got = []
+    with patch.object(server.Ao3, 'download_work', lambda self, link, log, chapters: got.append(link)), \
+         patch.object(server.parse_soup, 'get_total_pages', return_value=5), \
+         patch.object(server.parse_soup, 'get_work_and_series_urls',
+                      return_value=['https://archiveofourown.org/works/1', 'https://archiveofourown.org/works/2']):
+        ao3.download('https://archiveofourown.org/users/Example_Reader/bookmarks?page=1', [])
+
+    # the listing page, then its first work, then the skip: page 2 is never read
+    assert got == ['https://archiveofourown.org/works/1']
+    assert ao3.repo.get_soup.call_count == 1
+    assert ao3.download_cut is True
+
+
+@pytest.mark.parametrize('cut, marked', [(True, 'skip'), (False, 'done')])
+def test_a_download_step_cut_short_is_marked_skipped_never_done(cut, marked):
+    job = MagicMock()
+    ao3 = MagicMock()
+    ao3.download_cut = cut
+
+    server.finish_download_step(job, ao3)
+
+    getattr(job.steps, marked).assert_called_once_with('download')
+    getattr(job.steps, 'done' if marked == 'skip' else 'skip').assert_not_called()
+
+
+def test_the_full_scan_and_every_planned_download_mark_the_step_by_whether_it_was_skipped():
+    import inspect
+    # both download steps a full and quick scan use end through the one rule
+    assert 'finish_download_step' in inspect.getsource(server.run_bookmarks)
+    assert 'finish_download_step' in inspect.getsource(server.download_planned)
+    assert "steps.done('download')" not in inspect.getsource(server.download_planned)
+
+# endregion

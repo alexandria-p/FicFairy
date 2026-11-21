@@ -545,6 +545,20 @@
           </details>
         }
 
+        @if (run.skinsPending?.length) {
+          <details class="ids skins-pending">
+            <summary>
+              HTML downloaded, work skin not fetched
+              <span class="ids-count">{{ run.skinsPending!.length | number }}</span>
+            </summary>
+            <ul class="reason-list">
+              @for (id of run.skinsPending; track id) {
+                <li><a [href]="workSkinLink(id)" [appWorkLink]="id" target="_blank" rel="noopener">{{ id }}</a></li>
+              }
+            </ul>
+          </details>
+        }
+
         @if (run.rescued?.length) {
           <details class="ids">
             <summary>

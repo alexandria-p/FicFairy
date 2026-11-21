@@ -2348,6 +2348,23 @@
           </details>
         }
 
+        <!-- works whose HTML was downloaded and whose skin was never fetched: the skins step was
+             skipped, or the run ended before it got to them -->
+        @if (skinsPending().length) {
+          <details class="failures skins-pending" [open]="skinsPending().length <= 5">
+            <summary class="failures-text">
+              <strong>{{ skinsPending().length | number }}</strong>
+              {{ skinsPending().length === 1 ? 'work' : 'works' }} had HTML downloaded but no work skin fetched.
+            </summary>
+            <p class="hint">Their HTML is kept as AO3 sent it. The list is kept with this run in History.</p>
+            <ul class="failed-list">
+              @for (id of skinsPending(); track id) {
+                <li><a [href]="workSkinLink(id)" [appWorkLink]="id" target="_blank" rel="noopener">{{ id }}</a></li>
+              }
+            </ul>
+          </details>
+        }
+
         <!--
           files with no date written the app's way were asked about, one at a time: dating them
           in Resolve issues means the next run judges them by their date instead of asking

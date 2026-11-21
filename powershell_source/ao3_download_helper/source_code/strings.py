@@ -475,6 +475,7 @@ AO3_INFO_SKIN_NOT_SAVED = 'could not save the work skin of work {}: {}'
 AO3_INFO_SKINS_PENDING = 'fetching the work skins of {} works whose HTML this run downloaded'
 AO3_INFO_SKINS_PENDING_NONE = 'no work skin left to fetch - every HTML file downloaded had its skin to hand'
 AO3_INFO_SKIN_PUT_IN = 'work skin put into {}'
+AO3_INFO_SKINS_LEFT_PENDING = 'the work skins of {} works whose HTML this run downloaded were not fetched - their HTML is kept as AO3 sent it'
 AO3_INFO_SKIN_FAILURES = 'the work skins of {} works could not be fetched or put in - their HTML is kept as AO3 sent it'
 SKIN_FAILED_UNREADABLE = "its work page would not read: {}"
 SKIN_FAILED_NOT_SAVED = 'its skin could not be saved: {}'

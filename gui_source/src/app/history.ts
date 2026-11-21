@@ -6,7 +6,7 @@ import { Component, computed, effect, inject, signal, untracked, output } from '
 import { WorkLink } from './work-link';
 import { DecimalPipe } from '@angular/common';
 import { ActiveRun, IndexGap, Jobs, RunChoice, RunHistory, RunRemoval } from './jobs';
-import { describeGap, fichubOlderWords, issueCount, issuesOf, issuesReport, repairClashWords, saveText } from './issues';
+import { describeGap, fichubOlderWords, issueCount, issuesOf, issuesReport, repairClashWords, saveText, workSkinLink } from './issues';
 import { Library } from './library';
 
 /** a run's fic lists, worded: new index entries apart from ones brought up to date */
@@ -63,6 +63,7 @@ export class History {
   protected readonly recentRunLogs = RECENT_RUN_LOGS;
   protected readonly fichubOlderWords = fichubOlderWords;
   protected readonly repairClashWords = repairClashWords;
+  protected readonly workSkinLink = workSkinLink;
   private readonly library = inject(Library);
   /** dummy data on screen: a retry would start a real run, so it is held as every run is */
   protected readonly dummy = inject(DummyData).active;

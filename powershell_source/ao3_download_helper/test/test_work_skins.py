@@ -265,6 +265,83 @@ def test_skip_this_step_leaves_the_rest_without_skins(tmp_path):
     job.steps.done.assert_not_called()
 
 
+OTHER = {'id': '7', 'link': 'https://archiveofourown.org/works/7',
+         'title': 'Another', 'author': ['Writer'], 'date_updated': '2024-12-14'}
+
+
+def recorded_job(ao3):
+    """A run whose record is in memory, handed the downloader as a runner hands it."""
+    job = server.Job(server.ACTION_BOOKMARKS, ['HTML'], 'Someone', server.resolve_options({'skins': True}))
+    job.record = MagicMock()
+    job.record.data = {}
+    job.ao3 = ao3
+    return job
+
+
+def test_the_record_lists_each_work_waiting_for_its_skin_as_it_is_added(tmp_path):
+    ao3 = skinning(tmp_path, {})
+    job = recorded_job(ao3)
+
+    ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 2)
+    assert job.record.data['skinsPending'] == ['41822007']
+    ao3.download_one_indexed(dict(OTHER), 100, {}, 2, 2)
+    assert job.record.data['skinsPending'] == ['41822007', '7']
+
+
+def test_the_skins_step_takes_each_work_off_the_list_as_it_is_dealt_with(tmp_path):
+    ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWork')})
+    job = recorded_job(ao3)
+    ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 2)
+    ao3.download_one_indexed(dict(OTHER), 100, {}, 2, 2)
+    seen = []
+    real = ao3.skin_for
+
+    def stop_on_the_second(work, saving_only=False):
+        seen.append(list(job.record.data['skinsPending']))
+        if work == '7': raise exceptions.CancelledException()
+        return real(work, saving_only)
+
+    ao3.skin_for = stop_on_the_second
+    with pytest.raises(exceptions.CancelledException):
+        the_skins_step(ao3, tmp_path)
+
+    # the first was had and taken off; a stop leaves the second listed in the record
+    assert seen == [['41822007', '7'], ['7']]
+    assert job.record.data['skinsPending'] == ['7']
+
+
+def test_a_work_whose_skin_failed_leaves_the_waiting_list_for_the_failures(tmp_path):
+    ao3 = skinning(tmp_path, {})
+    ao3.repo.get_soup.side_effect = exceptions.InvalidStatusCodeException('503')
+    job = recorded_job(ao3)
+    ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
+
+    the_skins_step(ao3, tmp_path)
+
+    assert job.record.data['skinsPending'] == []
+    assert [x['id'] for x in ao3.skin_failures] == ['41822007']
+
+
+def test_skins_still_waiting_are_reported_and_kept_with_the_run():
+    from source_code import progress, runs
+    ao3 = MagicMock()
+    ao3.failures, ao3.skipped_works, ao3.skin_failures = [], [], []
+    ao3.skins = True
+    ao3.skins_pending = ['1', '2']
+    reported = []
+    server.report_failures(ao3, reported.append)
+
+    assert {'type': progress.SKINS_PENDING, 'skinsPending': ['1', '2']} in reported
+    record = runs.RunRecord.__new__(runs.RunRecord)
+    record.data = {}
+    record.collect(ao3)
+    assert record.data['skinsPending'] == ['1', '2']
+    # a run not fetching skins keeps no such list
+    ao3.skins = False
+    record.collect(ao3)
+    assert record.data['skinsPending'] == []
+
+
 def test_the_skins_step_comes_after_the_downloads_and_before_fichub():
     job = MagicMock()
     job.action = server.ACTION_BOOKMARKS

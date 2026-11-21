@@ -233,6 +233,7 @@ export function runSummary(record: Record<string, unknown>): string[] {
     [issues.fichubOlder?.length ?? 0, 'from an older FicHub copy'],
     [issues.repairClashes?.length ?? 0, 'not repaired: name clash'],
     [issues.skinFailures?.length ?? 0, 'work skins not fetched or put in'],
+    [issues.skinsPending?.length ?? 0, 'works whose skin was not fetched'],
   ];
   const said = kinds.filter(([n]) => n).map(([n, what]) => `${n} ${what}`);
   lines.push(`Issues: ${said.length ? said.join('; ') : 'none'}`);

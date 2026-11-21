@@ -60,6 +60,8 @@ FICHUB_OLDER = 'fichubOlder'
 REPAIR_CLASHES = 'repairClashes'
 # work skins a run could not get or put in (`Ao3.skin_failures`)
 SKIN_FAILURES = 'skinFailures'
+# works whose html was downloaded and whose skin was never fetched (`Ao3.skins_pending`)
+SKINS_PENDING = 'skinsPending'
 # how many files the run came across with no date in the app's own form in their names - each one
 # asked about (or answered for you). the page suggests dating them in Resolve issues
 UNSURE_FILES = 'unsureFiles'

@@ -264,6 +264,11 @@ class Ao3:
         # works whose html this run downloaded without its skin to hand - read in one pass of their
         # own after the downloads (`server.fetch_pending_skins`), not one by one between them
         self.skins_pending: list[str] = []
+        # told each time that list changes, so the run record holds it as it stands - a run
+        # that fails or is stopped before the skins step still says which works are waiting
+        self.on_skins_pending: Callable[[list[str]], None] | None = None
+        # Skip this step pressed during a download step: the works after it are not fetched
+        self.download_cut = False
         # new copies that arrived while the older copy they replace could not be removed.
         # nothing is lost, but there are now two copies, so the run names each one
         self.kept_copies: list[dict] = []
@@ -398,6 +403,7 @@ class Ao3:
 
         log = {}
         if not visited: visited = []
+        self.download_cut = False
 
         try:
             self.download_recursive(link, log, visited)
@@ -910,6 +916,26 @@ class Ao3:
         return css
 
 
+    def skins_pending_changed(self) -> None:
+        """Hand the list of works still waiting for their skin to whoever keeps the run record."""
+
+        if self.on_skins_pending is None: return
+        try:
+            self.on_skins_pending(list(self.skins_pending))
+        except Exception:
+            pass  # a note about the run is not worth taking the run down for
+
+    def download_skipped(self) -> bool:
+        """Skip this step pressed during a download step: between works, never inside one, so
+        every file is written whole. The works after it are left for another run."""
+
+        if self.download_cut: return True
+        if self.skip_requested and self.skip_requested():
+            self.download_cut = True
+            print(strings.AO3_INFO_STEP_SKIPPED)
+            return True
+        return False
+
     def note_skin_failure(self, work: str, error: str) -> None:
         """A work's skin this run could not get, or could not put in - once per work."""
 
@@ -961,7 +987,9 @@ class Ao3:
         work = str(work)
         if work not in self.skin_css:
             # not to hand: read after the downloads, in a step of its own, and put in then
-            if work not in self.skins_pending: self.skins_pending.append(work)
+            if work not in self.skins_pending:
+                self.skins_pending.append(work)
+                self.skins_pending_changed()
             return content
         css = self.skin_for(work)
         if work in self.skins_unread: return content
@@ -1019,8 +1047,10 @@ class Ao3:
     def download_pending(self, pending: list[dict], maximum: int) -> None:
         """The loop of `download_indexed`, one work at a time."""
 
+        self.download_cut = False
         for done, record in enumerate(pending, start=1):
             log: dict = {'link': record['link']}
+            if self.download_skipped(): return
             try:
                 self.check_cancelled()
                 self.download_one_indexed(record, maximum, log, done, len(pending))
@@ -2396,6 +2426,7 @@ class Ao3:
     def download_recursive(self, link: str, log: dict, visited: list[str]) -> None:
 
         self.check_cancelled()
+        if self.download_skipped(): return
 
         if link in visited:
             # every format of it is on disk - but a copy behind the listing's date (or a run
@@ -2427,6 +2458,7 @@ class Ao3:
                 self.note_listing_dates(thesoup)
                 for url in urls:
                     self.download_recursive(url, log, visited)
+                if self.download_cut: break  # skipped: no more listing pages read
                 if not self.mark:
                     pagenum = parse_text.get_page_number(link)
                     if not total_pages or pagenum >= total_pages:

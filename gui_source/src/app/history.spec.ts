@@ -482,6 +482,15 @@ describe('History', () => {
     expect(said).toContain('EPUB, HTML');
   });
 
+  it('lists the works a run downloaded HTML for and never fetched the skin of', async () => {
+    await show([aRun({ status: 'failed', skinsPending: ['7', '8'] })]);
+
+    const said = element.querySelector('.skins-pending')?.textContent?.replace(/\s+/g, ' ') ?? '';
+    expect(said).toContain('HTML downloaded, work skin not fetched');
+    expect(said).toContain('7');
+    expect(said).toContain('8');
+  });
+
   it('describes the quick scan question as what it was, not as undated files', async () => {
     await show([
       aRun({

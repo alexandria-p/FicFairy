@@ -397,6 +397,8 @@ export interface RunHistory {
   repairClashes?: RepairClash[];
   /** work skins the run could not get, or could not put into the work's html */
   skinFailures?: WorkFailure[];
+  /** works whose html was downloaded and whose skin was not fetched yet - kept as the run goes */
+  skinsPending?: string[];
   /** older copies marked for removal, and what became of each - absent on older runs */
   removals?: RunRemoval[];
   error: string;
@@ -576,6 +578,8 @@ export interface JobEvent {
   repairClashes?: RepairClash[];
   /** on a `skinFailures` event: work skins the run could not get or put in */
   skinFailures?: WorkFailure[];
+  /** on a `skinsPending` event: works whose html was downloaded with its skin never fetched */
+  skinsPending?: string[];
   /** on a `question` event: the work numbers it is about, where it names them */
   ids?: string[];
   /** on a `steps` event: the checklist this run intends to work through */

@@ -62,7 +62,7 @@ import { LibraryFreshness } from './freshness';
 import { safeGet, safeRemove, safeSet } from './storage';
 import { Library } from './library';
 import { DropboxLibraryStore, LibraryStore, StorageRequest } from './library-store';
-import { RunIssues, attemptIssues, fichubOlderWords, issueCount, issuesReport, repairClashWords } from './issues';
+import { RunIssues, attemptIssues, fichubOlderWords, issueCount, issuesReport, repairClashWords, workSkinLink } from './issues';
 import { ImportRequest, LONG_IMPORT_REQUESTS, importRequests } from './imports';
 import { REMEMBER_USERNAME_KEY, SAVED_USERNAME_KEY, SYNC_ACK_KEY, ao3TimeZone, inAo3Zone, utcToZonedDay, zonedDayToUtc, savedAnswerDefaults, savedQuestionTimeout, startingFiletypes, savedAlwaysAnswers, saveAlwaysAnswer, savedGuessedDateTimeout, savedOwnWaits, savedNobodyHere, writtenDate } from './preferences';
 
@@ -639,6 +639,8 @@ export class DownloadDialog implements OnDestroy {
   protected readonly repairClashes = signal<RepairClash[]>([]);
   /** work skins the run could not get or put in (`skinFailures`): their HTML is as AO3 sent it */
   protected readonly skinFailures = signal<WorkFailure[]>([]);
+  /** works whose html was downloaded and whose skin was never fetched (`skinsPending`) */
+  protected readonly skinsPending = signal<string[]>([]);
 
   /**
    * How many undated files the run has stopped to ask about, or 0 when it is not asking.
@@ -2250,6 +2252,7 @@ export class DownloadDialog implements OnDestroy {
     this.fichubOlder.set([]);
     this.repairClashes.set([]);
     this.skinFailures.set([]);
+    this.skinsPending.set([]);
     this.unsureFiles.set(0);
     this.duplicateCopies.set(null);
     this.notRemoved.set([]);
@@ -2474,6 +2477,9 @@ export class DownloadDialog implements OnDestroy {
         break;
       case 'skinFailures':
         this.skinFailures.set(event.skinFailures ?? []);
+        break;
+      case 'skinsPending':
+        this.skinsPending.set(event.skinsPending ?? []);
         break;
       case 'fichubOlder':
         this.fichubOlder.set(event.fichubOlder ?? []);
@@ -2813,6 +2819,7 @@ export class DownloadDialog implements OnDestroy {
     fichubOlder: this.fichubOlder(),
     repairClashes: this.repairClashes(),
     skinFailures: this.skinFailures(),
+    skinsPending: this.skinsPending(),
   }));
 
   /** how many entries there are across every list of issues this run reported */
@@ -2824,6 +2831,7 @@ export class DownloadDialog implements OnDestroy {
    */
   /** one older FicHub copy, in words */
   protected readonly repairClashWords = repairClashWords;
+  protected readonly workSkinLink = workSkinLink;
 
   protected fichubOlderWords(item: FicHubOlder): string {
     return fichubOlderWords(item);

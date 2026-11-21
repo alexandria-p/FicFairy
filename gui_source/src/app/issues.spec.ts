@@ -130,3 +130,13 @@ describe('work skins a run could not fetch or put in', () => {
     expect(report).toContain('1\thttps://archiveofourown.org/works/1\tits work page would not read: 503');
   });
 });
+
+describe('works whose skin was never fetched', () => {
+  it('counts as an issue, and gets a section of its own in the issues file', () => {
+    const issues = issuesOf({ skinsPending: ['7'] } as unknown as RunHistory);
+    expect(issueCount(issues)).toBe(1);
+    const report = issuesReport(issues, 'Issues', new Date('2026-11-08T00:00:00Z'));
+    expect(report).toContain('## 1 work whose skin was not fetched');
+    expect(report).toContain('7\thttps://archiveofourown.org/works/7');
+  });
+});

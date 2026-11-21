@@ -19,6 +19,8 @@ export interface RunIssues {
   repairClashes?: RepairClash[];
   /** work skins the run could not get, or could not put into the work's html */
   skinFailures?: WorkFailure[];
+  /** works whose html was downloaded and whose skin was never fetched */
+  skinsPending?: string[];
 }
 
 /** how many entries there are across every kind */
@@ -31,7 +33,8 @@ export function issueCount(issues: RunIssues): number {
     issues.skipped.length +
     (issues.fichubOlder?.length ?? 0) +
     (issues.repairClashes?.length ?? 0) +
-    (issues.skinFailures?.length ?? 0)
+    (issues.skinFailures?.length ?? 0) +
+    (issues.skinsPending?.length ?? 0)
   );
 }
 
@@ -62,6 +65,7 @@ export function issuesOf(run: RunHistory): RunIssues {
     fichubOlder: run.fichubOlder ?? [],
     repairClashes: run.repairClashes ?? [],
     skinFailures: run.skinFailures ?? [],
+    skinsPending: run.skinsPending ?? [],
   };
 }
 
@@ -71,6 +75,11 @@ export function fichubOlderFormats(item: FicHubOlder): string {
   const replaced = Object.entries(item.replaced ?? {}).map(([f, date]) =>
     `${f} (replaced yours, ${date ? `dated ${writtenDate(date)}` : 'with no date in its name'})`);
   return [...taken, ...replaced].join(', ');
+}
+
+/** a work's page on AO3, where its skin is read from */
+export function workSkinLink(id: string): string {
+  return `https://archiveofourown.org/works/${id}`;
 }
 
 /** a repair a name clash stopped, in words */
@@ -164,6 +173,13 @@ export function issuesReport(issues: RunIssues, heading = 'Issues from this run'
       'work skins that could not be fetched or put in'),
     'work id, link, reason (its HTML is kept as AO3 sent it)',
     (issues.skinFailures ?? []).map((row) => [row.id, row.link, row.error].join('\t')),
+  );
+  section(
+    plural(issues.skinsPending?.length ?? 0,
+      'work whose skin was not fetched',
+      'works whose skin was not fetched'),
+    'work id, link (its HTML is kept as AO3 sent it)',
+    (issues.skinsPending ?? []).map((id) => [id, workSkinLink(id)].join('\t')),
   );
   return lines.join('\n') + '\n';
 }

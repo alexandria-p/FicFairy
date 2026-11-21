@@ -1900,6 +1900,18 @@ describe('DownloadDialog', () => {
     expect(said).toContain('kept as AO3 sent it');
   });
 
+  it('lists at the end the works whose skin was never fetched', async () => {
+    await open('bookmarks');
+    await advanceTo('running');
+    jobs.push!({ type: 'skinsPending', skinsPending: ['1', '2'] } as JobEvent);
+    jobs.push!({ type: 'finished' } as JobEvent);
+    await fixture.whenStable();
+
+    const said = element.querySelector('.skins-pending')?.textContent?.replace(/\s+/g, ' ') ?? '';
+    expect(said).toContain('2 works had HTML downloaded but no work skin fetched');
+    expect(said).toContain('kept with this run in History');
+  });
+
   it('asks about a file whose date is only guessed, saying what it thinks and recommends', async () => {
     await open('bookmarks');
     await advanceTo('running');
@@ -3689,7 +3701,7 @@ describe('DownloadDialog', () => {
     expect(said).toContain('unrevealed collection');
     expect(said).toContain('made private, or hidden');
     // and the failures list, which is the other half of the report
-    expect(element.querySelector('.failures:not(.skipped):not(.skin-failures)')?.textContent).toContain(
+    expect(element.querySelector('.failures:not(.skipped):not(.skin-failures):not(.skins-pending)')?.textContent).toContain(
       'timed out',
     );
     // and a work skin that could not be had
