@@ -446,16 +446,16 @@ describe('ReadingSkinsSettings', () => {
   const picks = (element: HTMLElement) =>
     [...element.querySelectorAll<HTMLInputElement>('input[name=defaultReadingSkin]')].map((x) => x.value);
 
-  it('says what a reading skin is in one line, with the rest folded away', async () => {
+  it('says what a reading skin is, and what a work skin is, with nothing folded away', async () => {
     const { element } = await make();
     expect(element.querySelector('.intro')?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
       'Operates like a site skin on AO3. Will be applied to downloaded HTML files that you open through FicFairy.');
-    const how = element.querySelector<HTMLDetailsElement>('details.how-it-works')!;
-    expect(how.open).toBe(false);
-    const said = how.textContent?.replace(/\s+/g, ' ') ?? '';
-    expect(said).toContain('HTML files are downloaded from AO3 without any site or work skins.');
+    expect(element.querySelector('details.how-it-works')).toBeNull();
+    const said = element.textContent?.replace(/\s+/g, ' ') ?? '';
     expect(said).toContain('paintbrush icon');
     expect(said).toContain('Skins will only be applied to HTML files that you open through FicFairy.');
+    expect(said).not.toContain('without any site or work skins');
+    expect(said).not.toContain('To make them look nicer');
   });
 
   it('lists None, AO3 and your skins as the choices of the active site skin, AO3 never removable', async () => {
@@ -469,11 +469,15 @@ describe('ReadingSkinsSettings', () => {
     expect(ao3.querySelector('.preview-skin')).not.toBeNull();
   });
 
-  it('makes a skin the default when its radio is picked, and none with None', async () => {
+  it('makes a skin the active one when its radio is picked, colouring its row, and none with None', async () => {
     const { fixture, element } = await make();
+    expect(element.querySelector('.none-skin')!.classList).toContain('active');
     element.querySelector<HTMLInputElement>('input[name=defaultReadingSkin][value="builtin:AO3"]')!.click();
     await fixture.whenStable();
     expect(TestBed.inject(ReadingSkins).defaultId()).toBe('builtin:AO3');
+    expect([...element.querySelectorAll('.skin.active')].map((x) => x.getAttribute('data-skin'))).toEqual(['builtin:AO3']);
+    // the row says it; no line beneath does
+    expect(element.querySelector('.skin-outcome')).toBeNull();
     element.querySelector<HTMLInputElement>('input[name=defaultReadingSkin][value=""]')!.click();
     await fixture.whenStable();
     expect(TestBed.inject(ReadingSkins).defaultId()).toBe('');

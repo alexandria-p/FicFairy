@@ -82,11 +82,11 @@ export class ReadingSkinsSettings {
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }
 
+  /** the row it is on is coloured, so nothing more is said */
   protected setDefault(id: string): void {
     this.skins.setDefault(id);
     this.problem.set('');
-    const chosen = this.skins.defaultSkin();
-    this.outcome.set(chosen ? `"${chosen.name}" is now your active site skin.` : 'No active site skin.');
+    this.outcome.set('');
   }
 
   protected setLayer(on: boolean): void {

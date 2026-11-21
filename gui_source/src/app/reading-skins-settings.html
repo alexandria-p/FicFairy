@@ -2,20 +2,12 @@
   Operates like a site skin on AO3. Will be applied to downloaded HTML files that you open through
   FicFairy.
 </p>
-<details class="how-it-works">
-  <summary>How reading skins work</summary>
-  <p class="hint">HTML files are downloaded from AO3 without any site or work skins.</p>
-  <p class="hint">
-    To make them look nicer, you can choose a default skin - "site skin" - to apply here in User
-    Settings.
-  </p>
-  <p class="hint">
-    Some authors also create their own skins for their works (for example, social media fics) -
-    these are called "work skins". Files with a work skin that you've downloaded will have a
-    paintbrush icon next to them.
-  </p>
-  <p class="hint">Skins will only be applied to HTML files that you open through FicFairy.</p>
-</details>
+<p class="hint about-work-skins">
+  Some authors also create their own skins for their works (for example, social media fics) - these
+  are called "work skins". Files with a work skin that you've downloaded will have a paintbrush icon
+  next to them.
+</p>
+<p class="hint">Skins will only be applied to HTML files that you open through FicFairy.</p>
 
 <label class="check layer-skin">
   <input type="checkbox" name="layerReadingSkin" [checked]="skins.layer()"
@@ -37,12 +29,12 @@
      FicFairy, so there is always one to pick -->
 <fieldset class="skin-list">
   <legend>Active site skin</legend>
-  <label class="skin none-skin">
+  <label class="skin none-skin" [class.active]="!skins.defaultSkin()">
     <input type="radio" name="defaultReadingSkin" value="" [checked]="!skins.defaultSkin()" (change)="setDefault('')" />
     <span class="skin-name">None</span>
   </label>
   @for (skin of skins.skins(); track id(skin)) {
-    <div class="skin" [attr.data-skin]="id(skin)">
+    <div class="skin" [attr.data-skin]="id(skin)" [class.active]="skins.defaultId() === id(skin)">
       <label class="skin-pick">
         <input type="radio" name="defaultReadingSkin" [value]="id(skin)"
                [checked]="skins.defaultId() === id(skin)" (change)="setDefault(id(skin))" />
