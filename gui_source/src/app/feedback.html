@@ -173,11 +173,12 @@
                 (change)="toggleVisit($any($event.target).checked)" />
               Attach what I did on this visit <em>(optional)</em>
             </label>
-            <p class="hint">
-              What actions you took this session: the tabs you opened, library reads, windows, runs
-              started and the settings you changed.
-            </p>
             @if (attachVisit()) {
+              <!-- said once ticked, at the owner's request -->
+              <p class="hint visit-hint">
+                What actions you took this session: the tabs you opened, library reads, windows, runs
+                started and the settings you changed.
+              </p>
               <label class="field log-amount">
                 <span>How much of it to attach</span>
                 <select name="visitAmount" (change)="setVisitAmount($any($event.target).value)">

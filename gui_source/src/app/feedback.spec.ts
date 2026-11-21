@@ -150,9 +150,13 @@ describe('Feedback', () => {
     await make();
     await openForm();
     const box = element.querySelector<HTMLInputElement>('input[name="attachVisit"]')!;
+    // what it holds is said only once it is ticked
+    expect(element.querySelector('.visit-hint')).toBeNull();
     box.checked = true;
     box.dispatchEvent(new Event('change'));
     await settle();
+    expect(element.querySelector('.visit-hint')!.textContent!.replace(/\s+/g, ' ').trim()).toBe(
+      'What actions you took this session: the tabs you opened, library reads, windows, runs started and the settings you changed.');
     const preview = element.querySelector('details.visit pre')?.textContent ?? '';
     expect(preview).toContain('Saved: the Lavender palette');
     expect(preview).not.toContain('ReaderName');
