@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { ReadingSkin, ReadingSkins, skinId } from './reading-skins';
-import { SKIN_SAMPLE_WORK } from './skin-sample';
+import { skinSampleWork } from './skin-sample';
 import { withReadingSkin } from './skin-html';
 
 /**
@@ -60,15 +60,17 @@ export class ReadingSkinsSettings {
   }
 
   /**
-   * A made-up work (`SKIN_SAMPLE_WORK`) shown with this CSS, in a tab of its own - opened at once,
-   * as a tab opened after waiting is blocked as a pop-up - so a skin can be tried without making it
-   * the default. Nothing is saved.
+   * A made-up work from the dummy library (`skinSampleWork`: the owner's own blurb, lorem ipsum
+   * inside) shown with this CSS, in a tab of its own - opened at once, as a tab opened after
+   * waiting is blocked as a pop-up, and filled once the sample is built - so a skin can be tried
+   * without making it the active one. Nothing is saved.
    */
-  protected preview(css: string): void {
+  protected async preview(css: string): Promise<void> {
     const tab = window.open('', '_blank');
     if (!tab) return;
     tab.opener = null;
-    const url = URL.createObjectURL(new Blob([withReadingSkin(SKIN_SAMPLE_WORK, css)], { type: 'text/html' }));
+    const sample = await skinSampleWork();
+    const url = URL.createObjectURL(new Blob([withReadingSkin(sample, css)], { type: 'text/html' }));
     tab.location.href = url;
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }
@@ -77,7 +79,7 @@ export class ReadingSkinsSettings {
     this.skins.setDefault(id);
     this.problem.set('');
     const chosen = this.skins.defaultSkin();
-    this.outcome.set(chosen ? `"${chosen.name}" is now your default reading skin.` : 'No default reading skin.');
+    this.outcome.set(chosen ? `"${chosen.name}" is now your active site skin.` : 'No active site skin.');
   }
 
   protected setLayer(on: boolean): void {

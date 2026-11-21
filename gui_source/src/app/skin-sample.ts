@@ -1,13 +1,59 @@
 /**
- * A made-up work, laid out as AO3's own HTML download is (`#preface`, `.meta`, `dl.tags`,
- * `#chapters`, `.userstuff`), for previewing a reading skin from User settings without opening a
- * work of your own. Safe for work, and no real author, fandom or AO3 account.
+ * The work a reading skin is previewed on, from User settings: the first made-up work in
+ * `dummy-library.json` (the README's, debug mode's and guest mode's library - the owner's own
+ * blurbs), laid out as AO3's HTML download is (`#preface`, `.meta`, `dl.tags`, `#chapters`,
+ * `.userstuff`) so a skin lands on it as it does on a real download. Its tags, summary and stats
+ * are the blurb's; its chapters are lorem ipsum. The library is read only when a preview is
+ * asked for, so it stays out of the page's first download, as dummy data's does.
  */
-export const SKIN_SAMPLE_WORK = `<!DOCTYPE html>
+
+interface SampleReading {
+  title: string;
+  authors: string[];
+  fandoms: string[];
+  warnings: string[];
+  tags: { rating?: string; categories?: string[]; relationships?: string[]; characters?: string[]; additional?: string[] };
+  summary: string;
+  words: number;
+  chapters_published: number;
+  chapters_total: number | null;
+  date_updated: string;
+}
+
+const LOREM = [
+  'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
+  'Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
+  'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.',
+  'Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.',
+];
+
+const escape = (text: string) =>
+  text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+const tagLinks = (tags: string[] | undefined) => (tags ?? []).map((t) => `<a href="#">${escape(t)}</a>`).join(', ');
+
+/** one `dt`/`dd` pair of the tags box, or nothing for a kind the work has none of */
+function line(label: string, tags: string[] | undefined): string {
+  return tags?.length ? `<dt>${label}:</dt>\n<dd>${tagLinks(tags)}</dd>\n` : '';
+}
+
+/** the sample work's html, built from a made-up blurb */
+export function sampleWorkHtml(work: SampleReading): string {
+  const chapters = Math.min(2, Math.max(1, work.chapters_published || 1));
+  const body = Array.from({ length: chapters }, (_, i) => `
+  <div class="meta group">
+    <h2 class="heading">Chapter ${i + 1}</h2>
+  </div>
+  <div class="userstuff">
+    ${LOREM.map((p) => `<p>${p}</p>`).join('\n    ')}
+    ${i === 0 ? '<hr />' : ''}
+  </div>`).join('\n');
+  const total = work.chapters_total ?? '?';
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>The Lantern Keeper - Example_Author - Original Work</title>
+  <title>${escape(work.title)} - ${escape(work.authors.join(', '))}</title>
   <style type="text/css">
     p.message { text-align: center; }
     .meta h1 { font-size: 1.5em; text-align: center; }
@@ -24,63 +70,34 @@ export const SKIN_SAMPLE_WORK = `<!DOCTYPE html>
 <div id="preface">
   <h2 class="toc-heading">Preface</h2>
   <p class="message">
-    <b>The Lantern Keeper</b><br />
+    <b>${escape(work.title)}</b><br />
     A sample work, shown to preview your reading skin. It was not downloaded from anywhere.
   </p>
   <div class="meta">
     <dl class="tags">
-      <dt>Rating:</dt>
-      <dd><a href="#">General Audiences</a></dd>
-      <dt>Archive Warning:</dt>
-      <dd><a href="#">No Archive Warnings Apply</a></dd>
-      <dt>Category:</dt>
-      <dd><a href="#">Gen</a></dd>
-      <dt>Fandom:</dt>
-      <dd><a href="#">Original Work</a></dd>
-      <dt>Characters:</dt>
-      <dd><a href="#">Original Characters</a>, <a href="#">The Lantern Keeper</a></dd>
-      <dt>Additional Tags:</dt>
-      <dd><a href="#">Lighthouses</a>, <a href="#">Found Family</a>, <a href="#">Cozy</a>, <a href="#">Rain</a></dd>
-      <dt>Language:</dt>
-      <dd>English</dd>
-      <dt>Stats:</dt>
-      <dd>Published: 2024-03-03 Updated: 2024-05-12 Words: 1,204 Chapters: 2/2</dd>
+${line('Rating', work.tags.rating ? [work.tags.rating] : [])}${line('Archive Warning', work.warnings)}${line('Category', work.tags.categories)}${line('Fandom', work.fandoms)}${line('Relationship', work.tags.relationships)}${line('Characters', work.tags.characters)}${line('Additional Tags', work.tags.additional)}<dt>Language:</dt>
+<dd>English</dd>
+<dt>Stats:</dt>
+<dd>Updated: ${escape(work.date_updated)} Words: ${work.words.toLocaleString('en')} Chapters: ${work.chapters_published}/${total}</dd>
     </dl>
-    <h1>The Lantern Keeper</h1>
-    <div class="byline">by <a rel="author" href="#">Example_Author</a></div>
+    <h1>${escape(work.title)}</h1>
+    <div class="byline">by ${work.authors.map((a) => `<a rel="author" href="#">${escape(a)}</a>`).join(', ')}</div>
     <p>Summary</p>
-    <blockquote class="userstuff"><p>Every night the keeper lights the lamp. Every night, something answers.</p></blockquote>
-    <p>Notes</p>
-    <blockquote class="userstuff"><p>A short sample for trying out reading skins.</p></blockquote>
+    <blockquote class="userstuff"><p>${escape(work.summary)}</p></blockquote>
   </div>
 </div>
-<div id="chapters" class="userstuff">
-  <div class="meta group">
-    <h2 class="heading">Chapter 1: Low Tide</h2>
-  </div>
-  <div class="userstuff">
-    <p>The stairs to the lamp room numbered one hundred and twelve, and Wren had counted every one of them on her first night. By the second winter she no longer counted. Her feet knew the worn place on the forty-first step, and the loose rail at the ninetieth, and the way the wind sang through the gap in the window at the very top.</p>
-    <p>"You're late," said the gull on the railing. It said this every evening, and every evening Wren ignored it.</p>
-    <p>She struck the match. The wick caught, and the great lens turned, and far out on the dark water something blinked back - once, twice, and then a third time, slower, as if it were thinking.</p>
-    <hr />
-    <p>In the morning there was a parcel on the doorstep, wrapped in oilcloth and tied with green string. It was addressed, in very careful letters, <em>To the Keeper, with thanks</em>.</p>
-  </div>
-  <div class="meta group">
-    <h2 class="heading">Chapter 2: High Water</h2>
-  </div>
-  <div class="userstuff">
-    <p>The storm came in sideways. Rain hammered the glass until the whole tower hummed with it, and Wren sat by the lamp with a mug of tea going cold in her hands, watching the light sweep out across the waves.</p>
-    <p>Three blinks. Then three more. Closer, now.</p>
-    <p>She put down the mug, pulled on her coat, and went down all one hundred and twelve stairs to open the door.</p>
-  </div>
-</div>
-<div id="afterword">
-  <h2 class="toc-heading">Afterword</h2>
-  <div class="meta">
-    <p>End Notes</p>
-    <blockquote class="userstuff"><p>Thank you for reading this sample.</p></blockquote>
-  </div>
+<div id="chapters" class="userstuff">${body}
 </div>
 </body>
 </html>
 `;
+}
+
+/** the first made-up work of the dummy library, as the sample - read when a preview is asked for */
+export async function skinSampleWork(): Promise<string> {
+  const library = (await import('./dummy-library.json')).default as unknown as {
+    works: { entry: { indexes: SampleReading[] } }[];
+  };
+  const readings = library.works[0].entry.indexes;
+  return sampleWorkHtml(readings[readings.length - 1]);
+}

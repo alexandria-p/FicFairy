@@ -17,6 +17,15 @@
   <p class="hint">Skins will only be applied to HTML files that you open through FicFairy.</p>
 </details>
 
+<label class="check layer-skin">
+  <input type="checkbox" name="layerReadingSkin" [checked]="skins.layer()"
+         (change)="setLayer($any($event.target).checked)" />
+  <span>
+    Layer my reading skin under a work's own skin
+    <span class="hint layer-hint">The author's work skin wins where they disagree.</span>
+  </span>
+</label>
+
 @if (skins.reading()) {
   <p class="hint reading">Reading the skins saved in your library...</p>
 }
@@ -27,7 +36,7 @@
 <!-- the list is where the default is chosen: one radio per skin, None first; AO3 comes with
      FicFairy, so there is always one to pick -->
 <fieldset class="skin-list">
-  <legend>Default reading skin</legend>
+  <legend>Active site skin</legend>
   <label class="skin none-skin">
     <input type="radio" name="defaultReadingSkin" value="" [checked]="!skins.defaultSkin()" (change)="setDefault('')" />
     <span class="skin-name">None</span>
@@ -53,15 +62,9 @@
   }
 </fieldset>
 
-<label class="check layer-skin">
-  <input type="checkbox" name="layerReadingSkin" [checked]="skins.layer()"
-         (change)="setLayer($any($event.target).checked)" />
-  <span>
-    Layer my reading skin under a work's own skin
-    <span class="hint layer-hint">The author's work skin wins where they disagree.</span>
-  </span>
-</label>
 
+
+<h4 class="add-heading">Create or upload a new site skin</h4>
 @if (!adding()) {
   <button type="button" class="button subtle add-skin-open" (click)="openAdd()">+ Add a skin</button>
 } @else {

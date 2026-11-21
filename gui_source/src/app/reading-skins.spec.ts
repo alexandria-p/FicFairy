@@ -452,8 +452,9 @@ describe('ReadingSkinsSettings', () => {
     expect(said).toContain('Skins will only be applied to HTML files that you open through FicFairy.');
   });
 
-  it('lists None, AO3 and your skins as the choices of default, AO3 never removable', async () => {
+  it('lists None, AO3 and your skins as the choices of the active site skin, AO3 never removable', async () => {
     const { element } = await make();
+    expect(element.querySelector('.skin-list legend')?.textContent?.trim()).toBe('Active site skin');
     expect(picks(element)).toEqual(['', 'builtin:AO3']);
     expect(element.querySelector('select')).toBeNull();
     const ao3 = element.querySelector('[data-skin="builtin:AO3"]')!;
@@ -508,8 +509,11 @@ describe('ReadingSkinsSettings', () => {
     expect(element.querySelector('textarea[name=skinCss]')).toBeNull();
   });
 
-  it('offers layering ticked, with one line on what it does', async () => {
+  it('offers layering ticked, first of the choices, with one line on what it does', async () => {
     const { fixture, element } = await make();
+    const order = [...element.querySelectorAll('.layer-skin, .skin-list, .add-heading')].map((x) => x.className.split(' ').pop());
+    expect(order).toEqual(['layer-skin', 'skin-list', 'add-heading']);
+    expect(element.querySelector('.add-heading')?.textContent?.trim()).toBe('Create or upload a new site skin');
     const box = element.querySelector<HTMLInputElement>('input[name=layerReadingSkin]')!;
     expect(box.checked).toBe(true);
     expect(element.querySelector('.layer-hint')?.textContent?.trim()).toBe("The author's work skin wins where they disagree.");
@@ -527,10 +531,13 @@ describe('ReadingSkinsSettings', () => {
       const { element } = await make();
       element.querySelector<HTMLButtonElement>('[data-skin="builtin:AO3"] .preview-skin')!.click();
       expect(open).toHaveBeenCalledWith('', '_blank');
+      for (let i = 0; i < 500 && !tab.location.href; i++) await new Promise((r) => setTimeout(r, 10));
       expect(tab.opener).toBeNull();
       expect(tab.location.href).toBe('blob:preview');
       const html = await (made.mock.calls[0][0] as Blob).text();
-      expect(html).toContain('The Lantern Keeper');
+      // the first of the dummy library's made-up works, lorem ipsum inside
+      expect(html).toContain('Spooky Scary Skeletons');
+      expect(html).toContain('Lorem ipsum');
       expect(html).toContain('id="workskin"');
       expect(TestBed.inject(ReadingSkins).defaultId()).toBe('');
     } finally {
