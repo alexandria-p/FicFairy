@@ -1,4 +1,4 @@
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { DebugMode } from './debug-mode';
 import { Library } from './library';
 import { MemoryStore } from './memory-store';
@@ -432,14 +432,61 @@ describe('ReadingSkinsSettings', () => {
   beforeEach(() => localStorage.clear());
   afterEach(() => localStorage.clear());
 
-  it('saves a pasted skin where chosen, and offers it as the default', async () => {
-    TestBed.configureTestingModule({
-      providers: [{ provide: DebugMode, useValue: { on: () => true } }],
-    });
-    TestBed.inject(Library).store.set(new MemoryStore());
+  async function make(): Promise<{ fixture: ComponentFixture<ReadingSkinsSettings>; element: HTMLElement }> {
     const fixture = TestBed.createComponent(ReadingSkinsSettings);
     await fixture.whenStable();
-    const element: HTMLElement = fixture.nativeElement;
+    return { fixture, element: fixture.nativeElement as HTMLElement };
+  }
+  const picks = (element: HTMLElement) =>
+    [...element.querySelectorAll<HTMLInputElement>('input[name=defaultReadingSkin]')].map((x) => x.value);
+
+  it('says what a reading skin is in one line, with the rest folded away', async () => {
+    const { element } = await make();
+    expect(element.querySelector('.intro')?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+      'Operates like a site skin on AO3. Will be applied to downloaded HTML files that you open through FicFairy.');
+    const how = element.querySelector<HTMLDetailsElement>('details.how-it-works')!;
+    expect(how.open).toBe(false);
+    // a work from FicHub is laid out differently, and never has its author's skin
+    expect(how.querySelector('.fichub-look')?.textContent).toContain('FicHub');
+  });
+
+  it('lists None, AO3 and your skins as the choices of default, AO3 never removable', async () => {
+    const { element } = await make();
+    expect(picks(element)).toEqual(['', 'builtin:AO3']);
+    expect(element.querySelector('select')).toBeNull();
+    const ao3 = element.querySelector('[data-skin="builtin:AO3"]')!;
+    expect(ao3.querySelector('.skin-place')?.textContent?.trim()).toBe('built in');
+    expect(ao3.querySelector('.remove-skin')).toBeNull();
+    expect(ao3.querySelector('.preview-skin')).not.toBeNull();
+  });
+
+  it('makes a skin the default when its radio is picked, and none with None', async () => {
+    const { fixture, element } = await make();
+    element.querySelector<HTMLInputElement>('input[name=defaultReadingSkin][value="builtin:AO3"]')!.click();
+    await fixture.whenStable();
+    expect(TestBed.inject(ReadingSkins).defaultId()).toBe('builtin:AO3');
+    element.querySelector<HTMLInputElement>('input[name=defaultReadingSkin][value=""]')!.click();
+    await fixture.whenStable();
+    expect(TestBed.inject(ReadingSkins).defaultId()).toBe('');
+  });
+
+  it('folds the add form behind its button, and Cancel folds it again', async () => {
+    const { fixture, element } = await make();
+    expect(element.querySelector('textarea[name=skinCss]')).toBeNull();
+    element.querySelector<HTMLButtonElement>('.add-skin-open')!.click();
+    await fixture.whenStable();
+    expect(element.querySelector('textarea[name=skinCss]')).not.toBeNull();
+    expect(element.querySelector<HTMLButtonElement>('button.save-skin')!.disabled).toBe(true);
+    [...element.querySelectorAll<HTMLButtonElement>('.add-actions button')].find((b) => b.textContent?.trim() === 'Cancel')!.click();
+    await fixture.whenStable();
+    expect(element.querySelector('textarea[name=skinCss]')).toBeNull();
+  });
+
+  it('saves a pasted skin where chosen, folds the form, and offers it as the default', async () => {
+    TestBed.inject(Library).store.set(new MemoryStore());
+    const { fixture, element } = await make();
+    element.querySelector<HTMLButtonElement>('.add-skin-open')!.click();
+    await fixture.whenStable();
 
     const name = element.querySelector<HTMLInputElement>('input[name=skinName]')!;
     name.value = 'Cosy';
@@ -454,55 +501,39 @@ describe('ReadingSkinsSettings', () => {
     await fixture.whenStable();
 
     expect(element.querySelector('.skin-outcome')?.textContent).toContain('saved in your library');
-    expect(element.querySelector('[data-skin="library:Cosy"] .skin-place')?.textContent).toContain('library');
-    const options = [...element.querySelectorAll<HTMLOptionElement>('select[name=defaultReadingSkin] option')];
-    expect(options.map((x) => x.value)).toEqual(['', 'builtin:AO3', 'library:Cosy']);
+    expect(element.querySelector('[data-skin="library:Cosy"] .skin-place')?.textContent?.trim()).toBe('library');
+    expect(picks(element)).toEqual(['', 'builtin:AO3', 'library:Cosy']);
+    expect(element.querySelector('textarea[name=skinCss]')).toBeNull();
   });
 
-  it('offers layering ticked, and says what unticking it does', async () => {
-    TestBed.configureTestingModule({
-      providers: [{ provide: DebugMode, useValue: { on: () => true } }],
-    });
-    const fixture = TestBed.createComponent(ReadingSkinsSettings);
-    await fixture.whenStable();
-    const element: HTMLElement = fixture.nativeElement;
+  it('offers layering ticked, with one line on what it does', async () => {
+    const { fixture, element } = await make();
     const box = element.querySelector<HTMLInputElement>('input[name=layerReadingSkin]')!;
     expect(box.checked).toBe(true);
+    expect(element.querySelector('.layer-hint')?.textContent?.trim()).toBe("The author's work skin wins where they disagree.");
 
     box.click();
     await fixture.whenStable();
-
-    expect(element.querySelector('.layer-hint')?.textContent).toContain('author\'s skin alone');
     expect(TestBed.inject(ReadingSkins).layer()).toBe(false);
   });
 
-  it('offers AO3 and the skins you add, and says so while you have none of your own', async () => {
-    TestBed.configureTestingModule({
-      providers: [{ provide: DebugMode, useValue: { on: () => true } }],
-    });
-    const fixture = TestBed.createComponent(ReadingSkinsSettings);
-    await fixture.whenStable();
-    const element: HTMLElement = fixture.nativeElement;
-
-    const options = [...element.querySelectorAll<HTMLOptionElement>('select[name=defaultReadingSkin] option')];
-    expect(options.map((x) => x.value)).toEqual(['', 'builtin:AO3']);
-    expect(options[1].textContent?.trim()).toBe('AO3 (comes with FicFairy)');
-    expect(element.querySelector('.no-skins')?.textContent?.trim()).toBe('No skins of your own yet - add one below.');
-    // AO3 is listed, and cannot be removed
-    const ao3 = element.querySelector('[data-skin="builtin:AO3"]')!;
-    expect(ao3.querySelector('.skin-place')?.textContent?.trim()).toBe('Comes with FicFairy');
-    expect(ao3.querySelector('.remove-skin')).toBeNull();
-    // a work from FicHub is laid out differently, and never has its author's skin
-    expect(element.querySelector('.fichub-look')?.textContent).toContain('FicHub');
-  });
-
-  it('holds Save until there is a name and some CSS', async () => {
-    TestBed.configureTestingModule({
-      providers: [{ provide: DebugMode, useValue: { on: () => true } }],
-    });
-    const fixture = TestBed.createComponent(ReadingSkinsSettings);
-    await fixture.whenStable();
-
-    expect(fixture.nativeElement.querySelector('button.save-skin').disabled).toBe(true);
+  it('previews a skin on a made-up work in a tab of its own, saving nothing', async () => {
+    const tab = { opener: {}, location: { href: '' } };
+    const open = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+    const made = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:preview');
+    try {
+      const { element } = await make();
+      element.querySelector<HTMLButtonElement>('[data-skin="builtin:AO3"] .preview-skin')!.click();
+      expect(open).toHaveBeenCalledWith('', '_blank');
+      expect(tab.opener).toBeNull();
+      expect(tab.location.href).toBe('blob:preview');
+      const html = await (made.mock.calls[0][0] as Blob).text();
+      expect(html).toContain('The Lantern Keeper');
+      expect(html).toContain('id="workskin"');
+      expect(TestBed.inject(ReadingSkins).defaultId()).toBe('');
+    } finally {
+      open.mockRestore();
+      made.mockRestore();
+    }
   });
 });

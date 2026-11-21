@@ -1,10 +1,13 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { ReadingSkin, ReadingSkins, skinId } from './reading-skins';
+import { SKIN_SAMPLE_WORK } from './skin-sample';
+import { withReadingSkin } from './skin-html';
 
 /**
- * User settings' *Reading skins* section (inside its `details`, which User settings draws): your
- * skins, where each is saved, which is the default, and a form to add one - pasted, or from a
- * `.css` file.
+ * User settings' *Reading skins* section (inside its `details`, which User settings draws): one
+ * line saying what a reading skin is (the rest folded away), the skins as radios - picking one
+ * makes it the default, so each is listed once - each with a Preview on a made-up work, the
+ * layering choice, and a form to add one, folded behind *+ Add a skin* until asked for.
  */
 @Component({
   selector: 'app-reading-skins-settings',
@@ -19,6 +22,8 @@ export class ReadingSkinsSettings {
   protected readonly css = signal('');
   protected readonly place = signal<'browser' | 'library'>('browser');
   protected readonly saving = signal(false);
+  /** whether the add form is open - it is folded behind *+ Add a skin* to begin with */
+  protected readonly adding = signal(false);
   /** what the last add or remove did, or what went wrong */
   protected readonly outcome = signal('');
   protected readonly problem = signal('');
@@ -31,8 +36,41 @@ export class ReadingSkinsSettings {
   );
 
   protected placeWords(skin: ReadingSkin): string {
-    return skin.place === 'builtin' ? 'Comes with FicFairy'
-      : skin.place === 'browser' ? 'Saved to this browser' : 'Saved in your library';
+    return skin.place === 'builtin' ? 'built in'
+      : skin.place === 'browser' ? 'this browser' : 'library';
+  }
+
+  protected placeTitle(skin: ReadingSkin): string {
+    return skin.place === 'builtin' ? 'Comes with FicFairy, and cannot be removed'
+      : skin.place === 'browser' ? 'Saved to this browser only'
+      : `Saved in your library, as skins/custom/${skin.name}.css`;
+  }
+
+  protected openAdd(): void {
+    this.adding.set(true);
+    this.outcome.set('');
+    this.problem.set('');
+  }
+
+  protected closeAdd(): void {
+    this.adding.set(false);
+    this.name.set('');
+    this.css.set('');
+    this.problem.set('');
+  }
+
+  /**
+   * A made-up work (`SKIN_SAMPLE_WORK`) shown with this CSS, in a tab of its own - opened at once,
+   * as a tab opened after waiting is blocked as a pop-up - so a skin can be tried without making it
+   * the default. Nothing is saved.
+   */
+  protected preview(css: string): void {
+    const tab = window.open('', '_blank');
+    if (!tab) return;
+    tab.opener = null;
+    const url = URL.createObjectURL(new Blob([withReadingSkin(SKIN_SAMPLE_WORK, css)], { type: 'text/html' }));
+    tab.location.href = url;
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }
 
   protected setDefault(id: string): void {
@@ -79,6 +117,7 @@ export class ReadingSkinsSettings {
     this.outcome.set(`"${name}" saved ${this.place() === 'browser' ? 'to this browser' : 'in your library'}.`);
     this.name.set('');
     this.css.set('');
+    this.adding.set(false);
   }
 
   protected async remove(skin: ReadingSkin): Promise<void> {
