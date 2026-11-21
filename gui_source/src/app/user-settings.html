@@ -473,7 +473,7 @@
         <ul class="rows">
           <!-- FileNamePattern is changed from the DEBUG tab alone, which offers the renames it needs -->
           @for (setting of file.settings; track setting.key) {
-            @if (setting.key !== 'FileNamePattern' && !RUN_LOG_KEYS.includes(setting.key)) {
+            @if (setting.key !== 'FileNamePattern' && !ADVANCED_KEYS.includes(setting.key)) {
             <li class="row" [attr.data-setting]="setting.key">
               <div class="about">
                 <span class="name">
@@ -653,6 +653,68 @@
           }
         </div>
       }
+
+      <!-- a retry carrying on its downloads reading its works again: here, not in the lists above -->
+      <div class="advanced-part retry-reread">
+        <div class="group-head">
+          <h4>Retries</h4>
+          <span class="saved-to" title="Kept in this browser's own storage, on this computer - another browser, or another computer, has its own">Saved to this browser</span>
+        </div>
+        <p class="hint">
+          A retry that carries on from where its earlier attempt got to asks once whether to read
+          its works again from AO3 first, in case AO3 updated any of them in between.
+        </p>
+        <ul class="rows">
+          <li class="row" [attr.data-always]="retryAlways.name">
+            <div class="about">
+              <span class="name">{{ retryAlways.label }}</span>
+              <span class="description">Choose an answer to always use, or be asked every time.</span>
+            </div>
+            <select
+              [attr.aria-label]="retryAlways.label"
+              (change)="setAlways(retryAlways.name, retryAlways.label, $any($event.target).value)"
+            >
+              <option value="" [selected]="!alwaysAnswers()[retryAlways.name]">Ask every time</option>
+              <option value="yes" [selected]="alwaysAnswers()[retryAlways.name] === 'yes'">Always: {{ retryAlways.yes }}</option>
+              <option value="no" [selected]="alwaysAnswers()[retryAlways.name] === 'no'">Always: {{ retryAlways.no }}</option>
+            </select>
+          </li>
+          @if (!local) {
+            <li class="row" [attr.data-question-setting]="retryQuestion.name">
+              <div class="about">
+                <span class="name">When nobody answers it in time</span>
+              </div>
+              <select
+                [attr.aria-label]="retryQuestion.label + ' - when nobody answers'"
+                (change)="setAnswer(retryQuestion, $any($event.target).value)"
+              >
+                @for (choice of retryQuestion.choices; track choice.value) {
+                  <option [value]="choice.value" [selected]="answer(retryQuestion.name) === choice.value">
+                    {{ choice.label }}{{ choice.value === helperAnswer(retryQuestion.name) ? ' (default)' : '' }}
+                  </option>
+                }
+              </select>
+            </li>
+          } @else if (ini()?.editable && retryIni(); as setting) {
+            <!-- on this computer the same default is settings.ini's -->
+            <li class="row" [attr.data-setting]="setting.key">
+              <div class="about">
+                <span class="name">When nobody answers it in time</span>
+                <span class="description">Saved to <code>settings.ini</code> as <code>{{ setting.key }}</code>.</span>
+              </div>
+              <select
+                [attr.aria-label]="setting.key"
+                [value]="setting.value"
+                (change)="editIni(setting, $any($event.target).value, $any($event.target))"
+              >
+                @for (choice of setting.choices ?? []; track choice) {
+                  <option [value]="choice" [selected]="setting.value === choice">{{ iniWords(setting.key, choice) }}{{ choice === setting.default ? ' (default)' : '' }}</option>
+                }
+              </select>
+            </li>
+          }
+        </ul>
+      </div>
 
       <div class="advanced-part import-exclusions">
         <div class="group-head">

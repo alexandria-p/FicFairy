@@ -779,6 +779,29 @@ describe('UserSettings', () => {
     expect(options).toEqual(['No, keep my newer copy (default)', 'Yes, replace it']);
   });
 
+  it('keeps a retry reading its works again in Advanced, apart from the lists of answers', async () => {
+    TestBed.inject(HelperConnection).settings.set({ ...DEFAULT_PAGE_CONFIG, helperUrl: 'https://helper.example.com' });
+    await open();
+    const advanced = element.querySelector('details.advanced .advanced-part.retry-reread')!;
+    expect(advanced.querySelector('h4')?.textContent?.trim()).toBe('Retries');
+    expect(advanced.querySelector('[data-always="retry-reread"]')).not.toBeNull();
+    expect(advanced.querySelector('[data-question-setting="retry-reread"]')).not.toBeNull();
+    expect(element.querySelector('details.always-answers [data-always="retry-reread"]')).toBeNull();
+    expect(element.querySelector('details.questions [data-question-setting="retry-reread"]')).toBeNull();
+  });
+
+  it('on this computer, shows settings.ini\'s retry default in Advanced and not in the settings.ini list', async () => {
+    iniAnswer = { editable: true, file: 'settings.ini', settings: [
+      { key: 'RetryRereadAnswer', value: 'no', default: 'no', kind: 'choice', choices: ['no', 'yes'], about: 'retry' },
+      { key: 'ExtraWaitTime', value: '15', default: '40', kind: 'integer', about: 'seconds to wait' },
+    ] };
+    await open();
+    const advanced = element.querySelector('.advanced-part.retry-reread')!;
+    expect(advanced.querySelector('[data-setting="RetryRereadAnswer"]')).not.toBeNull();
+    expect(element.querySelectorAll('[data-setting="RetryRereadAnswer"]').length).toBe(1);
+    expect(element.querySelector('[data-setting="ExtraWaitTime"]')).not.toBeNull();
+  });
+
   it('lists the six cases and the retry question a run can always answer, changes one, and forgets one so it asks again', async () => {
     localStorage.setItem('ao3.alwaysAnswers', JSON.stringify({ 'ao3-older': 'yes' }));
     await open();
