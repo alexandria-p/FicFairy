@@ -1,5 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { ReadingSkin, ReadingSkins, SkinPlace, skinId } from './reading-skins';
+import { ReadingSkin, ReadingSkins, skinId } from './reading-skins';
 
 /**
  * User settings' *Reading skins* section (inside its `details`, which User settings draws): your
@@ -17,7 +17,7 @@ export class ReadingSkinsSettings {
 
   protected readonly name = signal('');
   protected readonly css = signal('');
-  protected readonly place = signal<SkinPlace>('browser');
+  protected readonly place = signal<'browser' | 'library'>('browser');
   protected readonly saving = signal(false);
   /** what the last add or remove did, or what went wrong */
   protected readonly outcome = signal('');
@@ -31,7 +31,8 @@ export class ReadingSkinsSettings {
   );
 
   protected placeWords(skin: ReadingSkin): string {
-    return skin.place === 'browser' ? 'Saved to this browser' : 'Saved in your library';
+    return skin.place === 'builtin' ? 'Comes with FicFairy'
+      : skin.place === 'browser' ? 'Saved to this browser' : 'Saved in your library';
   }
 
   protected setDefault(id: string): void {

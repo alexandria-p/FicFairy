@@ -20,7 +20,7 @@
     <option value="" [selected]="!skins.defaultSkin()">None</option>
     @for (skin of skins.skins(); track id(skin)) {
       <option [value]="id(skin)" [selected]="skins.defaultId() === id(skin)">
-        {{ skin.name }} ({{ skin.place === 'browser' ? 'this browser' : 'library' }})
+        {{ skin.name }} ({{ skin.place === 'builtin' ? 'comes with FicFairy' : skin.place === 'browser' ? 'this browser' : 'library' }})
       </option>
     }
   </select>
@@ -48,23 +48,26 @@
 @if (skins.readProblem()) {
   <p class="error read-problem">The skins in your library could not be read: {{ skins.readProblem() }}</p>
 }
-@if (skins.skins().length) {
-  <ul class="skin-list">
-    @for (skin of skins.skins(); track id(skin)) {
-      <li class="skin" [attr.data-skin]="id(skin)">
-        <span class="skin-name">{{ skin.name }}</span>
-        <span class="skin-place">{{ placeWords(skin) }}</span>
-        @if (skins.defaultId() === id(skin)) {
-          <span class="badge">Default</span>
-        }
+<!-- AO3 comes with FicFairy, so the list is never empty -->
+<ul class="skin-list">
+  @for (skin of skins.skins(); track id(skin)) {
+    <li class="skin" [attr.data-skin]="id(skin)">
+      <span class="skin-name">{{ skin.name }}</span>
+      <span class="skin-place">{{ placeWords(skin) }}</span>
+      @if (skins.defaultId() === id(skin)) {
+        <span class="badge">Default</span>
+      }
+      <!-- one that comes with FicFairy is always there to choose -->
+      @if (skin.place !== 'builtin') {
         <button type="button" class="button subtle remove-skin" (click)="remove(skin)">
           {{ confirmingRemove() === id(skin) ? 'Click again to remove' : 'Remove' }}
         </button>
-      </li>
-    }
-  </ul>
-} @else if (!skins.reading()) {
-  <p class="hint no-skins">No reading skins yet - add one below.</p>
+      }
+    </li>
+  }
+</ul>
+@if (!skins.reading() && !skins.browserSkins().length && !skins.librarySkins().length) {
+  <p class="hint no-skins">No skins of your own yet - add one below.</p>
 }
 
 <h4>Add a skin</h4>

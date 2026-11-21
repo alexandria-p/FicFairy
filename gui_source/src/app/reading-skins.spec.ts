@@ -2,7 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { DebugMode } from './debug-mode';
 import { Library } from './library';
 import { MemoryStore } from './memory-store';
-import { BROWSER_SKINS_KEY, DEFAULT_SKIN_KEY, LAYER_SKIN_KEY, ReadingSkins, skinProblem } from './reading-skins';
+import { BROWSER_SKINS_KEY, BUILT_IN_SKINS, DEFAULT_SKIN_KEY, LAYER_SKIN_KEY, ReadingSkins, skinProblem } from './reading-skins';
+import { AO3_READING_SKIN } from './ao3-reading-skin';
 import { ReadingSkinsSettings } from './reading-skins-settings';
 import { hasWorkSkin, shownWork, withAo3Shape, withReadingSkin } from './skin-html';
 
@@ -280,6 +281,33 @@ describe('ReadingSkins', () => {
     expect(localStorage.getItem(LAYER_SKIN_KEY)).toBeNull();
   });
 
+  it('comes with an AO3 skin that can be the default and is never removed', async () => {
+    const { library, skins } = setUp(new MemoryStore());
+    expect(BUILT_IN_SKINS.map((x) => x.name)).toEqual(['AO3']);
+    expect(skins.skins()[0]).toEqual({ name: 'AO3', place: 'builtin', css: AO3_READING_SKIN });
+
+    skins.setDefault('builtin:AO3');
+    TestBed.tick();
+    expect(localStorage.getItem(DEFAULT_SKIN_KEY)).toBe('builtin:AO3');
+    expect(library.readingSkin()).toBe(AO3_READING_SKIN);
+
+    expect(await skins.remove(skins.skins()[0])).toContain('cannot be removed');
+    expect(skins.skins()[0].name).toBe('AO3');
+    expect(localStorage.getItem(DEFAULT_SKIN_KEY)).toBe('builtin:AO3');
+  });
+
+  it('lays a downloaded work out with the AO3 skin, its tags box and headings styled as AO3 does', () => {
+    expect(skinProblem('AO3', AO3_READING_SKIN)).toBeNull();
+    const shown = withReadingSkin(DOWNLOADED, AO3_READING_SKIN);
+    const doc = new DOMParser().parseFromString(shown, 'text/html');
+    // the skin is last, after AO3's basics, so it wins where they say the same thing
+    const styles = [...doc.head.querySelectorAll('style')].map((x) => x.textContent ?? '');
+    expect(styles.at(-1)).toContain(AO3_READING_SKIN.trim());
+    expect(AO3_READING_SKIN).toContain('dl.work.meta');
+    expect(AO3_READING_SKIN).toContain('.preface .title.heading');
+    expect(doc.querySelector('dl.work.meta.group')).not.toBeNull();
+  });
+
   it('removing the default skin leaves none chosen', async () => {
     const store = new MemoryStore();
     const { library, skins } = setUp(store);
@@ -425,7 +453,7 @@ describe('ReadingSkinsSettings', () => {
     expect(element.querySelector('.skin-outcome')?.textContent).toContain('saved in your library');
     expect(element.querySelector('[data-skin="library:Cosy"] .skin-place')?.textContent).toContain('library');
     const options = [...element.querySelectorAll<HTMLOptionElement>('select[name=defaultReadingSkin] option')];
-    expect(options.map((x) => x.value)).toEqual(['', 'library:Cosy']);
+    expect(options.map((x) => x.value)).toEqual(['', 'builtin:AO3', 'library:Cosy']);
   });
 
   it('offers layering ticked, and says what unticking it does', async () => {
@@ -445,7 +473,7 @@ describe('ReadingSkinsSettings', () => {
     expect(TestBed.inject(ReadingSkins).layer()).toBe(false);
   });
 
-  it('offers no skins but those you add, and says so while there are none', async () => {
+  it('offers AO3 and the skins you add, and says so while you have none of your own', async () => {
     TestBed.configureTestingModule({
       providers: [{ provide: DebugMode, useValue: { on: () => true } }],
     });
@@ -454,8 +482,13 @@ describe('ReadingSkinsSettings', () => {
     const element: HTMLElement = fixture.nativeElement;
 
     const options = [...element.querySelectorAll<HTMLOptionElement>('select[name=defaultReadingSkin] option')];
-    expect(options.map((x) => x.value)).toEqual(['']);
-    expect(element.querySelector('.no-skins')).not.toBeNull();
+    expect(options.map((x) => x.value)).toEqual(['', 'builtin:AO3']);
+    expect(options[1].textContent?.trim()).toBe('AO3 (comes with FicFairy)');
+    expect(element.querySelector('.no-skins')?.textContent?.trim()).toBe('No skins of your own yet - add one below.');
+    // AO3 is listed, and cannot be removed
+    const ao3 = element.querySelector('[data-skin="builtin:AO3"]')!;
+    expect(ao3.querySelector('.skin-place')?.textContent?.trim()).toBe('Comes with FicFairy');
+    expect(ao3.querySelector('.remove-skin')).toBeNull();
     // a work from FicHub is laid out differently, and never has its author's skin
     expect(element.querySelector('.fichub-look')?.textContent).toContain('FicHub');
   });
