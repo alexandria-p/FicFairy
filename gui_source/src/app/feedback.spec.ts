@@ -260,7 +260,9 @@ describe('Feedback', () => {
     expect(words('easy')).toEqual(['Very hard', 'Hard', 'Neutral', 'Easy', 'Very easy']);
     // nothing picked to begin with: every question unanswered
     expect(['easy', 'useful', 'confusing', 'complete'].every((k) => choices(k).every((c) => !c.checked))).toBe(true);
-    expect(element.querySelector('[data-rating="easy"] .rating-said')?.textContent).toContain('Not answered');
+    // no line saying so, and nothing to clear yet
+    expect(element.querySelector('[data-rating="easy"] .rating-said')).toBeNull();
+    expect(element.querySelector('.quick-questions')?.textContent).not.toContain('Pick an answer');
 
     const pick = async (key: string, value: number) => {
       choices(key)[value - 1].click();
@@ -271,9 +273,10 @@ describe('Feedback', () => {
     // the middle word is an answer like any other
     await pick('complete', 3);
     expect(element.querySelector('[data-rating="easy"]')!.classList).toContain('answered');
+    expect(element.querySelector('[data-rating="easy"] .rating-said')!.textContent!.trim()).toBe('Clear');
     element.querySelector<HTMLButtonElement>('[data-rating="useful"] .clear-rating')!.click();
     await fixture.whenStable();
-    expect(element.querySelector('[data-rating="useful"] .rating-said')?.textContent).toContain('Not answered');
+    expect(element.querySelector('[data-rating="useful"] .clear-rating')).toBeNull();
     expect(choices('useful').every((c) => !c.checked)).toBe(true);
     expect(fold.querySelector('summary')?.textContent).toContain('2 answered');
 

@@ -78,7 +78,6 @@
                 <em>(Optional)</em> Quick questions about your experience
                 @if (ratedCount()) { <span class="dim">- {{ ratedCount() }} answered</span> }
               </summary>
-              <p class="hint">Pick an answer for any you like. One you leave unpicked is not sent.</p>
               @for (q of ratingQuestions; track q.key) {
                 <fieldset class="rating" [attr.data-rating]="q.key" [class.answered]="ratingOf(q.key) !== undefined">
                   <legend>{{ q.question }}</legend>
@@ -91,14 +90,12 @@
                       </label>
                     }
                   </div>
-                  <p class="rating-said">
-                    @if (ratingOf(q.key) === undefined) {
-                      <span class="dim">Not answered</span>
-                    } @else {
-                      Answered
+                  <!-- only a question with a word picked has anything to clear -->
+                  @if (ratingOf(q.key) !== undefined) {
+                    <p class="rating-said">
                       <button type="button" class="clear-rating" (click)="clearRating(q.key)">Clear</button>
-                    }
-                  </p>
+                    </p>
+                  }
                 </fieldset>
               }
             </details>
