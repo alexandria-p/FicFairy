@@ -863,6 +863,12 @@
             @if (part.authors.length) {
               <span class="part-author"><span class="by">by</span>&nbsp;{{ part.authors.join(', ') }}</span>
             }
+            <!-- beside the title, where it is read with it - never after the summary -->
+            @if (part.id === current) {
+              <span class="badge">This work</span>
+            } @else if (part.bookmarked) {
+              <span class="badge">Also bookmarked</span>
+            }
             <!-- a line of their own, so they never split the title from its author on a narrow screen -->
             @if (formatsOf(part).length) {
               <span class="part-formats">
@@ -884,11 +890,6 @@
                   }
                 </blockquote>
               </details>
-            }
-            @if (part.id === current) {
-              <span class="badge">This work</span>
-            } @else if (part.bookmarked) {
-              <span class="badge">Also bookmarked</span>
             }
           }
           </div>
