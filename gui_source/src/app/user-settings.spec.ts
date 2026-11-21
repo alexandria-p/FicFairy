@@ -649,7 +649,7 @@ describe('UserSettings', () => {
     const options = [...element.querySelectorAll('[data-setting="FicHubAnswer"] option')]
       .map((x) => x.textContent?.trim());
     // in the words of the question's own buttons; the file still holds yes / no
-    expect(options).toEqual(['Try FicHub', 'No, leave them']);
+    expect(options).toEqual(['Try FicHub (default)', 'No, leave them']);
 
     choose('[data-setting="FicHubAnswer"] select', 'no');
     await settle();
@@ -664,8 +664,9 @@ describe('UserSettings', () => {
     await open();
 
     const row = element.querySelector('[data-setting="AO3GuessedOlderAnswer"]')!;
-    expect([...row.querySelectorAll('option')].map((x) => x.textContent?.trim())).toEqual(['Keep mine', 'Replace it']);
-    expect(row.querySelector('.default')?.textContent).toContain('default: Keep mine');
+    // the default is marked in the list itself, never in a line of its own
+    expect([...row.querySelectorAll('option')].map((x) => x.textContent?.trim())).toEqual(['Keep mine (default)', 'Replace it']);
+    expect(row.querySelector('.default')).toBeNull();
 
     // the file still holds no / yes
     choose('[data-setting="AO3GuessedOlderAnswer"] select', 'yes');
@@ -680,8 +681,8 @@ describe('UserSettings', () => {
     await open();
 
     const row = element.querySelector('[data-setting="NobodyHereTakeDefaults"]')!;
-    expect([...row.querySelectorAll('option')].map((x) => x.textContent?.trim())).toEqual(['On', 'Off']);
-    expect(row.querySelector('.default')?.textContent).toContain('default: On');
+    expect([...row.querySelectorAll('option')].map((x) => x.textContent?.trim())).toEqual(['On (default)', 'Off']);
+    expect(row.querySelector('.default')).toBeNull();
 
     choose('[data-setting="NobodyHereTakeDefaults"] select', 'false');
     await settle();
@@ -775,7 +776,7 @@ describe('UserSettings', () => {
     // the defaults are worded as the buttons a question offers
     const options = [...element.querySelectorAll('[data-question-setting="overwrite-older"] option')]
       .map((x) => x.textContent?.trim());
-    expect(options).toEqual(['No, keep my newer copy', 'Yes, replace it']);
+    expect(options).toEqual(['No, keep my newer copy (default)', 'Yes, replace it']);
   });
 
   it('lists the six cases and the retry question a run can always answer, changes one, and forgets one so it asks again', async () => {
@@ -874,10 +875,14 @@ describe('UserSettings', () => {
     expect(prompts.querySelector('summary .saved-to')?.textContent?.trim()).toBe('Saved to this browser');
   });
 
-  it('shows each setting\'s default beside it', async () => {
+  it('marks a setting\'s default in its list, or on hovering a box with no list', async () => {
     await open();
 
-    expect(element.querySelector('[data-setting="ExtraWaitTime"] .default')?.textContent).toContain('default: 40');
+    // no line of its own any more
+    expect(element.querySelector('.default')).toBeNull();
+    expect(element.querySelector('[data-setting="ExtraWaitTime"] input')!.getAttribute('title')).toBe('Default: 40');
+    expect([...element.querySelectorAll('[data-setting="EnableDebugLogging"] option')].map((x) => x.textContent?.trim()))
+      .toEqual(['true', 'false (default)']);
   });
 
   it('asks before resetting, and Cancel changes nothing', async () => {
