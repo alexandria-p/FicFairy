@@ -2540,6 +2540,40 @@ describe('DownloadDialog', () => {
     expect(jobs.started[0].options.series).toBe(true);
   });
 
+  for (const action of ['collection', 'collections'] as const) {
+    it(`offers work skins on a ${action} run indexing its works, and sends them when ticked`, async () => {
+      debugOn();
+      await open(action);
+      await advanceTo('options');
+      checkbox('Index and download encountered works')!.click();
+      await fixture.whenStable();
+      await advanceTo('filetypes');
+
+      const box = element.querySelector<HTMLInputElement>('input[name=skins]')!;
+      expect(box).not.toBeNull();
+      expect(box.checked).toBe(false);
+      box.click();
+      await fixture.whenStable();
+      // collection listings carry no skin: each costs a request, after the downloads
+      expect(element.querySelector('.skins-hint')?.textContent).toContain('At most one extra request');
+      await advanceTo('running');
+
+      expect(jobs.started[0].options).toMatchObject({ collectionWorks: true, skins: true });
+    });
+
+    it(`offers no work skins on a ${action} run that does not index its works`, async () => {
+      debugOn();
+      await open(action);
+      await advanceTo('options');
+      await advanceTo('credentials');
+
+      // no file types page, so no box - and nothing sent
+      expect(element.querySelector('input[name=skins]')).toBeNull();
+      await advanceTo('running');
+      expect(jobs.started[0].options).toMatchObject({ collectionWorks: false, skins: false });
+    });
+  }
+
   it('offers to follow a collection\'s subcollections and parent, and sends the choice', async () => {
     await open('collection');
     await advanceTo('options');

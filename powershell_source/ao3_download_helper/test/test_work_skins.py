@@ -726,6 +726,32 @@ def test_a_custom_run_keeps_work_skins_whatever_it_covers(options):
     sent = started_options(server.ACTION_CUSTOM, {'skins': True, **options})
     assert sent['skins'] is True and sent['skinsOnly'] is False
 
+COLLECTION_URL = 'https://archiveofourown.org/collections/somename'
+
+
+@pytest.mark.parametrize('action, url', [(server.ACTION_COLLECTIONS, ''),
+                                         (server.ACTION_COLLECTION, COLLECTION_URL)])
+def test_a_collection_run_indexing_its_works_keeps_work_skins_and_lists_the_step(action, url):
+    sent = started_options(action, {'skins': True, 'collectionWorks': True}, url)
+    assert sent['skins'] is True
+
+    job = MagicMock()
+    job.action = action
+    job.filetypes = ['JSON', 'HTML']
+    job.options = server.resolve_options({'skins': True, 'collectionWorks': True})
+    steps = [x for x, _ in server.step_plan(job)]
+    assert steps.index('skins') == steps.index('fichub') - 1
+
+
+@pytest.mark.parametrize('action, url', [(server.ACTION_COLLECTIONS, ''),
+                                         (server.ACTION_COLLECTION, COLLECTION_URL)])
+def test_a_collection_run_not_indexing_its_works_saves_no_skins(action, url):
+    # it downloads nothing - json only - so there is no html for a skin to go with
+    assert started_options(action, {'skins': True}, url)['skins'] is False
+    assert started_options(action, {'skins': True, 'collectionWorks': True}, url,
+                           filetypes=['JSON'])['skins'] is False
+
+
 # endregion
 
 
