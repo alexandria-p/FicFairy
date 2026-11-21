@@ -583,8 +583,9 @@
 
 .series-list li {
   display: grid;
-  grid-template-columns: 4.5em minmax(0, 1fr);
-  align-items: baseline;
+  grid-template-columns: 5.5em minmax(0, 1fr);
+  column-gap: 8px;
+  align-items: start;
   padding: 6px 0;
   border-top: 1px solid var(--border);
   font-size: 0.88rem;
@@ -610,11 +611,20 @@
   margin-left: 0.3em;
 }
 
+/* the part number, then its format buttons one under another */
+.part-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding-top: 2px;
+}
+
 .part-formats {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 4px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
 }
 
 .part-formats .format {
