@@ -403,3 +403,24 @@ a.button {
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* each attachment's box and everything it opens, in a panel of its own */
+.attach-panel {
+  margin: 12px 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-2);
+}
+
+.attach-panel.on {
+  border-color: var(--accent-line);
+}
+
+.attach-panel > .check:first-child {
+  margin-top: 0;
+}
+
+.attach-panel > :last-child {
+  margin-bottom: 0;
+}

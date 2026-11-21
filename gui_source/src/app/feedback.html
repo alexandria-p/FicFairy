@@ -100,105 +100,110 @@
               }
             </details>
 
-            <label class="check" [class.unavailable]="!canAttach()">
-              <input type="checkbox" name="attachLog" [checked]="attachLog()" [disabled]="!canAttach()"
-                (change)="toggleLog($any($event.target).checked)" />
-              Attach a run's log <em>(optional)</em>
-            </label>
-            @if (!canAttach()) {
-              <p class="hint">Open your library first (either your local filesystem, or Dropbox) - this is where run logs are kept.</p>
-            }
-            @if (attachLog()) {
-              <div class="log-choice" role="radiogroup" aria-label="Which run's log">
-                <label class="radio">
-                  <input type="radio" name="logChoice" value="latest" [checked]="logChoice() === 'latest'"
-                    (change)="setLogChoice('latest')" />
-                  The most recent run
-                </label>
-                <label class="radio">
-                  <input type="radio" name="logChoice" value="choose" [checked]="logChoice() === 'choose'"
-                    (change)="setLogChoice('choose')" />
-                  Choose a run
-                </label>
-                @if (logChoice() === 'choose') {
-                  @if (runListFailed()) {
-                    <p class="hint">Your runs could not be read - attach the most recent one instead.</p>
-                  } @else if (runList(); as runs) {
-                    @if (runs.length) {
-                      <select class="run-pick" aria-label="Run" [value]="chosenRun()"
-                        (change)="chooseRun($any($event.target).value)">
-                        <option value="" disabled [selected]="!chosenRun()">Choose a run...</option>
-                        @for (run of runs; track run.file) {
-                          <option [value]="run.file">{{ runLabel(run) }}</option>
-                        }
-                      </select>
+            <!-- each attachment in a panel of its own, so what sits under a box plainly belongs to it -->
+            <div class="attach-panel run-log-panel" [class.on]="attachLog()">
+              <label class="check" [class.unavailable]="!canAttach()">
+                <input type="checkbox" name="attachLog" [checked]="attachLog()" [disabled]="!canAttach()"
+                  (change)="toggleLog($any($event.target).checked)" />
+                <span>Attach a run's log <em>(optional)</em></span>
+              </label>
+              @if (!canAttach()) {
+                <p class="hint">Open your library first (either your local filesystem, or Dropbox) - this is where run logs are kept.</p>
+              }
+              @if (attachLog()) {
+                <div class="log-choice" role="radiogroup" aria-label="Which run's log">
+                  <label class="radio">
+                    <input type="radio" name="logChoice" value="latest" [checked]="logChoice() === 'latest'"
+                      (change)="setLogChoice('latest')" />
+                    The most recent run
+                  </label>
+                  <label class="radio">
+                    <input type="radio" name="logChoice" value="choose" [checked]="logChoice() === 'choose'"
+                      (change)="setLogChoice('choose')" />
+                    Choose a run
+                  </label>
+                  @if (logChoice() === 'choose') {
+                    @if (runListFailed()) {
+                      <p class="hint">Your runs could not be read - attach the most recent one instead.</p>
+                    } @else if (runList(); as runs) {
+                      @if (runs.length) {
+                        <select class="run-pick" aria-label="Run" [value]="chosenRun()"
+                          (change)="chooseRun($any($event.target).value)">
+                          <option value="" disabled [selected]="!chosenRun()">Choose a run...</option>
+                          @for (run of runs; track run.file) {
+                            <option [value]="run.file">{{ runLabel(run) }}</option>
+                          }
+                        </select>
+                      } @else {
+                        <p class="hint">There are no runs in this library yet.</p>
+                      }
                     } @else {
-                      <p class="hint">There are no runs in this library yet.</p>
+                      <p class="reading-runs" role="status"><span class="spinner" aria-hidden="true"></span> Reading your runs...</p>
                     }
-                  } @else {
-                    <p class="reading-runs" role="status"><span class="spinner" aria-hidden="true"></span> Reading your runs...</p>
                   }
+                </div>
+                @if (logPreview()) {
+                  <label class="field log-amount">
+                    <span>How much of it to attach</span>
+                    <select name="logAmount" (change)="setLogAmount($any($event.target).value)">
+                      @for (amount of logAmounts; track amount) {
+                        <option [value]="amount" [selected]="logAmount() === amount">{{ amountWords(amount, logAttachLimit) }}</option>
+                      }
+                    </select>
+                  </label>
+                  @if (logCut()) {
+                    <p class="hint log-cut" role="status">
+                      Only the most recent part of this run's log is attached{{ logTrimmedTo() !== null ? ', trimmed to fit' : '' }},
+                      under the run's details. You can download the whole of it any time from the
+                      <strong>History</strong> tab: find the run and choose <strong>Download log</strong>.
+                    </p>
+                  }
+                  <details class="log">
+                    <summary>See exactly what will be sent</summary>
+                    <pre>{{ logPreview() }}</pre>
+                  </details>
+                  <p class="hint">Your AO3 username is taken out of it. It never holds your password.</p>
+                } @else if (logNote()) {
+                  <p class="hint">{{ logNote() }}</p>
+                } @else if (logChoice() === 'latest' || chosenRun()) {
+                  <p class="hint">Reading the log...</p>
                 }
-              </div>
-              @if (logPreview()) {
+              }
+            </div>
+
+            <div class="attach-panel visit-panel" [class.on]="attachVisit()">
+              <label class="check">
+                <input type="checkbox" name="attachVisit" [checked]="attachVisit()"
+                  (change)="toggleVisit($any($event.target).checked)" />
+                <span>Attach what I did on this visit <em>(optional)</em></span>
+              </label>
+              @if (attachVisit()) {
+                <!-- said once ticked, at the owner's request -->
+                <p class="hint visit-hint">
+                  What actions you took this session: the tabs you opened, library reads, windows, runs
+                  started and the settings you changed.
+                </p>
                 <label class="field log-amount">
                   <span>How much of it to attach</span>
-                  <select name="logAmount" (change)="setLogAmount($any($event.target).value)">
+                  <select name="visitAmount" (change)="setVisitAmount($any($event.target).value)">
                     @for (amount of logAmounts; track amount) {
-                      <option [value]="amount" [selected]="logAmount() === amount">{{ amountWords(amount, logAttachLimit) }}</option>
+                      <option [value]="amount" [selected]="visitAmount() === amount">{{ amountWords(amount, visitAttachLimit) }}</option>
                     }
                   </select>
                 </label>
-                @if (logCut()) {
-                  <p class="hint log-cut" role="status">
-                    Only the most recent part of this run's log is attached{{ logTrimmedTo() !== null ? ', trimmed to fit' : '' }},
-                    under the run's details. You can download the whole of it any time from the
-                    <strong>History</strong> tab: find the run and choose <strong>Download log</strong>.
+                @if (visitCut()) {
+                  <p class="hint visit-cut" role="status">
+                    Only the most recent part of your visit log is attached{{ visitTrimmedTo() !== null ? ', trimmed to fit' : '' }}.
+                    You can download the whole of it from <strong>User settings</strong>, under
+                    <strong>Advanced</strong>.
                   </p>
                 }
-                <details class="log">
+                <details class="log visit">
                   <summary>See exactly what will be sent</summary>
-                  <pre>{{ logPreview() }}</pre>
+                  <pre>{{ visitPreview() }}</pre>
                 </details>
-                <p class="hint">Your AO3 username is taken out of it. It never holds your password.</p>
-              } @else if (logNote()) {
-                <p class="hint">{{ logNote() }}</p>
-              } @else if (logChoice() === 'latest' || chosenRun()) {
-                <p class="hint">Reading the log...</p>
               }
-            }
-
-            <label class="check">
-              <input type="checkbox" name="attachVisit" [checked]="attachVisit()"
-                (change)="toggleVisit($any($event.target).checked)" />
-              Attach what I did on this visit <em>(optional)</em>
-            </label>
-            @if (attachVisit()) {
-              <!-- said once ticked, at the owner's request -->
-              <p class="hint visit-hint">
-                What actions you took this session: the tabs you opened, library reads, windows, runs
-                started and the settings you changed.
-              </p>
-              <label class="field log-amount">
-                <span>How much of it to attach</span>
-                <select name="visitAmount" (change)="setVisitAmount($any($event.target).value)">
-                  @for (amount of logAmounts; track amount) {
-                    <option [value]="amount" [selected]="visitAmount() === amount">{{ amountWords(amount, visitAttachLimit) }}</option>
-                  }
-                </select>
-              </label>
-              @if (visitCut()) {
-                <p class="hint visit-cut" role="status">
-                  Only the most recent part of your visit log is attached{{ visitTrimmedTo() !== null ? ', trimmed to fit' : '' }}.
-                  You can download the whole of it from <strong>User settings</strong>, under
-                  <strong>Advanced</strong>.
-                </p>
-              }
-              <details class="log visit">
-                <summary>See exactly what will be sent</summary>
-                <pre>{{ visitPreview() }}</pre>
-              </details>
-            }
+            </div>
 
             <div class="check-widget" #check></div>
             @if (failed()) {
