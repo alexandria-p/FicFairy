@@ -928,14 +928,14 @@ export class DownloadDialog implements OnDestroy {
     this.selected().some((x) => x.toUpperCase() === 'HTML'));
   /**
    * A run that opens each work's page on AO3 anyway - the fic runs, the update pass, a custom run
-   * checking existing works against AO3 - so a skin costs it no request at all, and does not
-   * hang on the HTML being downloaded.
+   * checking existing works against AO3 - so a skin costs it no request at all. It still needs
+   * HTML ticked, as every run does (`skinsHeld`).
    */
   protected readonly freeSkins = computed(() =>
     ['work', 'works', 'update'].includes(this.action()) ||
     (this.action() === 'custom' && this.coverage() === 'existing' && this.existingCheck() === 'ao3'));
-  /** the box held: a run that reads skins only for the HTML it downloads, with HTML unticked */
-  protected readonly skinsHeld = computed(() => !this.freeSkins() && !this.htmlTicked());
+  /** the box held while HTML is unticked - on every run, at the owner's request */
+  protected readonly skinsHeld = computed(() => !this.htmlTicked());
 
   /**
    * Which runs may fetch a work again that nothing says is out of date.

@@ -959,7 +959,7 @@ def test_a_link_that_is_not_one_collection_is_refused_before_the_job_starts(url)
     assert 'collection' in sent['body']['error'].lower()
 
 
-def started_options(action, asked, url=''):
+def started_options(action, asked, url='', filetypes=None):
     """Post a job and hand back the options the helper decided it would run with."""
 
     sent = {}
@@ -967,7 +967,7 @@ def started_options(action, asked, url=''):
     handler.path = '/api/jobs'
     handler.read_json.return_value = {
         'action': action, 'username': 'Someone', 'password': 'a-password',
-        'filetypes': ['JSON', 'HTML'], 'options': asked, 'url': url}
+        'filetypes': filetypes or ['JSON', 'HTML'], 'options': asked, 'url': url}
     handler.send_json.side_effect = lambda status, body: sent.update(status=status, body=body)
 
     # each start on a helper running nothing: the thread is stubbed, so the run it registers

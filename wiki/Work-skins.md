@@ -10,12 +10,12 @@ Each skin is saved beside your works as `skins/<work number>.css`. A work checke
 
 **A skin is never put into an HTML file.** It is only ever saved as CSS beside your works.
 
-Only a run with **[DEBUG] Fetch work skin for HTML downloads** ticked saves skins. That box is on the file types page of every run (every custom run too, whatever it covers - all but *Just fetch work skins*, and not on a retry). It is in debug mode only and off to begin with. Unticked, a run saves no skin and asks AO3 nothing extra.
+Only a run with **[DEBUG] Fetch work skin for HTML downloads** ticked saves skins. That box is on the file types page of every run (every custom run too, whatever it covers - all but *Just fetch work skins*, and not on a retry). It is in debug mode only and off to begin with, and **only works with HTML ticked**, on every run - without HTML it is greyed out. Unticked, a run saves no skin and asks AO3 nothing extra.
 
 Ticked, a run gets a skin in one of two ways:
 
-- **For free** - a run that already opens a work's page on AO3 (to index it or check it for updates) saves that page's skin at the same time. No extra request, and it is AO3's latest. It happens every time the page is read, whether or not the work's HTML is downloaded. These runs don't need HTML ticked.
-- **In a step of its own** - every other run reads skins only for the works whose HTML it downloads (a new download, an updated chapter, or HTML overwritten). That is one more request per work, made after the downloads: **Fetch work skins for the HTML downloaded**. A work whose HTML is already current is not checked. These runs need HTML ticked.
+- **For free** - a run that already opens a work's page on AO3 (to index it or check it for updates) saves that page's skin at the same time. No extra request, and it is AO3's latest. It happens every time the page is read, whether or not the work's HTML is downloaded.
+- **In a step of its own** - every other run reads skins only for the works whose HTML it downloads (a new download, an updated chapter, or HTML overwritten). That is one more request per work, made after the downloads: **Fetch work skins for the HTML downloaded**. A work whose HTML is already current is not checked.
 
 | Run | With the debug box ticked | Cost |
 | --- | --- | --- |

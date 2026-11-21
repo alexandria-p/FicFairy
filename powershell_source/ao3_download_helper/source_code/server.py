@@ -1208,11 +1208,9 @@ def checks_non_bookmarks(job: Job) -> bool:
 def fetches_skins(job: Job) -> bool:
     """Whether the run fetches work skins with the html it downloads - and so lists the step
     that reads the ones not to hand (`fetch_pending_skins`)."""
-    if not (job.options or {}).get('skins'): return False
-    # a retry going back for skins its earlier attempt missed reads them whatever it downloads
-    resume = getattr(job, 'resume', None)
-    carried = isinstance(resume, dict) and bool(resume.get('missedSkins'))
-    return carried or 'HTML' in [str(x).upper() for x in job.filetypes]
+    # only with HTML ticked, on every run (`do_POST` clears the option without it)
+    return bool((job.options or {}).get('skins')) and \
+        'HTML' in [str(x).upper() for x in job.filetypes]
 
 
 def step_plan(job: Job) -> list[tuple[str, str]]:
@@ -6798,6 +6796,9 @@ class Handler(BaseHTTPRequestHandler):
         else:
             options['skinScope'] = 'unchecked'
             options['skinWorks'] = []
+            # work skins go with html, on every run - the ones that read each work's page anyway
+            # included, at the owner's request: no HTML ticked, no skin saved
+            if 'HTML' not in [str(x).upper() for x in filetypes]: options['skins'] = False
 
         url = (body.get('url') or '').strip()
         # checked here rather than on the thread, so a bad link is a straight answer to the

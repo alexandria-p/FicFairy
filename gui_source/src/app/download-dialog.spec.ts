@@ -585,19 +585,23 @@ describe('DownloadDialog', () => {
   });
 
   for (const action of ['work', 'works', 'update'] as const) {
-    it(`says a ${action} run saves work skins at no extra request, and needs no HTML for it`, async () => {
+    it(`says a ${action} run saves work skins at no extra request, and holds the box without HTML`, async () => {
       debugOn();
       await open(action);
       await advanceTo('filetypes');
-      checkbox('HTML')!.click();
-      await fixture.whenStable();
       const box = element.querySelector<HTMLInputElement>('input[name=skins]')!;
-      expect(box.disabled).toBe(false);
       box.click();
       await fixture.whenStable();
 
       const said = element.querySelector('.skins-hint')?.textContent?.replace(/\s+/g, ' ').trim();
       expect(said).toBe('No extra requests to AO3 in this run - it opens each work\'s page anyway. Work skins are only fetched from AO3.');
+
+      checkbox('HTML')!.click();
+      await fixture.whenStable();
+      expect(element.querySelector<HTMLInputElement>('input[name=skins]')!.disabled).toBe(true);
+      expect(element.querySelector('.skins-hint')?.textContent).toContain('Tick HTML');
+      checkbox('HTML')!.click();
+      await fixture.whenStable();
       await advanceTo('running');
       expect(jobs.started[0].options).toMatchObject({ skins: true });
     });

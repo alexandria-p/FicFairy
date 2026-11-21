@@ -762,17 +762,20 @@ def test_a_retry_not_fetching_skins_leaves_the_missed_ones_alone(tmp_path):
     assert ao3.skins_pending == []
 
 
-@pytest.mark.parametrize('action', [server.ACTION_WORKS, server.ACTION_WORK, server.ACTION_UPDATE])
-def test_a_retry_going_back_for_missed_skins_lists_the_skins_step_whatever_it_downloads(action):
+@pytest.mark.parametrize('action', [server.ACTION_WORKS, server.ACTION_WORK, server.ACTION_UPDATE,
+                                    server.ACTION_CUSTOM, server.ACTION_QUICK])
+def test_work_skins_go_only_with_html_on_every_run_even_the_ones_reading_pages_anyway(action):
+    options = {'skins': True, **({'reindex': False, 'recheck': True} if action == server.ACTION_CUSTOM else {})}
+    url = {server.ACTION_WORK: '1', server.ACTION_WORKS: '1 2'}.get(action, '')
+    assert started_options(action, options, url, filetypes=['JSON'])['skins'] is False
+    assert started_options(action, options, url, filetypes=['JSON', 'HTML'])['skins'] is True
+
     job = MagicMock()
     job.action = action
-    job.filetypes = ['JSON']  # no html: these runs save skins from the pages they read anyway
+    job.filetypes = ['JSON']
     job.options = server.resolve_options({'skins': True})
-    job.resume = None
-    assert 'skins' not in [x for x, _ in server.step_plan(job)]
-
     job.resume = {'missedSkins': ['5']}
-    assert 'skins' in [x for x, _ in server.step_plan(job)]
+    assert 'skins' not in [x for x, _ in server.step_plan(job)]
 
 
 def test_the_skins_step_of_a_retry_reads_the_missed_works_and_saves_their_skins(tmp_path):
