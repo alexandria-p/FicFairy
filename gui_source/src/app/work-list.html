@@ -731,15 +731,15 @@
                     </button>
                   </li>
                 }
-                <!-- debug: a custom run that fetches this work's skin and nothing else -->
-                @if (offersSkins() && !work.error && worksToFetch(work).length) {
+                <!-- a custom run that fetches this work's skin and nothing else -->
+                @if (!work.error && worksToFetch(work).length) {
                   <li role="none">
                     <button type="button" role="menuitem" class="skin-now"
                       [class.unavailable]="runGoing()"
                       [attr.aria-disabled]="runGoing()"
                       [title]="runGoing() ? 'Unavailable while a run is already in progress' : ''"
                       (click)="!runGoing() && downloadSkin(work)">
-                      [DEBUG] Download work skin
+                      Download work skin
                     </button>
                   </li>
                 }
@@ -971,8 +971,8 @@
             : !tickedToFetch().length ? 'Nothing ticked can be downloaded - only works can, not series or external works'
             : fetchTickedNote()"
           (click)="downloadTicked()">{{ fetchTickedLabel() }}</button>
-        @if (offersSkins() && tickedForSkins().length) {
-          <button type="button" class="button debug skins-ticked" [disabled]="busy() || runGoing()"
+        @if (tickedForSkins().length) {
+          <button type="button" class="button skins-ticked" [disabled]="busy() || runGoing()"
             [title]="runGoing() ? 'Unavailable while a run is already in progress' : fetchTickedNote()"
             (click)="downloadTickedSkins()">{{ skinsTickedLabel() }}</button>
         }

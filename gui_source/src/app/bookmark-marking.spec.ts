@@ -313,13 +313,8 @@ describe('downloading or updating from the Works tab', () => {
     expect(TestBed.inject(Jobs).fetchWorksAsked()).toEqual(['11']);
   });
 
-  it("asks for a work's skin from its menu, in debug mode only", async () => {
+  it("asks for a work's skin from its menu, outside debug mode too", async () => {
     await listing([work('11')]);
-    expect((await menuOf('Work 11')).querySelector('button.skin-now')).toBeNull();
-
-    TestBed.inject(DebugMode).chosen.set(true);
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-    await settle();
     ((await menuOf('Work 11')).querySelector('button.skin-now') as HTMLButtonElement).click();
     expect(TestBed.inject(Jobs).skinsAsked()).toEqual(['11']);
   });

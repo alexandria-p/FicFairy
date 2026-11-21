@@ -1,1 +1,1 @@
-no-post
+Work skins and reading skins are out of debug mode. Fetch a work's own skin from each run's options, and read downloaded works with your own reading skin or the new built-in AO3 skin.

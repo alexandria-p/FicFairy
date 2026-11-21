@@ -111,7 +111,7 @@ export interface JobOptions {
   pages: number;
   series: boolean;
   images: boolean;
-  /** put each work's skin into the html the run downloads (debug only for now) */
+  /** save each work's skin as css beside the html the run downloads */
   skins?: boolean;
   workdates: boolean;
   /**
@@ -168,7 +168,7 @@ export interface JobOptions {
   reindex: boolean;
   /** skipping the indexing, look every indexed work up on AO3 (a custom run's alone) */
   recheck?: boolean;
-  /** a custom run that only fetches work skins - nothing indexed or downloaded (debug) */
+  /** a custom run that only fetches work skins - nothing indexed or downloaded */
   skinsOnly?: boolean;
   /**
    * fetching skins only, over the whole library: which works with html, by what is saved for each
@@ -768,7 +768,7 @@ export class Jobs {
   readonly lookUpAsked = signal<string[] | null>(null);
   /**
    * Works' skins asked to be fetched from a listing, by work number - an entry's ⋯ menu or the
-   * selection bar's *Download work skin* (debug mode). `App` takes it and opens a custom run set
+   * selection bar's *Download work skin*. `App` takes it and opens a custom run set
    * to fetch work skins only, for those works.
    */
   readonly skinsAsked = signal<string[] | null>(null);
