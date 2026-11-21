@@ -35,6 +35,10 @@ There are two ways a run gets a skin:
 
 A work with a skin saved shows a brush button on the Works tab, just left of the eye at the bottom of its entry. Hover says **Open downloaded workskin**; clicking it opens the saved CSS in a new tab.
 
+## In History
+
+A run that saved any skin lists them under **Work skins saved**. A run with the debug box ticked says so in its options (*work skins fetched for HTML downloads*); a *Just fetch work skins* run says what it covered.
+
 ## If a skin can't be fetched
 
 The HTML is kept exactly as AO3 sent it. The run lists the work as a skin that *could not be fetched or put in*, in the run window at the end, in History, and in the **Download issues** file. If a run is stopped, fails, or skips the skins step, the works whose HTML is still waiting for its skin are listed too (*HTML downloaded, work skin not fetched*), so you can fetch them later.

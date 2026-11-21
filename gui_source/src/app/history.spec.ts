@@ -482,6 +482,21 @@ describe('History', () => {
     expect(said).toContain('EPUB, HTML');
   });
 
+  it('lists the work skins a run saved, and says it fetched them', async () => {
+    await show([aRun({ action: 'quick', options: { skins: true }, skinsSaved: ['7', '8'],
+                       skinFailures: [{ id: '9', link: 'https://archiveofourown.org/works/9', error: 'its work page would not read: status 503' }] })]);
+
+    const said = element.querySelector('.run')?.textContent?.replace(/\s+/g, ' ') ?? '';
+    expect(said).toContain('work skins fetched for HTML downloads');
+    expect(said).toContain('Work skins saved 2');
+    expect(said).toContain('Work skins not fetched or put in 1');
+  });
+
+  it('says what a skins-only run covered', async () => {
+    await show([aRun({ action: 'custom', options: { skinsOnly: true, skinWorks: ['7', '8'] } })]);
+    expect(element.querySelector('.run')?.textContent).toContain('work skins only, for the 2 works picked');
+  });
+
   it('lists the works a run downloaded HTML for and never fetched the skin of', async () => {
     await show([aRun({ status: 'failed', skinsPending: ['7', '8'] })]);
 

@@ -376,6 +376,21 @@ def test_a_work_whose_skin_failed_leaves_the_waiting_list_for_the_failures(tmp_p
     assert [x['id'] for x in ao3.skin_failures] == ['41822007']
 
 
+def test_the_skins_saved_are_kept_with_the_run_in_order_and_none_are_left_out(tmp_path):
+    from source_code import runs
+    other = 'https://archiveofourown.org/works/7'
+    ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWork'), other: page('unlockedWorkNoSkin')})
+    ao3.fetch_page(WORK_PAGE, work=True)
+    ao3.fetch_page(other, work=True)
+    ao3.fetch_page(WORK_PAGE, work=True)  # read again: saved once, listed once
+
+    assert ao3.skins_found == ['41822007']
+    record = runs.RunRecord.__new__(runs.RunRecord)
+    record.data = {}
+    record.collect(ao3)
+    assert record.data['skinsSaved'] == ['41822007']
+
+
 def test_skins_still_waiting_are_reported_and_kept_with_the_run():
     from source_code import progress, runs
     ao3 = MagicMock()

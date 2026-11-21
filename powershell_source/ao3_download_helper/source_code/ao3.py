@@ -358,6 +358,9 @@ class Ao3:
         self.skin_css: dict[str, str] = {}
         # works whose skin this run saved to `skins/` while putting it into their html
         self.skins_saved: set[str] = set()
+        # the works whose skin this run saved as css, in the order saved - the run record's
+        # `skinsSaved`, which History lists (a work found to have none is not in it)
+        self.skins_found: list[str] = []
         # works whose page would not read for their skin this run
         self.skins_unread: set[str] = set()
         # the debug panel's Skip this step, asked at each page of a listing walk - set by the run
@@ -970,6 +973,7 @@ class Ao3:
             self.note_skin_failure(work, strings.SKIN_FAILED_NOT_SAVED.format(e))
             return False
         self.skins_saved.add(work)
+        if css: self.skins_found.append(work)
         return True
 
     def dress(self, work: str, filetype: str, name: str, content: bytes) -> bytes:

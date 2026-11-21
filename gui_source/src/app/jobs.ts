@@ -399,6 +399,8 @@ export interface RunHistory {
   skinFailures?: WorkFailure[];
   /** works whose html was downloaded and whose skin was not fetched yet - kept as the run goes */
   skinsPending?: string[];
+  /** works whose work skin the run saved as css */
+  skinsSaved?: string[];
   /** older copies marked for removal, and what became of each - absent on older runs */
   removals?: RunRemoval[];
   error: string;
