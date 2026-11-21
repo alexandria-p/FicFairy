@@ -4,6 +4,7 @@ import { LOOSE_PREFIX } from './unindexed-works';
 import { Component, computed, inject, input, linkedSignal, signal } from '@angular/core';
 import { WorkLink } from './work-link';
 import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
+import { DebugMode } from './debug-mode';
 import { Library, LocalCopy, OPENABLE_FORMATS, OpenableFormat, copyName, hiddenKey, viewableInBrowser } from './library';
 import { safeGet, safeSet } from './storage';
 import { Jobs } from './jobs';
@@ -430,6 +431,34 @@ export class WorkList {
   // region marking entries as bookmarks by hand
 
   private readonly jobs = inject(Jobs);
+  private readonly debugMode = inject(DebugMode);
+  /** fetching work skins is a debug tool for now, as the run window's own option is */
+  protected readonly offersSkins = computed(() => this.debugMode.on());
+
+  /** whether a work skin is saved for this entry's work - shown as an icon in its corner */
+  protected hasSkin(work: Bookmark): boolean {
+    return !!work.id && this.library.skinnedWorks().has(work.id);
+  }
+
+  /** the ticked works whose skins can be fetched - works only, as for downloading */
+  protected readonly tickedForSkins = computed(() => this.tickedToFetch());
+
+  protected readonly skinsTickedLabel = computed(() => {
+    const n = this.tickedForSkins().length;
+    return `[DEBUG] Download work skin for ${n.toLocaleString()} ${n === 1 ? 'work' : 'works'}`;
+  });
+
+  /** a custom run set to fetch these works' skins and nothing else */
+  protected downloadSkin(work: Bookmark): void {
+    this.menuFor.set(null);
+    const works = this.worksToFetch(work);
+    if (works.length && !this.runGoing()) this.jobs.skinsAsked.set(works);
+  }
+
+  protected downloadTickedSkins(): void {
+    const works = this.tickedForSkins();
+    if (works.length && !this.runGoing()) this.jobs.skinsAsked.set(works);
+  }
   /** a run reads and writes the index: marking by hand waits until it has ended */
   protected readonly runGoing = computed(() => this.jobs.activeRuns().length > 0);
   protected readonly markProblem = signal('');
@@ -1007,6 +1036,32 @@ export class WorkList {
       // shown as it is
     }
     const url = URL.createObjectURL(new Blob([shown], { type: 'application/json' }));
+    tab.location.href = url;
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }
+
+  /**
+   * The work skin saved for it (`skins/<work number>.css`), as text in a tab of its own - opened at
+   * once, as View index history is, since a tab opened after waiting is blocked as a pop-up.
+   */
+  protected async openSkin(work: Bookmark): Promise<void> {
+    const tab = window.open('', '_blank');
+    if (!tab) return;
+    tab.opener = null;
+    let css: string | null = null;
+    try {
+      css = work.id ? await this.library.skinText(work.id) : null;
+    } catch {
+      css = null;
+    }
+    this.visit.note(css === null ? 'Open downloaded workskin: no skin file found' : 'Open downloaded workskin: shown in a new tab');
+    if (css === null) {
+      tab.document.title = 'No work skin';
+      tab.document.body.textContent = `No work skin was found for ${work.title || work.id}.`;
+      return;
+    }
+    // plain text, so the browser shows it rather than offering to save a stylesheet
+    const url = URL.createObjectURL(new Blob([css], { type: 'text/plain;charset=utf-8' }));
     tab.location.href = url;
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }

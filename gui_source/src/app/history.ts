@@ -6,11 +6,11 @@ import { Component, computed, effect, inject, signal, untracked, output } from '
 import { WorkLink } from './work-link';
 import { DecimalPipe } from '@angular/common';
 import { ActiveRun, IndexGap, Jobs, RunChoice, RunHistory, RunRemoval } from './jobs';
-import { describeGap, fichubOlderWords, issueCount, issuesOf, issuesReport, repairClashWords, saveText } from './issues';
+import { describeGap, fichubOlderWords, issueCount, issuesOf, issuesReport, repairClashWords, saveText, workSkinLink } from './issues';
 import { Library } from './library';
 
 /** a run's fic lists, worded: new index entries apart from ones brought up to date */
-export function ficLists(run: Pick<RunHistory, 'reindexed' | 'newlyIndexed' | 'downloaded' | 'updated'>):
+export function ficLists(run: Pick<RunHistory, 'reindexed' | 'newlyIndexed' | 'downloaded' | 'updated' | 'skinsSaved'>):
     { label: string; ids: string[] }[] {
   const newly = new Set(run.newlyIndexed ?? []);
   return [
@@ -18,6 +18,8 @@ export function ficLists(run: Pick<RunHistory, 'reindexed' | 'newlyIndexed' | 'd
     { label: 'Re-indexed', ids: (run.reindexed ?? []).filter((id) => !newly.has(id)) },
     { label: 'Downloaded', ids: run.downloaded ?? [] },
     { label: 'Updated', ids: run.updated ?? [] },
+    // a work's author's skin, saved beside the works as css
+    { label: 'Work skins saved', ids: run.skinsSaved ?? [] },
   ];
 }
 import { StorageChoice } from './storage-choice';
@@ -63,6 +65,7 @@ export class History {
   protected readonly recentRunLogs = RECENT_RUN_LOGS;
   protected readonly fichubOlderWords = fichubOlderWords;
   protected readonly repairClashWords = repairClashWords;
+  protected readonly workSkinLink = workSkinLink;
   private readonly library = inject(Library);
   /** dummy data on screen: a retry would start a real run, so it is held as every run is */
   protected readonly dummy = inject(DummyData).active;
@@ -373,6 +376,17 @@ export class History {
     if (options['parentCollections']) said.push('with parent collections');
     if (options['series']) said.push('all works from encountered series');
     if (options['images']) said.push('save images separately');
+    if (options['skins']) said.push('work skins saved as css');
+    if (options['skinsOnly']) {
+      const picked = Array.isArray(options['skinWorks']) ? options['skinWorks'].length : 0;
+      const scopes: Record<string, string> = {
+        unchecked: 'works never checked for a skin', saved: 'works that already had a skin saved',
+        none: 'works last known to have no skin', all: 'all works',
+      };
+      said.push(picked
+        ? `work skins only, for ${picked === 1 ? 'the work' : `the ${picked} works`} picked`
+        : `work skins only, for ${scopes[String(options['skinScope'] ?? 'unchecked')] ?? 'works never checked for a skin'}`);
+    }
     return said;
   }
 

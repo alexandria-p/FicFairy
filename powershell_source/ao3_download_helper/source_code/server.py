@@ -31,7 +31,7 @@ import requests
 
 from source_code import access, dropbox_library, exceptions, fichub, settings_file, indexing, naming, parse_soup, parse_text, progress, runs, strings, updater as updates
 from source_code.actions import shared
-from source_code.ao3 import REASON_MAINTENANCE, SORT_DATE_SELECTORS, failure_reason, Ao3, index_gaps, was_bookmark
+from source_code.ao3 import REASON_MAINTENANCE, SKIN_NOTES, SORT_DATE_SELECTORS, failure_reason, Ao3, index_gaps, was_bookmark
 from source_code.fileio import FileOps
 from source_code.repo import Repository
 from source_code.storage import PageStorage
@@ -382,7 +382,12 @@ COLLECTION_ACTIONS = (ACTION_COLLECTIONS, ACTION_COLLECTION)
 # sets that itself rather than taking it from the request.
 OVERWRITE_ACTIONS = (ACTION_BOOKMARKS, ACTION_CUSTOM)
 # the runs that can put work skins into their html: the scans and the fic runs
-SKIN_ACTIONS = (ACTION_BOOKMARKS, ACTION_QUICK, ACTION_CUSTOM, ACTION_WORK, ACTION_WORKS)
+# every run that can download html may fetch work skins with it, at no cost unless ticked. A
+# run fetching skins alone (`skinsOnly`) is the custom run's, and sets it aside (`do_POST`)
+SKIN_ACTIONS = ACTIONS
+# which works a run fetching skins alone takes, by what is saved for each in `skins/`: none yet
+# (never checked), a skin (`.css`), the note that it has none (`.none`), or every one
+SKIN_SCOPES = ('unchecked', 'saved', 'none', 'all')
 
 # The runs that may also check every non-bookmark in the index for updates - the works it
 # holds only because they were found through something else, such as another work's series.
@@ -542,6 +547,18 @@ def resolve_options(requested) -> dict:
         # at a time, and judge its files against what AO3 says now (`rechecks`) rather than
         # against the index as it stands
         'recheck': bool(given.get('recheck')),
+        # a custom run that only fetches work skins: no index, no download - each work's page
+        # read for its author's skin, saved as `skins/<worknum>.css` (`run_skins_only`)
+        'skinsOnly': bool(given.get('skinsOnly')),
+        # which works with html it fetches skins for, by what is saved for them (`SKIN_SCOPES`):
+        # never checked (the default), a skin saved, noted as having none, or all of them.
+        # `overwriteSkins` from an older page is all of them
+        'skinScope': given.get('skinScope') if given.get('skinScope') in SKIN_SCOPES
+        else 'all' if given.get('overwriteSkins') else 'unchecked',
+        # the works to fetch skins for, by number - picked in the Works tab. none is every work
+        # with html in the library
+        'skinWorks': [str(x) for x in given.get('skinWorks') if str(x).isdigit()]
+        if isinstance(given.get('skinWorks'), list) else [],
         # any run may go without logging in - see USERNAME_ACTIONS for what it still needs
         'skipLogin': bool(given.get('skipLogin')),
         # a typed range: the page sends each end as the UTC moment it begins (from) or ends
@@ -953,6 +970,16 @@ class Job:
         real = isinstance(Ao3, type) and isinstance(value, Ao3)
         if real: value.skins = bool((getattr(self, 'options', None) or {}).get('skins'))
         if real: value.run_id = self.id
+        # the debug panel's Skip this step lands in a listing walk too, between pages
+        if real: value.skip_requested = self.skipping
+        # the works waiting for their skin go into the run record as the list grows
+        if real: value.on_skins_pending = self.note_skins_pending
+        # a retry fetching skins goes back for the ones its earlier attempt did not get, whether
+        # or not their html is downloaded again - read in the skins step with the rest
+        if real and value.skins is True:
+            for work in (getattr(self, 'resume', None) or {}).get('missedSkins') or []:
+                if work not in value.skins_pending: value.skins_pending.append(str(work))
+            if value.skins_pending: value.skins_pending_changed()
         done = self.earlier_progress().get('formatsDone') if getattr(self, 'resume', None) else None
         if value is not None and isinstance(done, dict):
             value.formats_done = {str(work): {str(x).upper() for x in formats or []}
@@ -969,6 +996,13 @@ class Job:
 
     def checkpoint(self, **fields) -> None:
         if self.record: self.record.checkpoint(**fields)
+
+    def note_skins_pending(self, works: list[str]) -> None:
+        """The works whose html is waiting for its skin, kept in the record as they are added and
+        taken off as the skins step reads each - in memory at once (what the page reads of a run
+        still going), and on disk with the record's next save, which a stop, a failure and the
+        end of a run all make at once."""
+        if self.record: self.record.data['skinsPending'] = list(works)
 
 
     def skipping(self) -> bool:
@@ -1171,6 +1205,14 @@ def checks_non_bookmarks(job: Job) -> bool:
     return job.action != ACTION_CUSTOM or bool(job.options.get('reindex'))
 
 
+def fetches_skins(job: Job) -> bool:
+    """Whether the run fetches work skins with the html it downloads - and so lists the step
+    that reads the ones not to hand (`fetch_pending_skins`)."""
+    # only with HTML ticked, on every run (`do_POST` clears the option without it)
+    return bool((job.options or {}).get('skins')) and \
+        'HTML' in [str(x).upper() for x in job.filetypes]
+
+
 def step_plan(job: Job) -> list[tuple[str, str]]:
     """What this particular run is going to do, in order.
 
@@ -1182,6 +1224,11 @@ def step_plan(job: Job) -> list[tuple[str, str]]:
     downloads = [x for x in job.filetypes if x != strings.AO3_DOWNLOAD_TYPE_METADATA]
     metadata = strings.AO3_DOWNLOAD_TYPE_METADATA in job.filetypes
     plan: list[tuple[str, str]] = [('login', strings.STEP_LOGIN)]
+
+    if job.action == ACTION_CUSTOM and job.options.get('skinsOnly'):
+        # nothing indexed and nothing downloaded: only each work's page read for its skin
+        # - and so no FicHub (it has no skins) and no cleanup (which writes into index entries)
+        return plan + [('skins', strings.STEP_SKINS_ONLY), ('report', strings.STEP_REPORT)]
 
     if job.action in COLLECTION_ACTIONS:
         works = bool(job.options.get('collectionWorks'))
@@ -1259,8 +1306,9 @@ def step_plan(job: Job) -> list[tuple[str, str]]:
             if checks_non_bookmarks(job):
                 window.append(('nonbookmarks', strings.STEP_NON_BOOKMARKS))
             window.extend([('check', strings.STEP_CHECK_FILES),
-                           ('update', strings.STEP_UPDATE_WINDOW),
-                           ('fichub', strings.STEP_FICHUB),
+                           ('update', strings.STEP_UPDATE_WINDOW)])
+            if fetches_skins(job): window.append(('skins', strings.STEP_SKINS_FOR_HTML))
+            window.extend([('fichub', strings.STEP_FICHUB),
                            ('cleanup', strings.STEP_CLEANUP),
                            ('report', strings.STEP_REPORT)])
             return window
@@ -1293,6 +1341,7 @@ def step_plan(job: Job) -> list[tuple[str, str]]:
     # end. every run can end with files to tidy away, and every run reports - in that order,
     # so a work FicHub gave us is linked to its collections, and anything the cleanup could
     # not remove is in the report
+    if fetches_skins(job): plan.append(('skins', strings.STEP_SKINS_FOR_HTML))
     plan.append(('fichub', strings.STEP_FICHUB))
     plan.append(('cleanup', strings.STEP_CLEANUP))
     plan.append(('report', strings.STEP_REPORT))
@@ -1547,7 +1596,12 @@ def prepare_resume(job: Job, fileops: FileOps) -> None:
         'first': earlier.get('resumesFirst') or earlier['id'],
         'baseline': earlier.get('baseline') or '',
         'progress': retry_progress(earlier, mode),
+        # the skins it did not get: a retry fetching skins goes back for them (`Job.ao3`)
+        'missedSkins': missed_skins(earlier),
     }
+    if mode == RETRY_FAILED and skins_only_record(earlier):
+        # just the skins it did not get: those works, picked, whatever is saved for them
+        job.options['skinWorks'] = missed_skins(earlier)
     if mode == RETRY_FAILED and job.action in FIC_ACTIONS:
         # a fic run's failures are fics it could not read: just those, by their links
         links = [str(x.get('link') or '') for x in earlier.get('failures') or []
@@ -1756,6 +1810,25 @@ def finished_both(record: dict) -> bool:
     return bool(wanted) and all(steps.get(step) in over for step in wanted)
 
 
+def missed_skins(record: dict | None) -> list[str]:
+    """The works whose skin a run did not get: the ones it could not fetch or save
+    (`skinFailures`) and the ones still waiting (`skinsPending` - for a skins-only run, every work
+    it never reached). In order, each once."""
+
+    if not isinstance(record, dict): return []
+    found: list[str] = []
+    for item in list(record.get('skinFailures') or []) + list(record.get('skinsPending') or []):
+        work = str(item.get('id') if isinstance(item, dict) else item or '')
+        if work and work not in found: found.append(work)
+    return found
+
+
+def skins_only_record(record: dict | None) -> bool:
+    """Whether `record` is a run that only fetched work skins."""
+    return isinstance(record, dict) and record.get('action') == ACTION_CUSTOM and \
+        bool((record.get('options') or {}).get('skinsOnly'))
+
+
 def retry_problem(record: dict | None, mode: str, active: set[str]) -> str:
     """Why `record` cannot be retried this way, or '' when it can."""
 
@@ -1768,6 +1841,10 @@ def retry_problem(record: dict | None, mode: str, active: set[str]) -> str:
     if action == ACTION_COLLECTION and not record.get('url'): return strings.RESUME_NO_LINK
     if action in FIC_ACTIONS and not record.get('url'): return strings.RETRY_NO_FIC_LINKS
     if mode == RETRY_TOP: return ''
+    if skins_only_record(record):
+        # it indexes and downloads nothing: from the top, or just the skins it did not get
+        if mode != RETRY_FAILED: return strings.RETRY_SKINS_ONLY_TWO_WAYS
+        return '' if missed_skins(record) else strings.RETRY_NO_SKINS_MISSED
     if mode in (RETRY_INDEX, RETRY_DOWNLOADS) and action not in LIST_ACTIONS and \
             record.get('status') == runs.STATUS_PARTIAL:
         # it reached the end: there is nothing to carry on from, only what it missed
@@ -1805,6 +1882,8 @@ def retry_default(record: dict, available: set[str]) -> str:
     retries just those; anything else starts again from the top.
     """
 
+    if skins_only_record(record):
+        return RETRY_FAILED if RETRY_FAILED in available else RETRY_TOP
     if record.get('status') == runs.STATUS_PARTIAL:
         # some of its indexing failed: everything is indexed again (a fic run re-reads its
         # failed fics anyway); only downloads failed: just those
@@ -1837,9 +1916,13 @@ def retry_choices(record: dict, active: set[str]) -> dict:
         kept = (RETRY_TOP, RETRY_DOWNLOADS, RETRY_FAILED) \
             if record.get('action') in LIST_ACTIONS else (RETRY_TOP, RETRY_FAILED)
         modes = [m for m in modes if m['mode'] in kept]
+    if skins_only_record(record):
+        # a skins-only run has two ways: every work again, or just the skins it did not get
+        modes = [m for m in modes if m['mode'] in (RETRY_TOP, RETRY_FAILED)]
     available = {m['mode'] for m in modes if m['available']}
     return {'modes': modes, 'default': retry_default(record, available) if available else '',
-            'failedWorks': len(failed_work_ids(record))}
+            'failedWorks': len(failed_work_ids(record)), 'skinsOnly': skins_only_record(record),
+            'missedSkins': len(missed_skins(record))}
 
 
 def retryable_among(records: list[dict], active: set[str]) -> list[dict]:
@@ -2082,6 +2165,8 @@ def finish_walk_step(job: Job, ao3: Ao3, step: str) -> None:
     but the step did not do what it says), or done."""
 
     if getattr(ao3, 'walk_skipped', False): mark_earlier(job, step)
+    # Skip this step, from the debug panel: what it would have done did not all happen
+    elif getattr(ao3, 'walk_cut', False) is True: job.steps.skip(step)
     elif getattr(ao3, 'walk_failed', False): job.steps.fail(step)
     else: job.steps.done(step)
 
@@ -2523,7 +2608,7 @@ def run_bookmarks(job: Job, fileops: FileOps, repo: Repository, report) -> None:
             finally:
                 ao3.existing_copies = None
                 ao3.judge_copy = None
-        job.steps.done('download')
+        finish_download_step(job, ao3)
     else:
         # a metadata-only run, or one stopped during indexing: these never start
         job.steps.skip('check')
@@ -2852,7 +2937,17 @@ def download_planned(job: Job, fileops: FileOps, ao3: Ao3, records: list[dict],
     ao3.download_indexed(newest_first(records), visited, plan['existing'],
                          forced=set(overwrite) if overwrite is not None
                          else bool(job.options.get('overwrite')))
-    job.steps.done('download')
+    finish_download_step(job, ao3)
+
+
+def finish_download_step(job: Job, ao3) -> None:
+    """Done, or skipped when Skip this step cut the downloads short (`Ao3.download_cut`):
+    what it would have fetched after that did not happen, so it is never marked done."""
+
+    if getattr(ao3, 'download_cut', False) is True:
+        job.steps.skip('download')
+    else:
+        job.steps.done('download')
 
 
 def fill_missing_formats(job: Job, fileops: FileOps, ao3: Ao3, skip: set[str],
@@ -3084,7 +3179,15 @@ def run_work(job: Job, fileops: FileOps, repo: Repository, report) -> None:
     progress.report(report, progress.PHASE, name=progress.INDEXING)
     print(strings.AO3_INFO_ONE_WORK.format(work))
     try:
-        record = ao3.index_one_work(link, find_existing=existing_entry(ao3, fileops, work))
+        with ao3.skippable():
+            record = ao3.index_one_work(link, find_existing=existing_entry(ao3, fileops, work))
+    except exceptions.StepSkippedException:
+        # Skip this step, from the debug panel: the fic was not read, so there is nothing to
+        # download or walk either
+        job.steps.skip('index')
+        for step in ('series', 'check', 'download'): job.steps.skip(step)
+        finish_run(job, fileops, ao3, report)
+        return
     except (exceptions.CancelledException, exceptions.SessionExpiredException):
         raise
     except Exception as e:
@@ -3445,10 +3548,13 @@ def run_fic_list(job: Job, fileops: FileOps, repo: Repository, report, importing
 
     records: list[dict] = []
     asked: list[str] = []
+    # Skip this step, from the debug panel: the fics not yet read are left, and the step says so
+    cut = False
     for done, link in enumerate(links, start=1):
         if job.cancel.is_set(): break
         if job.skipping():
             print(strings.AO3_INFO_STEP_SKIPPED)
+            cut = True
             break
         work = parse_text.get_work_number(link) or ''
         if work in finished:
@@ -3458,7 +3564,11 @@ def run_fic_list(job: Job, fileops: FileOps, repo: Repository, report, importing
         progress.report(report, progress.WORK, title=link, link=link, done=done,
                         total=len(links), phase=progress.INDEXING)
         try:
-            record = ao3.index_one_work(link, find_existing=existing_entry(ao3, fileops, work))
+            with ao3.skippable():
+                record = ao3.index_one_work(link, find_existing=existing_entry(ao3, fileops, work))
+        except exceptions.StepSkippedException:
+            cut = True
+            break
         except (exceptions.CancelledException, exceptions.SessionExpiredException):
             raise
         except Exception as e:
@@ -3479,7 +3589,8 @@ def run_fic_list(job: Job, fileops: FileOps, repo: Repository, report, importing
         return
     # a fic whose page would not read was not indexed: the step says so, and the run goes on
     # with the rest - the fics themselves are named in its issues
-    if any(gap.get('kind') == 'work' for gap in ao3.index_failures): job.steps.fail('index')
+    if cut: job.steps.skip('index')
+    elif any(gap.get('kind') == 'work' for gap in ao3.index_failures): job.steps.fail('index')
     else: job.steps.done('index')
 
     if importing:
@@ -3906,6 +4017,10 @@ def run_custom(job: Job, fileops: FileOps, repo: Repository, report) -> None:
     walking a listing and not walking it.
     """
 
+    if job.options.get('skinsOnly'):
+        run_skins_only(job, fileops, repo, report)
+        return
+
     downloadtypes = [x for x in job.filetypes if x != strings.AO3_DOWNLOAD_TYPE_METADATA]
     metadata = strings.AO3_DOWNLOAD_TYPE_METADATA in job.filetypes
     pages = job.options['pages'] or None
@@ -3962,7 +4077,8 @@ def run_custom(job: Job, fileops: FileOps, repo: Repository, report) -> None:
         for record in records: ao3.mark_series_of(record)
         walked = True
         walk_broke = False
-    if walk_broke: job.steps.fail('index')
+    if getattr(ao3, 'walk_cut', False) is True: job.steps.skip('index')
+    elif walk_broke: job.steps.fail('index')
     else: job.steps.done('index') if walked else mark_earlier(job, 'index')
 
     records = merge_by_work(records, index_series_and_non_bookmarks(job, fileops, ao3, report))
@@ -5021,10 +5137,137 @@ def ask_yes_no(job, name: str, default: str, details: dict, work: str,
     return choice == 'yes' and not job.cancel.is_set()
 
 
+def saved_skin_states(fileops: FileOps) -> dict[str, str]:
+    """What `skins/` holds for each work, by number: 'css' for a skin saved, 'none' for the note
+    that it has none. Nothing when the folder is not there yet."""
+    try:
+        names = fileops.list_files(os.path.join(fileops.downloadfolder, strings.SKINS_FOLDER_NAME))
+    except Exception:
+        return {}
+    states: dict[str, str] = {}
+    for name in names:
+        stem, extension = os.path.splitext(os.path.basename(str(name)))
+        if extension.lower() in SKIN_NOTES:
+            # a skin saved wins over a stray note that there was none
+            if states.get(stem) != 'css': states[stem] = extension.lower()[1:]
+    return states
+
+
+def saved_skin_ids(fileops: FileOps) -> set[str]:
+    """The works with a skin saved, or noted as having none."""
+    return set(saved_skin_states(fileops))
+
+
+def skin_scope_takes(scope: str, state: str | None) -> bool:
+    """Whether a work with this saved state (`saved_skin_states`) is in this scope."""
+    return (scope == 'all' or (scope == 'unchecked' and state is None)
+            or (scope == 'saved' and state == 'css') or (scope == 'none' and state == 'none'))
+
+
+def run_skins_only(job: Job, fileops: FileOps, repo: Repository, report) -> None:
+    """A custom run that only fetches work skins: each work's page read for its author's skin,
+    saved as `skins/<worknum>.css`, or `<worknum>.none` for a work with none, over whatever was
+    saved before - and nothing else. No index entry is written, no format downloaded, no html
+    rewritten: the page puts the skin in as a work is opened from FicFairy.
+
+    The works picked in the Works tab (`skinWorks`) are always fetched, whatever is saved for
+    them - they were asked for by name. Otherwise every work with html in the library is narrowed
+    by what is saved for it (`skinScope`): never checked, a skin saved (to bring it up to date),
+    noted as having none (has its author added one since?), or all of them. A page that will not
+    read saves nothing; it is listed with the skin failures (`skinFailures`), the work itself
+    untouched. The run ends with its report alone: no FicHub and no cleanup step.
+    """
+
+    ao3 = Ao3(repo, fileops, [], None, False, False, progress=report,
+              cancelled=job.cancel.is_set)
+    job.ao3 = ao3
+    # after handing it over: the run's own options say no skins (it is not a download run)
+    ao3.skins = True
+    job.steps.start('skins')
+    picked = list(job.options.get('skinWorks') or [])
+    if picked:
+        works = picked
+    else:
+        copies = shared.scan_downloaded_works(fileops.worksfolder, ['HTML'], storage=fileops.storage)
+        states = saved_skin_states(fileops)
+        scope = job.options.get('skinScope') or 'unchecked'
+        works = sorted((x for x in copies if skin_scope_takes(scope, states.get(x))),
+                       key=lambda x: int(x) if str(x).isdigit() else 0)
+    if not works:
+        print(strings.AO3_INFO_SKINS_ONLY_NONE_LEFT)
+        job.steps.skip('skins')
+        report_failures(ao3, report)
+        return
+    print(strings.AO3_INFO_SKINS_ONLY_START.format(len(works)))
+    # every work still to do is kept with the run as it goes, so a retry can take just the ones
+    # it never reached (`missed_skins`)
+    ao3.skins_pending = [str(x) for x in works]
+    ao3.skins_pending_changed()
+    found = none = 0
+    for done, work in enumerate(works, 1):
+        ao3.check_cancelled()
+        progress.report(report, progress.WORK, title=f'work {work}',
+                        link=f'{strings.AO3_BASE_URL}/works/{work}', filetype='skin',
+                        phase=progress.DOWNLOADING, done=done - 1, total=len(works))
+        css = ao3.skin_for(work, saving_only=True)
+        if work not in ao3.skins_unread and ao3.save_skin(work, css):
+            if css: found += 1
+            else: none += 1
+        # dealt with: had, or listed as a failure - no longer waiting
+        if str(work) in ao3.skins_pending:
+            ao3.skins_pending.remove(str(work))
+            ao3.skins_pending_changed()
+    print(strings.AO3_INFO_SKINS_ONLY_DONE.format(found, none, len(ao3.skins_unread)))
+    job.steps.done('skins')
+    # not `finish_run`: its FicHub, cleanup (collection links written into index entries) and
+    # skins-for-html steps are for runs that index or download - this one only reads skins
+    report_failures(ao3, report)
+
+
+def fetch_pending_skins(job: Job, fileops: FileOps, ao3, report) -> None:
+    """The work skins of the works whose html this run downloaded without the skin to hand -
+    read in one pass, after every download, as a step of its own (`STEP_SKINS_FOR_HTML`), and
+    saved as css (`skins/<worknum>.css`, or `.none`). **Never put into the html file.**
+
+    A skin is to hand where the run read the work's page anyway (the fic runs, the update pass,
+    any re-read), and saved then; the scans index from listing pages, which carry none, so their
+    downloads leave each work here (`Ao3.skins_pending`) rather than reading its page between two
+    downloads. Each page is read once. A skin that cannot be had or saved is listed
+    (`Ao3.skin_failures`). Stop ends it; Skip this step leaves the rest without skins.
+    """
+
+    planned = any(step == 'skins' for step, _ in getattr(job.steps, 'plan', []) or [])
+    pending = list(getattr(ao3, 'skins_pending', None) or []) if getattr(ao3, 'skins', False) is True else []
+    if not pending:
+        if planned:
+            print(strings.AO3_INFO_SKINS_PENDING_NONE)
+            job.steps.skip('skins')
+        return
+    job.steps.start('skins')
+    print(strings.AO3_INFO_SKINS_PENDING.format(len(pending)))
+    for done, work in enumerate(pending, 1):
+        ao3.check_cancelled()
+        if job.skipping():
+            print(strings.AO3_INFO_STEP_SKIPPED)
+            job.steps.skip('skins')
+            return
+        progress.report(report, progress.WORK, title=f'work {work}',
+                        link=f'{strings.AO3_BASE_URL}/works/{work}', filetype='skin',
+                        phase=progress.DOWNLOADING, done=done - 1, total=len(pending))
+        # reading the page saves its skin (`note_skin`); one that will not read is listed
+        ao3.skin_for(work)
+        # dealt with: had, or listed as a failure - no longer waiting
+        if work in ao3.skins_pending:
+            ao3.skins_pending.remove(work)
+            ao3.skins_pending_changed()
+    job.steps.done('skins')
+
+
 def finish_run(job: Job, fileops: FileOps, ao3, report) -> None:
     """How every run ends: FicHub for what ao3 would not give us, the cleanup step, then
     the report of anything left undone."""
 
+    fetch_pending_skins(job, fileops, ao3, report)
     rescue_with_fichub(job, fileops, ao3, report)
     cleanup(job, fileops, ao3)
     report_failures(ao3, report)
@@ -5202,9 +5445,13 @@ def crawl_collections(job: Job, fileops: FileOps, ao3: Ao3, step: str, crawl) ->
         ao3.scoped = True
         return None
     job.steps.start(step)
-    records = crawl()
+    ao3.walk_cut = False
+    with ao3.skippable():
+        records = crawl()
+    # Skip this step, from the debug panel, between pages of a listing
+    if getattr(ao3, 'walk_cut', False) is True: job.steps.skip(step)
     # a collection whose listing broke off was saved with what it had, but not finished
-    if any(gap.get('kind') == 'collection' for gap in ao3.index_failures): job.steps.fail(step)
+    elif any(gap.get('kind') == 'collection' for gap in ao3.index_failures): job.steps.fail(step)
     else: job.steps.done(step)
     return records
 
@@ -6060,6 +6307,16 @@ def report_failures(ao3: Ao3, report) -> None:
         print(strings.AO3_INFO_REPAIR_CLASHES.format(len(clashes)))
         progress.report(report, progress.REPAIR_CLASHES, repairClashes=clashes)
 
+    waiting = getattr(ao3, 'skins_pending', None) if getattr(ao3, 'skins', False) is True else None
+    if isinstance(waiting, list) and waiting:
+        print(strings.AO3_INFO_SKINS_LEFT_PENDING.format(len(waiting)))
+        progress.report(report, progress.SKINS_PENDING, skinsPending=list(waiting))
+
+    skins = getattr(ao3, 'skin_failures', None)
+    if isinstance(skins, list) and skins:
+        print(strings.AO3_INFO_SKIN_FAILURES.format(len(skins)))
+        progress.report(report, progress.SKIN_FAILURES, skinFailures=skins)
+
     rescued = getattr(ao3, 'rescued', None)
     if isinstance(rescued, list) and rescued:
         print(strings.AO3_INFO_FICHUB_RESCUED.format(len(rescued)))
@@ -6465,7 +6722,9 @@ class Handler(BaseHTTPRequestHandler):
             # no password is used, so none is kept. a run reading your own listing is found
             # by your username; any other has no use for one either
             password = ''
-            if action not in USERNAME_ACTIONS: username = ''
+            # fetching work skins reads work pages alone, never your listing
+            if action not in USERNAME_ACTIONS or (action == ACTION_CUSTOM and options['skinsOnly']):
+                username = ''
             elif not username:
                 self.send_json(400, {'error': 'a username is required to read your bookmarks '
                                               'or collections, even without logging in'})
@@ -6526,6 +6785,20 @@ class Handler(BaseHTTPRequestHandler):
         # re-reading a non-bookmark writes its entry, which a run told not to index has ruled out
         # (and one looking every indexed work up re-reads the non-bookmarks among them anyway)
         if not indexing_run or options['recheck']: options['nonBookmarks'] = False
+
+        # fetching work skins is the custom run's alone, and does nothing else: no index, no
+        # download, no walk - so its record says nothing it did not do
+        if action != ACTION_CUSTOM: options['skinsOnly'] = False
+        if options['skinsOnly']:
+            filetypes = []
+            for key in ('series', 'nonBookmarks', 'overwrite', 'images', 'recheck', 'dates', 'skins'):
+                options[key] = False
+        else:
+            options['skinScope'] = 'unchecked'
+            options['skinWorks'] = []
+            # work skins go with html, on every run - the ones that read each work's page anyway
+            # included, at the owner's request: no HTML ticked, no skin saved
+            if 'HTML' not in [str(x).upper() for x in filetypes]: options['skins'] = False
 
         url = (body.get('url') or '').strip()
         # checked here rather than on the thread, so a bad link is a straight answer to the

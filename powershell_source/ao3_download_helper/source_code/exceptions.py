@@ -53,6 +53,13 @@ class SeriesLinkException(Ao3DownloaderException):
     pass
 
 
+class StepSkippedException(Ao3DownloaderException):
+    """Raised inside a listing walk when the debug panel's Skip this step was pressed: the walk
+    ends where it is, keeping everything already written, and the step is marked skipped. Not a
+    stop - the run goes on to its next step - so it is never a CancelledException."""
+    pass
+
+
 class CancelledException(Ao3DownloaderException):
     """Raised when a caller asks for a run to stop. Unwinds to the nearest handler,
     which keeps whatever was already written rather than discarding it."""

@@ -200,6 +200,29 @@ export function withAo3Shape(html: string, readingSkin = ''): string {
 }
 
 /**
+ * A download with no skin in it, given the work skin a run saved for it beside the works
+ * (`skins/<work number>.css`) - for a work whose html was already up to date when the run fetched
+ * its skin, so the file was not downloaded again. Put in as the helper puts one in at download:
+ * everything in the body inside `<div id="workskin">`, the CSS at the end of the `<head>` - after
+ * which it is shown like any work with its own skin (`shownWork`). Exactly as it was when it has a
+ * skin already, the CSS is empty or would close its own style, or there is no head and body.
+ */
+export function withSavedSkin(html: string, css: string): string {
+  if (!css.trim() || breaksOutOfStyle(css) || hasWorkSkin(html)) return html;
+  if (!/<head[\s>]/i.test(html) || !/<body[\s>]/i.test(html)) return html;
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const workskin = doc.createElement('div');
+  workskin.id = 'workskin';
+  while (doc.body.firstChild) workskin.appendChild(doc.body.firstChild);
+  doc.body.appendChild(workskin);
+  const style = doc.createElement('style');
+  style.setAttribute('type', 'text/css');
+  style.textContent = `\n/* the work skin, from the work's page on AO3 */\n${css}\n`;
+  doc.head.appendChild(style);
+  return '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+}
+
+/**
  * How a downloaded work's html is shown when opened from the app: a work with a skin of its own
  * shaped like AO3's page around it, with `readingSkin` layered under its skin unless `layer` is
  * off (`withAo3Shape`);

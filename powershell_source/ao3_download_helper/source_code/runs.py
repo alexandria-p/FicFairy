@@ -221,6 +221,13 @@ class RunRecord:
             'fichubOlder': [],
             # Resolve issues' repairs not done because the name they would give was taken
             'repairClashes': [],
+            # work skins the run could not get or put in (`Ao3.skin_failures`)
+            'skinFailures': [],
+            # works whose html was downloaded and whose skin was not fetched yet - kept as it
+            # grows, so a run that fails or stops says which (`Ao3.skins_pending`)
+            'skinsPending': [],
+            # works whose work skin the run saved as css (`Ao3.skins_found`) - History lists them
+            'skinsSaved': [],
             # older copies of a work the run decided to remove, and what became of each:
             # `pending` until the cleanup step, then `removed`, or `kept` with the reason.
             # written the moment they are marked, so a run that dies first still says which
@@ -354,6 +361,12 @@ class RunRecord:
         self.data['fichubOlder'] = list(older) if isinstance(older, list) else []
         clashes = getattr(ao3, 'repair_clashes', None)
         self.data['repairClashes'] = list(clashes) if isinstance(clashes, list) else []
+        skins = getattr(ao3, 'skin_failures', None)
+        self.data['skinFailures'] = list(skins) if isinstance(skins, list) else []
+        waiting = getattr(ao3, 'skins_pending', None) if getattr(ao3, 'skins', False) is True else None
+        self.data['skinsPending'] = list(waiting) if isinstance(waiting, list) else []
+        found = getattr(ao3, 'skins_found', None)
+        self.data['skinsSaved'] = list(found) if isinstance(found, list) else []
         # where indexing broke off - which listing or collection, which pages were read,
         # which failed, how far back in date it got
         self.data['indexFailures'] = index_gaps(ao3)

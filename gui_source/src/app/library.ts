@@ -1,4 +1,4 @@
-import { hasWorkSkin, shownWork } from './skin-html';
+import { hasWorkSkin, shownWork, withSavedSkin } from './skin-html';
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import {
   Bookmark,
@@ -30,6 +30,9 @@ import { VisitLog } from './visit-log';
  * local folder, or where to fetch it from for Dropbox - fetched only when clicked, since
  * reading every work up front would mean downloading the whole library to show a list.
  */
+
+/** where a run saves each work's skin, `<work number>.css` - the helper's `SKINS_FOLDER_NAME` */
+const SKINS_FOLDER = 'skins';
 
 /** how the visit log names where a Dropbox check took something from, when not Dropbox */
 const CACHE = "this browser's cache";
@@ -210,6 +213,20 @@ export class Library {
    * matched to a work.
    */
   readonly worksFiles = signal<WorksFile[]>([]);
+  /**
+   * The works with a work skin saved beside the works (`skins/<worknum>.css` - a run's, see the
+   * helper's `Ao3.save_skin`; a work with none is noted as `.none`, so it is not here), by number:
+   * the Works tab marks them. From the listing a Dropbox read already has, or a listing of
+   * `skins/` after any other read and after a run that wrote there.
+   */
+  readonly skinnedWorks = signal<Set<string>>(new Set());
+  private readonly skinsAfterRead = effect(() => {
+    const read = this.lastRead();
+    if (!read) return;
+    untracked(() => {
+      if (this.showing !== 'dropbox' || this.showingDummy) void this.readSkins(read.store);
+    });
+  });
   readonly htmlFiles = computed(() => this.copies().html);
   /** each work's newest downloaded PDF, by work number - what the listing's PDF button opens */
   readonly pdfFiles = computed(() => this.copies().pdf);
@@ -609,10 +626,17 @@ export class Library {
         // the reading skin - only what is shown; a file that cannot be read as text is shown as it
         // is, never not at all
         if (format === 'html') {
-          blob = await read.text().then((text) => {
-            if (!skin && !hasWorkSkin(text)) return read;
-            return new Blob([shownWork(text, skin, this.layerReadingSkin())], { type: read.type });
-          }, () => read);
+          try {
+            let text = await read.text();
+            // a work whose html was current when a run fetched its skin has it saved beside
+            // the works instead of in the file
+            if (!hasWorkSkin(text)) text = withSavedSkin(text, await this.savedSkin(copy));
+            if (skin || hasWorkSkin(text)) {
+              blob = new Blob([shownWork(text, skin, this.layerReadingSkin())], { type: read.type });
+            }
+          } catch {
+            blob = read;
+          }
         }
         const url = URL.createObjectURL(blob);
         if (tab) tab.location.href = url;
@@ -625,6 +649,22 @@ export class Library {
         else tab?.close();
       },
     );
+  }
+
+  /**
+   * The work skin a run saved for this copy's work (`skins/<work number>.css`), or '' when there
+   * is none, it is empty (the run found the work has no skin), or it cannot be read.
+   */
+  private async savedSkin(copy: LocalCopy): Promise<string> {
+    const store = this.store();
+    const name = copy instanceof Blob ? (copy as File).name ?? '' : copy.dropboxPath.split('/').pop() ?? '';
+    const id = name ? workIdFromFilename(name) : null;
+    if (!store || !id) return '';
+    try {
+      return (await store.read(`${SKINS_FOLDER}/${id}.css`)) ?? '';
+    } catch {
+      return '';
+    }
   }
 
   /**
@@ -782,6 +822,7 @@ export class Library {
     this.copies.set(emptyCopies());
     this.copySource = null;
     this.worksFiles.set([]);
+    this.skinnedWorks.set(new Set());
     this.worksListing = null;
     this.fromCache.set(null);
     this.hidden.set(new Map());
@@ -1092,6 +1133,8 @@ export class Library {
     const top = (path: string) => path.split('/')[0]?.toLowerCase() ?? '';
     const indexPaths = paths.filter((p) => /\.json$/i.test(p) && INDEX_FOLDERS.includes(top(p)));
     const worksChanged = paths.some((p) => top(p) === WORKS_FOLDER);
+    // a run that saved a work skin: the Works tab marks the work
+    if (paths.some((p) => top(p) === SKINS_FOLDER)) void this.readSkins(store);
     if (!indexPaths.length && !worksChanged) return;
 
     try {
@@ -1167,6 +1210,13 @@ export class Library {
     const folder = indexFolderOf(entry);
     const path = await entryFile(store, await store.list(folder, false).catch(() => []), entry.id);
     return path ? store.read(path) : null;
+  }
+
+  /** a work's saved work skin (`skins/<work number>.css`) as it is, or null when it has none */
+  async skinText(id: string): Promise<string | null> {
+    const store = this.store();
+    if (!store || !id) return null;
+    return store.read(`${SKINS_FOLDER}/${id}.css`);
   }
 
   async setBookmarked(given: Bookmark | Bookmark[], bookmarked: boolean): Promise<number> {
@@ -1348,6 +1398,21 @@ export class Library {
   }
 
   /** each work's newest copy in every format, from the files in works/ */
+  /** the works a list of names in `skins/` says have a skin */
+  private noteSkinNames(names: string[]): void {
+    const ids = names.map((n) => /^(\d+)\.css$/i.exec(n)?.[1]).filter((x): x is string => !!x);
+    this.skinnedWorks.set(new Set(ids));
+  }
+
+  private async readSkins(store: LibraryStore): Promise<void> {
+    try {
+      const paths = await store.list(SKINS_FOLDER, false);
+      if (store === this.store()) this.noteSkinNames(paths.map((p) => p.split('/').pop() ?? p));
+    } catch {
+      if (store === this.store()) this.skinnedWorks.set(new Set());
+    }
+  }
+
   private mapCopies(files: File[]): Copies {
     this.worksFiles.set(files.filter((f) => openableFormat(baseName(f))).map((f) => ({
       name: baseName(f), modified: f.lastModified || null, format: openableFormat(baseName(f))!, copy: f,
@@ -1357,6 +1422,12 @@ export class Library {
   }
 
   private dropboxCopiesOf(files: DropboxFile[], root: string): Copies {
+    // a listing of the whole library says which works have a skin saved, at no cost; one of
+    // works/ alone (after a run) says nothing about it
+    const parts = files.map((f) => f.path.slice(root.length).split('/').filter(Boolean));
+    if (parts.some((p) => p[0]?.toLowerCase() !== WORKS_FOLDER)) {
+      this.noteSkinNames(parts.filter((p) => p.length === 2 && p[0].toLowerCase() === SKINS_FOLDER).map((p) => p[1]));
+    }
     this.worksFiles.set(files.filter((f) => {
       const inside = f.path.slice(root.length).split('/').filter(Boolean);
       return inside[0]?.toLowerCase() === WORKS_FOLDER && openableFormat(f.name);

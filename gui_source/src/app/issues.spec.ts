@@ -116,3 +116,27 @@ describe('repairs a name clash stopped', () => {
       'HTML: failed to repair from FicHub due to a name clash - 1 Fic - Someone 2026-05-01.html is already another file, so 1 Fic - Someone.html was kept as it is');
   });
 });
+
+describe('work skins a run could not fetch or save', () => {
+  const run = {
+    skinFailures: [{ id: '1', link: 'https://archiveofourown.org/works/1', error: 'its work page would not read: 503' }],
+  } as unknown as RunHistory;
+
+  it('counts as an issue, and gets a section of its own in the issues file', () => {
+    const issues = issuesOf(run);
+    expect(issueCount(issues)).toBe(1);
+    const report = issuesReport(issues, 'Issues', new Date('2026-11-08T00:00:00Z'));
+    expect(report).toContain('## 1 work skin that could not be fetched or saved');
+    expect(report).toContain('1\thttps://archiveofourown.org/works/1\tits work page would not read: 503');
+  });
+});
+
+describe('works whose skin was never fetched', () => {
+  it('counts as an issue, and gets a section of its own in the issues file', () => {
+    const issues = issuesOf({ skinsPending: ['7'] } as unknown as RunHistory);
+    expect(issueCount(issues)).toBe(1);
+    const report = issuesReport(issues, 'Issues', new Date('2026-11-08T00:00:00Z'));
+    expect(report).toContain('## 1 work whose skin was not fetched');
+    expect(report).toContain('7\thttps://archiveofourown.org/works/7');
+  });
+});

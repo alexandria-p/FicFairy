@@ -11,6 +11,7 @@ import {
   JobAction,
   JobEvent,
   JobOptions,
+  SkinScope,
   Jobs,
   RetryMode,
   RetryableRun,
@@ -61,7 +62,7 @@ import { LibraryFreshness } from './freshness';
 import { safeGet, safeRemove, safeSet } from './storage';
 import { Library } from './library';
 import { DropboxLibraryStore, LibraryStore, StorageRequest } from './library-store';
-import { RunIssues, attemptIssues, fichubOlderWords, issueCount, issuesReport, repairClashWords } from './issues';
+import { RunIssues, attemptIssues, fichubOlderWords, issueCount, issuesReport, repairClashWords, workSkinLink } from './issues';
 import { ImportRequest, LONG_IMPORT_REQUESTS, importRequests } from './imports';
 import { REMEMBER_USERNAME_KEY, SAVED_USERNAME_KEY, SYNC_ACK_KEY, ao3TimeZone, inAo3Zone, utcToZonedDay, zonedDayToUtc, savedAnswerDefaults, savedQuestionTimeout, startingFiletypes, savedAlwaysAnswers, saveAlwaysAnswer, savedGuessedDateTimeout, savedOwnWaits, savedNobodyHere, writtenDate } from './preferences';
 
@@ -95,8 +96,13 @@ type Step =
   | 'failed';
 
 /** how long the run page waits on the helper (and a quick scan's floor) before giving up */
-/** the runs that can put work skins into their html - the helper's `SKIN_ACTIONS` */
-export const SKIN_ACTIONS: readonly JobAction[] = ['bookmarks', 'quick', 'custom', 'work', 'works'];
+/**
+ * the runs that can fetch work skins with the html they download - every run with a file types
+ * page (the helper's `SKIN_ACTIONS` is every action); an import's formats are its own window's
+ */
+export const SKIN_ACTIONS: readonly JobAction[] = [
+  'bookmarks', 'quick', 'custom', 'work', 'works', 'new', 'sync', 'update', 'collections', 'collection',
+];
 
 export const START_WAIT_MS = 2 * 60 * 1000;
 const TIMED_OUT = Symbol('timed out');
@@ -207,6 +213,8 @@ export class DownloadDialog implements OnDestroy {
   readonly importing = input<ImportRequest | null>(null);
   /** what the link box starts with - a work number, when the window was opened from a listing */
   readonly prefill = input('');
+  /** works whose skins were asked for from a listing: the custom run opens fetching only those */
+  readonly skinWorks = input<string[]>([]);
   /** roughly how many requests an import makes - over `LONG_IMPORT_REQUESTS` it says to leave the window open */
   protected readonly importRequestCount = computed(() => {
     const importing = this.importing();
@@ -314,7 +322,41 @@ export class DownloadDialog implements OnDestroy {
    * could. A quick scan uses the same signal for its own pair: 'all' there means back to
    * its last completed run.
    */
-  protected readonly coverage = signal<'all' | 'pages' | 'dates' | 'run' | 'resume' | 'existing'>('all');
+  protected readonly coverage = signal<'all' | 'pages' | 'dates' | 'run' | 'resume' | 'existing' | 'skins'>('all');
+  /**
+   * A custom run that only fetches work skins (`coverage` 'skins', debug mode): each work's page
+   * read for its author's skin and saved beside the works - nothing indexed, nothing downloaded,
+   * so it has no file types and no other options (the helper's `run_skins_only`)
+   */
+  protected readonly skinsOnly = computed(
+    () => this.action() === 'custom' && !this.resuming() &&
+      // works picked in a listing are this run from the start, whatever the coverage says yet
+      (this.coverage() === 'skins' || this.skinWorks().length > 0));
+  /** fetching skins only, over the whole library: which works, by what is saved for each */
+  protected readonly skinScope = signal<SkinScope>('unchecked');
+  protected readonly skinScopes: { value: SkinScope; label: string; hint: string }[] = [
+    { value: 'unchecked', label: 'Works never checked for a skin',
+      hint: 'Works FicFairy has not looked at for a skin yet. The cheapest choice after the first time.' },
+    { value: 'saved', label: 'Works that already have a skin saved',
+      hint: "Fetches each again and replaces the one saved, in case the author changed it or it is damaged." },
+    { value: 'none', label: 'Works last known to have no skin',
+      hint: 'Checks again in case their authors have added one since.' },
+    { value: 'all', label: 'All works',
+      hint: 'Every work with HTML in your library, whatever is saved for it. One request to AO3 per work.' },
+  ];
+  /**
+   * Opened from the Works tab for the skins of the works picked there (`skinWorks`): a window of
+   * its own, titled for it, with no custom-run page to choose from - it goes straight to the
+   * login, since a work picked by hand has nothing left to choose.
+   */
+  protected readonly pickedSkins = computed(() => this.action() === 'custom' && this.skinWorks().length > 0);
+  /** what a run fetching skins only covers, in words */
+  protected readonly skinsCover = computed(() => {
+    const picked = this.skinWorks().length;
+    if (picked) return `the work skins of the ${picked === 1 ? 'work' : `${picked} works`} you picked`;
+    const scope = this.skinScopes.find((x) => x.value === this.skinScope());
+    return `the work skins of: ${scope?.label.toLowerCase() ?? 'works never checked for a skin'}`;
+  });
   /**
    * A custom run picking up where an unfinished run left off. It then runs as that run -
    * its workflow, file types and options - so nothing else on the way in is a choice.
@@ -441,6 +483,15 @@ export class DownloadDialog implements OnDestroy {
   }
 
   protected retryLabel(mode: RetryMode, run: RetryableRun): string {
+    if (run.retry.skinsOnly) {
+      const missed = run.retry.missedSkins ?? 0;
+      if (mode === 'top') return 'From the top - every work\'s skin fetched again';
+      if (mode === 'failed') {
+        return missed
+          ? `Just the ${missed} ${missed === 1 ? 'skin' : 'skins'} it could not get - failed, or never reached`
+          : 'Just the skins it could not get (none missed)';
+      }
+    }
     switch (mode) {
       case 'top':
         return run.action === 'quick'
@@ -603,6 +654,10 @@ export class DownloadDialog implements OnDestroy {
   protected readonly fichubOlder = signal<FicHubOlder[]>([]);
   /** Resolve issues' repairs not done: the name each would get is taken (`repairClashes`) */
   protected readonly repairClashes = signal<RepairClash[]>([]);
+  /** work skins the run could not get or save (`skinFailures`) */
+  protected readonly skinFailures = signal<WorkFailure[]>([]);
+  /** works whose html was downloaded and whose skin was never fetched (`skinsPending`) */
+  protected readonly skinsPending = signal<string[]>([]);
 
   /**
    * How many undated files the run has stopped to ask about, or 0 when it is not asking.
@@ -684,6 +739,10 @@ export class DownloadDialog implements OnDestroy {
   private unloadGuard: ((event: BeforeUnloadEvent) => void) | null = null;
 
   protected readonly title = computed(() => {
+    if (this.pickedSkins()) {
+      const picked = this.skinWorks().length;
+      return picked === 1 ? 'Download work skin' : `Download work skins (${picked} works)`;
+    }
     switch (this.action()) {
       case 'bookmarks':
         return '(Full scan) Reindex & Update All';
@@ -855,17 +914,28 @@ export class DownloadDialog implements OnDestroy {
   protected readonly picksImages = computed(() => this.action() === 'custom');
 
   /**
-   * Work skins - the CSS an author gives a work, which AO3's own download leaves out - put into
-   * the html this run downloads (the helper's `Ao3.dress`). Debug mode only for now, on the scans
-   * and the fic runs (the helper's `SKIN_ACTIONS`), and only when HTML is ticked. A work page the
-   * run reads anyway gives the skin for nothing; otherwise each work's page is read once.
+   * Work skins - the CSS an author gives a work, which AO3's own download leaves out - saved as
+   * css beside the works (`skins/<work number>.css`), **never put into the html** - debug mode
+   * only, at the owner's request - on every run that has file types to pick (`SKIN_ACTIONS`).
+   * Ticked: a work page the run reads anyway gives its skin for nothing (`freeSkins`); otherwise
+   * each work whose HTML is downloaded has its page read once. Unticked, no skin is saved at all.
    */
   protected readonly picksSkins = computed(() =>
-    this.debugTools() && !this.resuming() && SKIN_ACTIONS.includes(this.action()));
+    this.debugTools() && !this.resuming() && !this.skinsOnly() && SKIN_ACTIONS.includes(this.action()));
 
-  /** whether HTML is among the file types - the only format a skin goes into */
+  /** whether HTML is among the file types - the downloads a scan reads skins for */
   protected readonly htmlTicked = computed(() =>
     this.selected().some((x) => x.toUpperCase() === 'HTML'));
+  /**
+   * A run that opens each work's page on AO3 anyway - the fic runs, the update pass, a custom run
+   * checking existing works against AO3 - so a skin costs it no request at all. It still needs
+   * HTML ticked, as every run does (`skinsHeld`).
+   */
+  protected readonly freeSkins = computed(() =>
+    ['work', 'works', 'update'].includes(this.action()) ||
+    (this.action() === 'custom' && this.coverage() === 'existing' && this.existingCheck() === 'ao3'));
+  /** the box held while HTML is unticked - on every run, at the owner's request */
+  protected readonly skinsHeld = computed(() => !this.htmlTicked());
 
   /**
    * Which runs may fetch a work again that nothing says is out of date.
@@ -909,7 +979,8 @@ export class DownloadDialog implements OnDestroy {
    */
   protected readonly picksFiletypes = computed(
     // an import's formats were chosen in the import window
-    () => this.action() !== 'import' && (!this.picksCollectionWorks() || this.collectionWorks()),
+    () => this.action() !== 'import' && !this.skinsOnly() &&
+      (!this.picksCollectionWorks() || this.collectionWorks()),
   );
   protected readonly needsLink = computed(
     () => this.action() === 'collection' || this.action() === 'work' || this.action() === 'works',
@@ -935,7 +1006,8 @@ export class DownloadDialog implements OnDestroy {
    * bookmarks or collections, found by your name. The helper's `USERNAME_ACTIONS`.
    */
   protected readonly needsUsername = computed(() =>
-    USERNAME_ACTIONS.includes(
+    // fetching work skins reads each work's page, never your listing
+    !this.skinsOnly() && USERNAME_ACTIONS.includes(
       // a retry is sent as custom when it is not one of the scans, so the run it retries
       // says whether it reads your own listing - a fic run's retry needs no username
       this.resuming() ? (this.chosenResume()?.action ?? this.sentAction()) : this.sentAction(),
@@ -980,7 +1052,7 @@ export class DownloadDialog implements OnDestroy {
    */
   protected readonly hasOptions = computed(
     () =>
-      this.picksPages() ||
+      !this.pickedSkins() && (this.picksPages() ||
       // a run that has swapped pages for a date window still has that choice to offer
       this.picksDates() ||
       this.picksSeries() ||
@@ -990,7 +1062,7 @@ export class DownloadDialog implements OnDestroy {
       this.picksNonBookmarks() ||
       this.picksCollectionWorks() ||
       // it can always be pointed at an earlier scan, so it always has a choice to offer
-      this.action() === 'quick',
+      this.action() === 'quick'),
   );
 
   /**
@@ -1008,6 +1080,7 @@ export class DownloadDialog implements OnDestroy {
     () =>
       this.splitOptions() &&
       !this.resuming() &&
+      !this.skinsOnly() &&
       (this.picksSeries() || this.picksNonBookmarks() || this.picksOverwrite() || this.picksImages()),
   );
 
@@ -1070,7 +1143,7 @@ export class DownloadDialog implements OnDestroy {
     if (this.workdates()) chosen.push('look up publication dates');
     if (this.picksSeries() && this.series()) chosen.push('the rest of each series');
     if (this.picksImages() && this.images()) chosen.push('save images separately');
-    if (this.picksSkins() && this.skins() && this.htmlTicked()) chosen.push('work skins in html');
+    if (this.picksSkins() && this.skins() && !this.skinsHeld()) chosen.push('work skins saved as css');
     if (this.picksReindex() && !this.reindex()) {
       chosen.push(this.recheck() ? 'each indexed work looked up on AO3' : 'no reindexing');
     }
@@ -1127,7 +1200,7 @@ export class DownloadDialog implements OnDestroy {
 
     rows.push({
       label: 'File types',
-      value: this.chosenFiletypes().join(', ') || 'nothing - indexing only',
+      value: this.chosenFiletypes().join(', ') || (this.skinsOnly() ? 'nothing - work skins only' : 'nothing - indexing only'),
     });
 
     if (this.resuming()) {
@@ -1153,6 +1226,8 @@ export class DownloadDialog implements OnDestroy {
     } else if (this.picksPages()) {
       rows.push({ label: 'Covers', value: this.pageRange() });
       rows.push({ label: 'Ordered by', value: `date ${this.listingOrder()}` });
+    } else if (this.skinsOnly()) {
+      rows.push({ label: 'Covers', value: this.skinsCover() });
     } else if (this.action() === 'custom' && this.coverage() === 'existing') {
       rows.push({ label: 'Covers', value: 'every work already in your index' });
     } else if (this.picksDates() || this.action() === 'quick') {
@@ -1209,7 +1284,7 @@ export class DownloadDialog implements OnDestroy {
     if (this.picksSkins()) {
       rows.push({
         label: 'Work skins',
-        value: this.skins() && this.htmlTicked() ? 'put into html downloads' : 'not fetched',
+        value: this.skins() && !this.skinsHeld() ? 'saved as css' : 'not fetched',
       });
     }
     if (this.picksOverwrite()) {
@@ -1407,6 +1482,8 @@ export class DownloadDialog implements OnDestroy {
    */
   protected readonly backgroundQuestions = computed<QuestionName[]>(() => {
     if (this.resuming()) return ['fichub', 'overwrite-older'];
+    // fetching work skins asks nothing: no work it reads can fail to download
+    if (this.skinsOnly()) return [];
     const asked: QuestionName[] = [];
     if (this.action() === 'quick' && this.coverage() !== 'run' && this.coverage() !== 'dates') {
       asked.push('quick-floor');
@@ -1528,6 +1605,14 @@ export class DownloadDialog implements OnDestroy {
 
   constructor() {
     void this.init();
+    // works whose skins were asked for from a listing: the custom run opens set to fetch those
+    let skinsSet = false;
+    effect(() => {
+      const works = this.skinWorks();
+      if (skinsSet || !works.length) return;
+      skinsSet = true;
+      untracked(() => this.coverage.set('skins'));
+    });
     // a work number handed over from a listing goes in the box once, as if typed
     let prefilled = false;
     effect(() => {
@@ -1709,6 +1794,8 @@ export class DownloadDialog implements OnDestroy {
     // a window opened onto a run already going shows what the run said it was saving
     if (this.attachedTo()) return this.announcedFiletypes();
     if (this.resuming()) return this.chosenResume()?.filetypes ?? [];
+    // fetching work skins saves no format, the index included
+    if (this.skinsOnly()) return [];
     const importing = this.importing();
     if (this.action() === 'import' && importing) return importing.filetypes;
     // collections on their own are only ever indexed
@@ -2194,6 +2281,8 @@ export class DownloadDialog implements OnDestroy {
     this.keptCopies.set([]);
     this.fichubOlder.set([]);
     this.repairClashes.set([]);
+    this.skinFailures.set([]);
+    this.skinsPending.set([]);
     this.unsureFiles.set(0);
     this.duplicateCopies.set(null);
     this.notRemoved.set([]);
@@ -2226,7 +2315,7 @@ export class DownloadDialog implements OnDestroy {
         subcollections: this.picksCollectionWorks() && this.subcollections(),
         parentCollections: this.picksCollectionWorks() && this.parentCollections(),
         images: this.images(),
-        skins: this.picksSkins() && this.skins() && this.htmlTicked(),
+        skins: this.picksSkins() && this.skins() && !this.skinsHeld(),
         workdates: this.workdates(),
         // only offered on the runs that can be pointed at a known set of works
         // an import's from its own window's *Overwrite existing downloads*
@@ -2238,6 +2327,10 @@ export class DownloadDialog implements OnDestroy {
         reindex: this.picksReindex() ? this.reindex() : true,
         // skipping the indexing, every indexed work may still be looked up on AO3
         recheck: this.recheck(),
+        // a custom run fetching work skins and nothing else - the helper clears the rest
+        skinsOnly: this.skinsOnly(),
+        skinScope: this.skinsOnly() ? this.skinScope() : 'unchecked',
+        skinWorks: this.skinsOnly() ? this.skinWorks() : [],
         // a window of time and a slice of the listing are alternatives, so the one not
         // chosen is not sent at all rather than sent and ignored
         dates: this.picksDates() && this.useDates(),
@@ -2412,6 +2505,12 @@ export class DownloadDialog implements OnDestroy {
       case 'repairClashes':
         this.repairClashes.set(event.repairClashes ?? []);
         break;
+      case 'skinFailures':
+        this.skinFailures.set(event.skinFailures ?? []);
+        break;
+      case 'skinsPending':
+        this.skinsPending.set(event.skinsPending ?? []);
+        break;
       case 'fichubOlder':
         this.fichubOlder.set(event.fichubOlder ?? []);
         break;
@@ -2539,6 +2638,10 @@ export class DownloadDialog implements OnDestroy {
         error: 'in an unrevealed collection - it cannot be downloaded until it is revealed' },
       { id: null, link: '', title: 'Something',
         error: 'not a work - it may have been deleted, made private, or hidden' },
+    ]);
+    this.skinFailures.set([
+      { id: '333', link: 'https://archiveofourown.org/works/333',
+        error: "its work page would not read: 503" },
     ]);
     this.append('debug: showing a made-up report - nothing here really happened');
     this.step.set('done');
@@ -2745,6 +2848,8 @@ export class DownloadDialog implements OnDestroy {
     skipped: this.skipped(),
     fichubOlder: this.fichubOlder(),
     repairClashes: this.repairClashes(),
+    skinFailures: this.skinFailures(),
+    skinsPending: this.skinsPending(),
   }));
 
   /** how many entries there are across every list of issues this run reported */
@@ -2756,6 +2861,7 @@ export class DownloadDialog implements OnDestroy {
    */
   /** one older FicHub copy, in words */
   protected readonly repairClashWords = repairClashWords;
+  protected readonly workSkinLink = workSkinLink;
 
   protected fichubOlderWords(item: FicHubOlder): string {
     return fichubOlderWords(item);

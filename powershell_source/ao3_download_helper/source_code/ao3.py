@@ -259,6 +259,16 @@ class Ao3:
         # Resolve issues' repairs not done: the name the file would get is another file's
         # ({id, link, file, wanted, site}) - reported at the end (`report_failures`)
         self.repair_clashes: list[dict] = []
+        # work skins this run could not get or put in, {id, link, error} - the `skinFailures` list
+        self.skin_failures: list[dict] = []
+        # works whose html this run downloaded without its skin to hand - read in one pass of their
+        # own after the downloads (`server.fetch_pending_skins`), not one by one between them
+        self.skins_pending: list[str] = []
+        # told each time that list changes, so the run record holds it as it stands - a run
+        # that fails or is stopped before the skins step still says which works are waiting
+        self.on_skins_pending: Callable[[list[str]], None] | None = None
+        # Skip this step pressed during a download step: the works after it are not fetched
+        self.download_cut = False
         # new copies that arrived while the older copy they replace could not be removed.
         # nothing is lost, but there are now two copies, so the run names each one
         self.kept_copies: list[dict] = []
@@ -346,6 +356,18 @@ class Ao3:
         # the run reads anyway (`note_skin`), so a work it has already read costs nothing more
         self.skins = False
         self.skin_css: dict[str, str] = {}
+        # works whose skin this run saved to `skins/` while putting it into their html
+        self.skins_saved: set[str] = set()
+        # the works whose skin this run saved as css, in the order saved - the run record's
+        # `skinsSaved`, which History lists (a work found to have none is not in it)
+        self.skins_found: list[str] = []
+        # works whose page would not read for their skin this run
+        self.skins_unread: set[str] = set()
+        # the debug panel's Skip this step, asked at each page of a listing walk - set by the run
+        # (`Job.ao3`, to `Job.skipping`, which clears the request as it reads it)
+        self.skip_requested = None
+        # whether the last walk was cut short by it (`skip_point`)
+        self.walk_cut = False
         # how far the collection listing being read has got: its first page, the last page
         # read in full, and the works found - said when one breaks off
         self.listing_read: dict = {}
@@ -384,6 +406,7 @@ class Ao3:
 
         log = {}
         if not visited: visited = []
+        self.download_cut = False
 
         try:
             self.download_recursive(link, log, visited)
@@ -493,6 +516,7 @@ class Ao3:
         total_pages = None
         self.walk_finished = False
         self.walk_failed = False
+        self.walk_cut = False
         # how far the walk got, for when it breaks off: the page it began on, the last one
         # read in full, and the dates on that page's last blurb - the bookmark's and the
         # work's own - which is how far back in time the listing was read
@@ -502,165 +526,170 @@ class Ao3:
         reached = {'bookmarked': '', 'updated': ''}
 
         try:
-            while True:
-                self.check_cancelled()
-                current = parse_text.get_page_number(link)
-                shown_total = None if open_ended else total_pages
-                print(strings.AO3_INFO_METADATA_FETCHING.format(str(current), str(shown_total))
-                      if shown_total else
-                      strings.AO3_INFO_METADATA_FETCHING_FIRST.format(str(current)))
-                # said before the request, so the ui names the page being fetched rather
-                # than the last one that finished. the fetch is the slow part, and a
-                # caption written only afterwards describes the wrong page for all of it
-                asking, asking_of = self.page_progress(current, shown_total)
-                progress.report(self.progress, progress.PAGE, page=asking, total=asking_of,
-                                listingPage=current, listingTotal=shown_total, fetching=True)
-                self.fileops.write_log({'link': link, 'message': strings.INFO_STARTING_PAGE, 'level': 'debug'})
-                thesoup = self.fetch_page(link)
-                if not parse_soup.get_blurbs(thesoup) and not parse_soup.looks_like_listing(thesoup):
-                    # not a listing at all: an end to the walk taken from it would be a guess
-                    raise exceptions.Ao3DownloaderException(strings.ERROR_LISTING_UNREADABLE)
-                if total_pages is None:
-                    total_pages = parse_soup.get_total_pages(thesoup)
-                page_records = []
-                # bookmarks of a series or of a work off ao3: indexed in their own folders,
-                # never downloaded, and never what a walk stops at
-                page_series: list[dict] = []
-                page_external: list[dict] = []
-                reached_known = False
-                for blurb in parse_soup.get_blurbs(thesoup):
-                    if ceiling:
-                        dated = parse_text.get_date_stamp(parse_soup.get_text_or_empty(
-                            blurb, SORT_DATE_SELECTORS.get(ceiling_on, 'div.header p.datetime')))
-                        if dated and dated > ceiling: continue
-                    kind, number = parse_soup.get_blurb_kind(blurb)
-                    if kind in (parse_soup.BLURB_SERIES, parse_soup.BLURB_EXTERNAL) and \
-                            (number or kind == parse_soup.BLURB_EXTERNAL):
-                        key = parse_soup.get_blurb_id(blurb) or f'{kind}-{number}'
-                        if key in seen: continue
-                        seen.add(key)
-                        if kind == parse_soup.BLURB_SERIES:
-                            document = parse_soup.get_series_bookmark_metadata(blurb, number)
-                            document[strings.BOOKMARK_TYPE_FIELD] = strings.BOOKMARK_TYPE_SERIES
-                            page_series.append(document)
-                        else:
-                            document = parse_soup.get_external_bookmark_metadata(blurb, number)
-                            document[strings.BOOKMARK_TYPE_FIELD] = strings.BOOKMARK_TYPE_EXTERNAL
-                            page_external.append(document)
-                        document['source'] = source
-                        if own_bookmarks: document[strings.BOOKMARKED_FIELD] = True
-                        continue
-                    worknum = number if kind == parse_soup.BLURB_WORK else None
-                    if not worknum:
-                        skipped += 1
-                        # why, not just how many - a count leaves no way to tell which
-                        # bookmark was passed over or to go and look at it
-                        self.skipped_works.append(parse_soup.get_blurb_skip_reason(blurb))
-                        continue
-                    # it still gets indexed below - it has a number and a place in the
-                    # listing - but asking ao3 for the file would fail by definition
-                    self.note_unrevealed(blurb, worknum)
+            with self.skippable():
+                while True:
+                    self.check_cancelled()
+                    self.skip_point()
+                    current = parse_text.get_page_number(link)
+                    shown_total = None if open_ended else total_pages
+                    print(strings.AO3_INFO_METADATA_FETCHING.format(str(current), str(shown_total))
+                          if shown_total else
+                          strings.AO3_INFO_METADATA_FETCHING_FIRST.format(str(current)))
+                    # said before the request, so the ui names the page being fetched rather
+                    # than the last one that finished. the fetch is the slow part, and a
+                    # caption written only afterwards describes the wrong page for all of it
+                    asking, asking_of = self.page_progress(current, shown_total)
+                    progress.report(self.progress, progress.PAGE, page=asking, total=asking_of,
+                                    listingPage=current, listingTotal=shown_total, fetching=True)
+                    self.fileops.write_log({'link': link, 'message': strings.INFO_STARTING_PAGE, 'level': 'debug'})
+                    thesoup = self.fetch_page(link)
+                    if not parse_soup.get_blurbs(thesoup) and not parse_soup.looks_like_listing(thesoup):
+                        # not a listing at all: an end to the walk taken from it would be a guess
+                        raise exceptions.Ao3DownloaderException(strings.ERROR_LISTING_UNREADABLE)
+                    if total_pages is None:
+                        total_pages = parse_soup.get_total_pages(thesoup)
+                    page_records = []
+                    # bookmarks of a series or of a work off ao3: indexed in their own folders,
+                    # never downloaded, and never what a walk stops at
+                    page_series: list[dict] = []
+                    page_external: list[dict] = []
+                    reached_known = False
+                    for blurb in parse_soup.get_blurbs(thesoup):
+                        if ceiling:
+                            dated = parse_text.get_date_stamp(parse_soup.get_text_or_empty(
+                                blurb, SORT_DATE_SELECTORS.get(ceiling_on, 'div.header p.datetime')))
+                            if dated and dated > ceiling: continue
+                        kind, number = parse_soup.get_blurb_kind(blurb)
+                        if kind in (parse_soup.BLURB_SERIES, parse_soup.BLURB_EXTERNAL) and \
+                                (number or kind == parse_soup.BLURB_EXTERNAL):
+                            key = parse_soup.get_blurb_id(blurb) or f'{kind}-{number}'
+                            if key in seen: continue
+                            seen.add(key)
+                            if kind == parse_soup.BLURB_SERIES:
+                                document = parse_soup.get_series_bookmark_metadata(blurb, number)
+                                document[strings.BOOKMARK_TYPE_FIELD] = strings.BOOKMARK_TYPE_SERIES
+                                page_series.append(document)
+                            else:
+                                document = parse_soup.get_external_bookmark_metadata(blurb, number)
+                                document[strings.BOOKMARK_TYPE_FIELD] = strings.BOOKMARK_TYPE_EXTERNAL
+                                page_external.append(document)
+                            document['source'] = source
+                            if own_bookmarks: document[strings.BOOKMARKED_FIELD] = True
+                            continue
+                        worknum = number if kind == parse_soup.BLURB_WORK else None
+                        if not worknum:
+                            skipped += 1
+                            # why, not just how many - a count leaves no way to tell which
+                            # bookmark was passed over or to go and look at it
+                            self.skipped_works.append(parse_soup.get_blurb_skip_reason(blurb))
+                            continue
+                        # it still gets indexed below - it has a number and a place in the
+                        # listing - but asking ao3 for the file would fail by definition
+                        self.note_unrevealed(blurb, worknum)
 
-                    # a work only a collection led the index to is checked here, when reached:
-                    # if you had not bookmarked it, it is new to your bookmarks, so the walk
-                    # reads it (marking it bookmarked) and carries on
-                    if known is not None and str(worknum) in known and \
-                            (not hasattr(known, 'confirmed') or known.confirmed(str(worknum))):
-                        # the first fic we already hold. everything past it on this page,
-                        # and every page after it, has been seen before
-                        print(strings.AO3_INFO_REACHED_KNOWN)
-                        reached_known = True
-                        break
-
-                    if stop_before:
-                        # only sound on a listing sorted by this date - see the docstring
-                        selector = ('div.user p.datetime' if stop_on == 'bookmarked'
-                                    else 'div.header p.datetime')
-                        updated = parse_text.get_date_stamp(parse_soup.get_text_or_empty(
-                            blurb, selector))
-                        if updated and updated < stop_before:
-                            print(strings.AO3_INFO_REACHED_OLDER.format(stop_before))
+                        # a work only a collection led the index to is checked here, when reached:
+                        # if you had not bookmarked it, it is new to your bookmarks, so the walk
+                        # reads it (marking it bookmarked) and carries on
+                        if known is not None and str(worknum) in known and \
+                                (not hasattr(known, 'confirmed') or known.confirmed(str(worknum))):
+                            # the first fic we already hold. everything past it on this page,
+                            # and every page after it, has been seen before
+                            print(strings.AO3_INFO_REACHED_KNOWN)
                             reached_known = True
                             break
-                    # a work can be bookmarked more than once, and can shift between pages
-                    # while we're paging through, so dedupe on the bookmark rather than the work
-                    key = parse_soup.get_blurb_id(blurb) or str(worknum)
-                    if key in seen: continue
-                    seen.add(key)
-                    document = {'source': source}
-                    document.update(parse_soup.get_blurb_metadata(blurb))
-                    document[strings.BOOKMARK_TYPE_FIELD] = strings.BOOKMARK_TYPE_WORK
-                    if own_bookmarks: document[strings.BOOKMARKED_FIELD] = True
-                    records.append(document)
-                    page_records.append(document)
-                # nothing is written until the whole page has been read. a page is one unit
-                # of work: it is fetched, parsed and only then saved, so a page abandoned
-                # partway leaves no half-built entries and simply gets asked for again.
-                # saving as each blurb was parsed made the page half-written by definition
-                for document in page_records:
-                    self.save_metadata(document)
-                for document in page_external:
-                    self.save_entry(document, strings.EXTERNAL_INDEX_FOLDER_NAME)
-                # a series is not walked here: it is marked, and every marked series is
-                # walked once indexing is over, so a work anywhere in the listing is read
-                # from the listing and not a second time from a series
-                for document in page_series:
-                    self.save_series_entry(document)
-                    self.mark_series(document['id'], document.get('title'), bookmark=document)
-                for document in page_records:
-                    self.mark_series_of(document)
-                if self.on_page:
-                    # the last bookmark on the page and the date it carries in the order the
-                    # listing is sorted by - the date is what a retry looks for again, since
-                    # pages move between attempts and an updated fic moves with them
-                    blurbs = parse_soup.get_blurbs(thesoup)
-                    anchor = None
-                    if blurbs and parse_soup.get_blurb_id(blurbs[-1]):
-                        sort = 'updated' if listing_sort(source) == 'updated' else 'bookmarked'
-                        anchor = {'id': parse_soup.get_blurb_id(blurbs[-1]),
-                                  'date': parse_text.get_date_stamp(parse_soup.get_text_or_empty(
-                                      blurbs[-1], SORT_DATE_SELECTORS[sort])),
-                                  'sort': sort}
-                    self.on_page(current, anchor, [str(d['id']) for d in page_records
-                                                   if d.get('id')])
-                shown_total = None if open_ended else total_pages
-                done, of = self.page_progress(current, shown_total)
-                # two sets of numbers on purpose: the bar measures the slice being fetched,
-                # so it runs 1..n and ends full, while the words say where that actually is
-                # in the listing - 'page 42 of 80' is what you would go and look at
-                progress.report(self.progress, progress.PAGE, page=done, total=of,
-                                listingPage=current, listingTotal=shown_total,
-                                works=len(records))
-                last_good = current
-                page_blurbs = parse_soup.get_blurbs(thesoup)
-                if page_blurbs:
-                    reached = {
-                        'bookmarked': parse_text.get_date_stamp(parse_soup.get_text_or_empty(
-                            page_blurbs[-1], 'div.user p.datetime')) or reached['bookmarked'],
-                        'updated': parse_text.get_date_stamp(parse_soup.get_text_or_empty(
-                            page_blurbs[-1], 'div.header p.datetime')) or reached['updated'],
-                    }
-                # said as soon as the page is in, and before any decision to stop: this used
-                # to sit after the break checks, so the page a run ended on - the last one
-                # of the listing, or the one the page limit stopped at - never reported
-                # finishing at all
-                print(strings.AO3_INFO_METADATA_PAGE.format(
-                          str(current), str(shown_total), str(len(records)))
-                      if shown_total else
-                      strings.AO3_INFO_METADATA_PAGE_ONLY.format(
-                          str(current), str(len(records))))
-                # the works ahead of the familiar or older one are still new, so they were kept
-                # and written; it is only the walking that stops here. after the page has said
-                # it finished, not before - a walk stopped by a floor used to end on 'fetching
-                # page 4' and never report the page it had actually read
-                if reached_known or not total_pages or current >= total_pages:
-                    self.walk_finished = True
-                    break
-                link = parse_text.get_next_page(link)
-                if self.pages and parse_text.get_page_number(link) == self.pages + 1:
-                    if self.debug: self.fileops.write_log({'link': link, 'message': strings.INFO_PAGE_LIMIT_REACHED, 'level': 'debug'})
-                    self.walk_finished = True
-                    break
+
+                        if stop_before:
+                            # only sound on a listing sorted by this date - see the docstring
+                            selector = ('div.user p.datetime' if stop_on == 'bookmarked'
+                                        else 'div.header p.datetime')
+                            updated = parse_text.get_date_stamp(parse_soup.get_text_or_empty(
+                                blurb, selector))
+                            if updated and updated < stop_before:
+                                print(strings.AO3_INFO_REACHED_OLDER.format(stop_before))
+                                reached_known = True
+                                break
+                        # a work can be bookmarked more than once, and can shift between pages
+                        # while we're paging through, so dedupe on the bookmark rather than the work
+                        key = parse_soup.get_blurb_id(blurb) or str(worknum)
+                        if key in seen: continue
+                        seen.add(key)
+                        document = {'source': source}
+                        document.update(parse_soup.get_blurb_metadata(blurb))
+                        document[strings.BOOKMARK_TYPE_FIELD] = strings.BOOKMARK_TYPE_WORK
+                        if own_bookmarks: document[strings.BOOKMARKED_FIELD] = True
+                        records.append(document)
+                        page_records.append(document)
+                    # nothing is written until the whole page has been read. a page is one unit
+                    # of work: it is fetched, parsed and only then saved, so a page abandoned
+                    # partway leaves no half-built entries and simply gets asked for again.
+                    # saving as each blurb was parsed made the page half-written by definition
+                    for document in page_records:
+                        self.save_metadata(document)
+                    for document in page_external:
+                        self.save_entry(document, strings.EXTERNAL_INDEX_FOLDER_NAME)
+                    # a series is not walked here: it is marked, and every marked series is
+                    # walked once indexing is over, so a work anywhere in the listing is read
+                    # from the listing and not a second time from a series
+                    for document in page_series:
+                        self.save_series_entry(document)
+                        self.mark_series(document['id'], document.get('title'), bookmark=document)
+                    for document in page_records:
+                        self.mark_series_of(document)
+                    if self.on_page:
+                        # the last bookmark on the page and the date it carries in the order the
+                        # listing is sorted by - the date is what a retry looks for again, since
+                        # pages move between attempts and an updated fic moves with them
+                        blurbs = parse_soup.get_blurbs(thesoup)
+                        anchor = None
+                        if blurbs and parse_soup.get_blurb_id(blurbs[-1]):
+                            sort = 'updated' if listing_sort(source) == 'updated' else 'bookmarked'
+                            anchor = {'id': parse_soup.get_blurb_id(blurbs[-1]),
+                                      'date': parse_text.get_date_stamp(parse_soup.get_text_or_empty(
+                                          blurbs[-1], SORT_DATE_SELECTORS[sort])),
+                                      'sort': sort}
+                        self.on_page(current, anchor, [str(d['id']) for d in page_records
+                                                       if d.get('id')])
+                    shown_total = None if open_ended else total_pages
+                    done, of = self.page_progress(current, shown_total)
+                    # two sets of numbers on purpose: the bar measures the slice being fetched,
+                    # so it runs 1..n and ends full, while the words say where that actually is
+                    # in the listing - 'page 42 of 80' is what you would go and look at
+                    progress.report(self.progress, progress.PAGE, page=done, total=of,
+                                    listingPage=current, listingTotal=shown_total,
+                                    works=len(records))
+                    last_good = current
+                    page_blurbs = parse_soup.get_blurbs(thesoup)
+                    if page_blurbs:
+                        reached = {
+                            'bookmarked': parse_text.get_date_stamp(parse_soup.get_text_or_empty(
+                                page_blurbs[-1], 'div.user p.datetime')) or reached['bookmarked'],
+                            'updated': parse_text.get_date_stamp(parse_soup.get_text_or_empty(
+                                page_blurbs[-1], 'div.header p.datetime')) or reached['updated'],
+                        }
+                    # said as soon as the page is in, and before any decision to stop: this used
+                    # to sit after the break checks, so the page a run ended on - the last one
+                    # of the listing, or the one the page limit stopped at - never reported
+                    # finishing at all
+                    print(strings.AO3_INFO_METADATA_PAGE.format(
+                              str(current), str(shown_total), str(len(records)))
+                          if shown_total else
+                          strings.AO3_INFO_METADATA_PAGE_ONLY.format(
+                              str(current), str(len(records))))
+                    # the works ahead of the familiar or older one are still new, so they were kept
+                    # and written; it is only the walking that stops here. after the page has said
+                    # it finished, not before - a walk stopped by a floor used to end on 'fetching
+                    # page 4' and never report the page it had actually read
+                    if reached_known or not total_pages or current >= total_pages:
+                        self.walk_finished = True
+                        break
+                    link = parse_text.get_next_page(link)
+                    if self.pages and parse_text.get_page_number(link) == self.pages + 1:
+                        if self.debug: self.fileops.write_log({'link': link, 'message': strings.INFO_PAGE_LIMIT_REACHED, 'level': 'debug'})
+                        self.walk_finished = True
+                        break
+        except exceptions.StepSkippedException:
+            # skipped from the debug panel: what was written stays, and the walk is not finished
+            self.walk_cut = True
         except exceptions.CancelledException:
             # everything written so far stays on disk; this is not an error
             print(strings.INFO_CANCELLED)
@@ -849,22 +878,27 @@ class Ao3:
 
     def note_skin(self, url: str, soup) -> None:
         """Remember the skin on a work page this run read anyway - the fic runs, the update
-        pass and every other re-read - so `skin_for` never asks AO3 for the same page twice."""
+        pass and every other re-read - so `skin_for` never asks AO3 for the same page twice; and,
+        on a run asked to fetch skins (`skins`), **save it as css** (`save_skin`) there and then:
+        the page is already open, so it costs no request and is AO3's latest. Unticked, nothing is
+        saved. A skin is never put into an html file."""
 
-        if not self.skins: return
         work = parse_text.get_work_number(url or '')
         if not work: return
         try:
-            self.skin_css[str(work)] = parse_soup.get_work_skin(soup)
+            css = parse_soup.get_work_skin(soup)
         except Exception:
-            pass # a page that cannot be read for a skin is a work with none, for this run
+            return  # a page that cannot be read for a skin is a work with none, for this run
+        self.skin_css[str(work)] = css
+        # free, and AO3's latest - saved only on a run asked to fetch skins
+        if self.skins is True: self.save_skin(str(work), css)
 
 
-    def skin_for(self, work: str) -> str:
+    def skin_for(self, work: str, saving_only: bool = False) -> str:
         """A work's skin, '' for none: from a page this run already read, or else its own page,
         read once (the first chapter is enough - the skin is the same on every one).
 
-        A page that will not read costs the skin and nothing else: the html is saved without it.
+        A page that will not read costs the skin and nothing else.
         A stop, or a lapsed login, still ends the run.
         """
 
@@ -877,41 +911,90 @@ class Ao3:
             raise
         except Exception as e:
             self.skin_css[work] = ''
+            self.skins_unread.add(work)
+            self.note_skin_failure(work, strings.SKIN_FAILED_UNREADABLE.format(e))
             self.log_error({'message': strings.AO3_INFO_SKIN_UNREADABLE.format(work, e),
                             'link': f'{strings.AO3_BASE_URL}/works/{work}'}, e)
             print(strings.AO3_INFO_SKIN_UNREADABLE.format(work, e))
             return ''
         css = self.skin_css.setdefault(work, '')
-        print((strings.AO3_INFO_SKIN_FOUND if css else strings.AO3_INFO_SKIN_NONE).format(work))
+        found = strings.AO3_INFO_SKIN_FOUND_SAVED if saving_only else strings.AO3_INFO_SKIN_FOUND
+        print((found if css else strings.AO3_INFO_SKIN_NONE).format(work))
         return css
 
 
-    def dress(self, work: str, filetype: str, name: str, content: bytes) -> bytes:
-        """A downloaded file with its work's skin put in, when this run was asked to - html only.
+    def skins_pending_changed(self) -> None:
+        """Hand the list of works still waiting for their skin to whoever keeps the run record."""
 
-        AO3's download leaves the skin out, and its rules are all written `#workskin .<class>`,
-        so the CSS goes into the `<head>` and the body is wrapped in `<div id="workskin">`, as on
-        the work page. Done before the file is saved, so it is written once and every check on
-        it (`saved_intact`, its name and date) sees the file as it is kept. The skin is saved
-        beside the works too, `skins/<worknum>.css`. Anything that does not fit leaves the file
-        exactly as AO3 sent it.
+        if self.on_skins_pending is None: return
+        try:
+            self.on_skins_pending(list(self.skins_pending))
+        except Exception:
+            pass  # a note about the run is not worth taking the run down for
+
+    def download_skipped(self) -> bool:
+        """Skip this step pressed during a download step: between works, never inside one, so
+        every file is written whole. The works after it are left for another run."""
+
+        if self.download_cut: return True
+        if self.skip_requested and self.skip_requested():
+            self.download_cut = True
+            print(strings.AO3_INFO_STEP_SKIPPED)
+            return True
+        return False
+
+    def note_skin_failure(self, work: str, error: str) -> None:
+        """A work's skin this run could not get, or could not save - once per work."""
+
+        work = str(work)
+        if any(x['id'] == work for x in self.skin_failures): return
+        self.skin_failures.append({'id': work, 'link': f'{strings.AO3_BASE_URL}/works/{work}',
+                                   'error': error})
+
+    def save_skin(self, work: str, css: str) -> bool:
+        """Save a work's skin as `skins/<worknum>.css`, over any saved before - or, for a work with
+        none, note that as `skins/<worknum>.none` (empty), so it is not asked about again and the
+        page can tell a work with a skin from one without by name alone. Whichever of the two it
+        is not is removed. Says whether it was saved; a write that fails costs the skin alone."""
+
+        work = str(work)
+        # once a run: a page read again holds the same skin, and every write is an upload in Dropbox
+        if work in self.skins_saved: return True
+        kept, gone = ('css', 'none') if css else ('none', 'css')
+        try:
+            self.fileops.save_bytes(os.path.join(strings.SKINS_FOLDER_NAME, f'{work}.{kept}'),
+                                    (css or '').encode('utf-8'))
+            other = os.path.join(self.fileops.downloadfolder, strings.SKINS_FOLDER_NAME, f'{work}.{gone}')
+            if self.fileops.exists(other) is True: self.fileops.delete_file(other)
+        except Exception as e:
+            self.log_error({'message': strings.AO3_INFO_SKIN_NOT_SAVED.format(work, e)}, e)
+            print(strings.AO3_INFO_SKIN_NOT_SAVED.format(work, e))
+            self.note_skin_failure(work, strings.SKIN_FAILED_NOT_SAVED.format(e))
+            return False
+        self.skins_saved.add(work)
+        if css: self.skins_found.append(work)
+        return True
+
+    def take_skin(self, work: str, filetype: str) -> None:
+        """A work's skin, saved as css, for the html a run asked to fetch skins (`skins`) has just
+        downloaded - a new download, an update, or a copy overwritten. A work whose html is not
+        downloaded is not looked at for a skin.
+
+        **The skin is never put into the html file** (at the owner's instruction): it is saved
+        beside the works as `skins/<worknum>.css`, or `<worknum>.none` for a work with none, and
+        the page shows it as the work opens from FicFairy. Where the run read the work's page
+        anyway it is saved already (`note_skin`), for nothing. Otherwise the work is noted
+        (`skins_pending`) and its page read after every download is done, in a step of its own
+        (`server.fetch_pending_skins`) - so the skins never hold a download up, and a run stopped
+        or skipped there has every file it fetched.
         """
 
-        if not self.skins or filetype.upper() != 'HTML':
-            return content
-        css = self.skin_for(work)
-        if not css: return content
-        try:
-            self.fileops.save_bytes(os.path.join(strings.SKINS_FOLDER_NAME, f'{work}.css'),
-                                    css.encode('utf-8'))
-        except Exception as e:
-            self.log_error({'message': strings.AO3_INFO_SKIN_NOT_ADDED.format(work)}, e)
-        dressed = with_skin(content, css)
-        if dressed is None:
-            print(strings.AO3_INFO_SKIN_NOT_ADDED.format(work))
-            return content
-        print(strings.AO3_INFO_SKIN_ADDED.format(name))
-        return dressed
+        if self.skins is not True or filetype.upper() != 'HTML': return
+        work = str(work)
+        if work in self.skin_css: return  # read with its page, and saved then
+        if work not in self.skins_pending:
+            self.skins_pending.append(work)
+            self.skins_pending_changed()
 
 
     def download_indexed(self, records: list[dict], visited: list[str] | None = None,
@@ -958,8 +1041,10 @@ class Ao3:
     def download_pending(self, pending: list[dict], maximum: int) -> None:
         """The loop of `download_indexed`, one work at a time."""
 
+        self.download_cut = False
         for done, record in enumerate(pending, start=1):
             log: dict = {'link': record['link']}
+            if self.download_skipped(): return
             try:
                 self.check_cancelled()
                 self.download_one_indexed(record, maximum, log, done, len(pending))
@@ -1050,7 +1135,7 @@ class Ao3:
                     parse_text.get_direct_download_link(work, filetype), filetype)
                 name = filename + parse_text.get_file_type(filetype)
                 # AO3's own html only: FicHub's copy carries no skin to match
-                if not fetch: content = self.dress(work, filetype, name, content)
+                if not fetch: self.take_skin(work, filetype)
                 self.save_download(record['link'], filetype, name, content)
                 if arrived is not None: arrived.append(filetype)
 
@@ -1144,6 +1229,30 @@ class Ao3:
         return done, max(1, last - self.start + 1)
 
 
+    @contextlib.contextmanager
+    def skippable(self):
+        """While indexing: Skip this step lands mid-request too, as a stop does - the request in
+        flight, a retry's wait and AO3's break all end at once (`Repository.skip_check`). Nothing is
+        written from a request walked away from, so nothing is part-written."""
+
+        repo = self.repo
+        before = getattr(repo, 'skip_check', None)
+        if self.skip_requested is not None: repo.skip_check = self.skip_requested
+        try:
+            yield
+        finally:
+            repo.skip_check = before
+
+    def skip_point(self) -> None:
+        """Where a listing walk can be skipped: between pages, never inside one, so whatever a
+        page held is written whole first. Raises `StepSkippedException` when Skip this step was
+        pressed."""
+
+        if self.skip_requested and self.skip_requested():
+            self.walk_cut = True
+            print(strings.AO3_INFO_STEP_SKIPPED)
+            raise exceptions.StepSkippedException()
+
     def walk_pages(self, link: str, stop: int | None = None):
         """Yield each page of a paginated ao3 listing, following 'next' until it runs out -
         or until page `stop`, when given. It starts on whatever page `link` names."""
@@ -1151,6 +1260,7 @@ class Ao3:
         total_pages = None
         while True:
             self.check_cancelled()
+            self.skip_point()
             soup = self.fetch_page(link)
             yield soup
             if total_pages is None:
@@ -1449,6 +1559,8 @@ class Ao3:
                     if not slug: continue
                     self.take_collection(slug, source, records, blurb)
             self.walk_family(records)
+        except exceptions.StepSkippedException:
+            self.walk_cut = True  # skipped from the debug panel: what was saved stays
         except exceptions.CancelledException:
             print(strings.INFO_CANCELLED)
         except Exception as e:
@@ -1481,6 +1593,8 @@ class Ao3:
             print(strings.AO3_INFO_COLLECTION_ONE.format(slug))
             self.take_collection(slug, link, records)
             self.walk_family(records)
+        except exceptions.StepSkippedException:
+            self.walk_cut = True  # skipped from the debug panel: what was saved stays
         except exceptions.CancelledException:
             print(strings.INFO_CANCELLED)
         except Exception as e:
@@ -1674,7 +1788,7 @@ class Ao3:
                 if self.on_collection_page:
                     self.on_collection_page(slug, key, None, ids, done=True, externals=externals,
                                             series=series)
-            except exceptions.CancelledException:
+            except (exceptions.CancelledException, exceptions.StepSkippedException):
                 raise
             except Exception as e:
                 document[key] = []
@@ -2208,6 +2322,7 @@ class Ao3:
             try:
                 self.check_cancelled()
                 thesoup = self.proceed(self.repo.get_soup(work_link))
+                self.note_skin(work_link, thesoup)  # the page is in hand: its skin costs nothing
                 record['date_created'] = parse_soup.get_text_or_empty(thesoup, 'dd.published')
                 # single chapter works have no status line; keep the listing date in that case
                 updated = parse_soup.get_text_or_empty(thesoup, 'dd.status')
@@ -2305,6 +2420,7 @@ class Ao3:
     def download_recursive(self, link: str, log: dict, visited: list[str]) -> None:
 
         self.check_cancelled()
+        if self.download_skipped(): return
 
         if link in visited:
             # every format of it is on disk - but a copy behind the listing's date (or a run
@@ -2336,6 +2452,7 @@ class Ao3:
                 self.note_listing_dates(thesoup)
                 for url in urls:
                     self.download_recursive(url, log, visited)
+                if self.download_cut: break  # skipped: no more listing pages read
                 if not self.mark:
                     pagenum = parse_text.get_page_number(link)
                     if not total_pages or pagenum >= total_pages:
@@ -2503,7 +2620,7 @@ class Ao3:
                 link = parse_soup.get_download_link(thesoup, filetype)
                 response = self.repo.get_book(link)
                 name = filename + parse_text.get_file_type(filetype)
-                if number: response = self.dress(number, filetype, name, response)
+                if number: self.take_skin(number, filetype)
                 self.save_download(work_url, filetype, name, response)
 
         if self.images:
@@ -2792,29 +2909,8 @@ class Ao3:
         self.fileops.write_log(log)
 
 
-SKIN_OPEN = '<div id="workskin">'
+# a work's saved skin, or the note that it has none
+SKIN_NOTES = ('.css', '.none')
 
 
-def with_skin(content: bytes, css: str) -> bytes | None:
-    """AO3's downloaded html with a work skin in it, or None when it cannot take one as it is.
-
-    The CSS goes in a `<style>` at the end of the `<head>`, after AO3's own download styles, and
-    everything in the `<body>` goes inside `<div id="workskin">`, which every skin rule names.
-    None - and the file is saved as AO3 sent it - for a file that is not utf-8, has no head or
-    body to find, already has the wrapper, or a skin that would close its own `<style>`.
-    """
-
-    try:
-        text = content.decode('utf-8')
-    except (UnicodeDecodeError, AttributeError):
-        return None
-    lower = text.lower()
-    if 'id="workskin"' in lower or '</style' in css.lower(): return None
-    head_end = lower.find('</head>')
-    body = re.search(r'<body[^>]*>', text, re.IGNORECASE)
-    body_end = lower.rfind('</body>')
-    if head_end < 0 or not body or body_end < body.end(): return None
-    style = f'<style type="text/css">\n/* the work skin, from the work\'s page on AO3 */\n{css}\n</style>\n'
-    return (text[:head_end] + style + text[head_end:body.end()] + '\n' + SKIN_OPEN
-            + text[body.end():body_end] + '</div>\n' + text[body_end:]).encode('utf-8')
 

@@ -256,7 +256,7 @@ async function advanceTo(target: 'options' | 'more-options' | 'filetypes' | 'cre
         password.dispatchEvent(new Event('input'));
         await fixture.whenStable();
       }
-      (button('Start download') ?? button('Start repair'))!.click();
+      (button('Start download') ?? button('Start repair') ?? button('Fetch work skins'))!.click();
       await fixture.whenStable();
       continue;
     }
@@ -436,9 +436,20 @@ describe('DownloadDialog', () => {
     await advanceTo('filetypes');
 
     expect(element.querySelector('input[name=skins]')).toBeNull();
+    await advanceTo('running');
+    expect(jobs.started[0].options).toMatchObject({ skins: false });
   });
 
-  for (const action of ['bookmarks', 'quick', 'custom'] as const) {
+  it('offers work skins unticked in debug mode', async () => {
+    debugOn();
+    await open('bookmarks');
+    await advanceTo('filetypes');
+
+    expect(element.querySelector<HTMLInputElement>('input[name=skins]')!.checked).toBe(false);
+    expect(element.querySelector('.skins-option')?.textContent).toContain('[DEBUG]');
+  });
+
+  for (const action of ['bookmarks', 'quick', 'custom', 'update', 'sync', 'work'] as const) {
     it(`sends work skins on a ${action} run when ticked in debug mode`, async () => {
       debugOn();
       await open(action);
@@ -454,13 +465,147 @@ describe('DownloadDialog', () => {
     });
   }
 
-  it('does not offer work skins on a run that cannot take them', async () => {
+  // every custom run that is not the skins-only one offers the box, whatever it covers
+  const clickOn = (selector: string) => element.querySelector<HTMLInputElement>(selector)!.click();
+  for (const [what, labels, nested, sent] of [
+    ['all bookmarks', [], '', { reindex: true, dates: false }],
+    ['a page range', ['A slice of your bookmarks listing'], '', { dates: false }],
+    ['a date range', ['A slice of your bookmarks listing'], 'input[name=sliceBy][value=dates]', { dates: true }],
+    ['existing works, checked against AO3', ['Just update existing works'],
+      'input[name=existingCheck][value=ao3]', { reindex: false, recheck: true }],
+    ['existing works, checked against the index', ['Just update existing works'],
+      'input[name=existingCheck][value=index]', { reindex: false, recheck: false }],
+  ] as [string, string[], string, Record<string, unknown>][]) {
+    it(`offers work skins on a custom run over ${what}, and sends them when ticked`, async () => {
+      debugOn();
+      await open('custom');
+      await advanceTo('options');
+      for (const label of labels) checkbox(label)!.click();
+      await fixture.whenStable();
+      // the choices nested under one show once it is picked
+      if (nested) clickOn(nested);
+      await fixture.whenStable();
+      await advanceTo('filetypes');
+
+      const box = element.querySelector<HTMLInputElement>('input[name=skins]')!;
+      expect(box).not.toBeNull();
+      expect(box.checked).toBe(false);
+      box.click();
+      await fixture.whenStable();
+      await advanceTo('running');
+
+      expect(jobs.started[0].options).toMatchObject({ skins: true, skinsOnly: false, ...sent });
+    });
+  }
+
+  it('does not offer work skins with the run that fetches nothing but skins', async () => {
     debugOn();
-    await open('update');
-    await advanceTo('filetypes');
+    await open('custom');
+    await advanceTo('options');
+    checkbox('Just fetch work skins')!.click();
+    await fixture.whenStable();
+    await advanceTo('credentials');
 
     expect(element.querySelector('input[name=skins]')).toBeNull();
   });
+
+  it('lets a custom run in debug mode only fetch work skins, with no file types to pick', async () => {
+    debugOn();
+    await open('custom');
+    await advanceTo('options');
+    checkbox('Just fetch work skins')!.click();
+    await fixture.whenStable();
+    // never checked, to begin with
+    expect(element.querySelector<HTMLInputElement>('input[name=skinScope][value=unchecked]')!.checked).toBe(true);
+    element.querySelector<HTMLInputElement>('input[name=skinScope][value=none]')!.click();
+    await fixture.whenStable();
+
+    await advanceTo('credentials');
+    expect(element.querySelector('input[name=skins]')).toBeNull();
+    await advanceTo('running');
+
+    expect(jobs.started[0].filetypes).toEqual([]);
+    expect(jobs.started[0].options).toMatchObject({ skinsOnly: true, skinScope: 'none', skinWorks: [] });
+  });
+
+  it('does not offer fetching work skins only outside debug mode', async () => {
+    await open('custom');
+    await advanceTo('options');
+
+    expect(checkbox('Just fetch work skins')).toBeUndefined();
+  });
+
+  for (const [picked, title] of [
+    [['12'], 'Download work skin'],
+    [['12', '34'], 'Download work skins (2 works)'],
+  ] as [string[], string][]) {
+    it(`opens a window of its own for the skins of ${picked.length} work(s) picked in a listing`, async () => {
+      debugOn();
+      fixture = TestBed.createComponent(DownloadDialog);
+      fixture.componentRef.setInput('action', 'custom');
+      fixture.componentRef.setInput('skinWorks', picked);
+      await fixture.whenStable();
+      element = fixture.nativeElement as HTMLElement;
+      for (let i = 0; i < 20 && element.querySelector('[data-step]')?.getAttribute('data-step') === 'preparing'; i++) {
+        await new Promise((r) => setTimeout(r, 10));
+        await fixture.whenStable();
+      }
+
+      // titled for it, and straight to the login: no custom-run page to choose from
+      expect(element.textContent).toContain(title);
+      expect(element.textContent).not.toContain('Custom run');
+      expect(element.querySelector('[data-step]')?.getAttribute('data-step')).toBe('credentials');
+      expect(element.querySelector('input[name=coverage]')).toBeNull();
+      const said = element.textContent?.replace(/\s+/g, ' ') ?? '';
+      expect(said).toContain(picked.length === 1
+        ? 'Log in to AO3 in case this work is restricted to AO3 users.'
+        : 'Log in to AO3 in case these works are restricted to AO3 users.');
+      expect(said).not.toContain('will not show');
+      expect(said).not.toContain('your own bookmarks');
+      expect(said).toContain('Fetch work skins');
+      expect(said).not.toContain('Start download');
+      await advanceTo('running');
+
+      expect(jobs.started[0].action).toBe('custom');
+      expect(jobs.started[0].filetypes).toEqual([]);
+      expect(jobs.started[0].options).toMatchObject({ skinsOnly: true, skinWorks: picked });
+    });
+  }
+
+  it('says in one line what work skins cost, and that they only come from AO3 - once ticked', async () => {
+    debugOn();
+    await open('bookmarks');
+    await advanceTo('filetypes');
+    expect(element.querySelector('.skins-hint')).toBeNull();
+    element.querySelector<HTMLInputElement>('input[name=skins]')!.click();
+    await fixture.whenStable();
+
+    const said = element.querySelector('.skins-hint')?.textContent?.replace(/\s+/g, ' ').trim();
+    expect(said).toBe('At most one extra request to AO3 per fic the run picks up. Work skins are only fetched from AO3.');
+  });
+
+  for (const action of ['work', 'works', 'update'] as const) {
+    it(`says a ${action} run saves work skins at no extra request, and holds the box without HTML`, async () => {
+      debugOn();
+      await open(action);
+      await advanceTo('filetypes');
+      const box = element.querySelector<HTMLInputElement>('input[name=skins]')!;
+      box.click();
+      await fixture.whenStable();
+
+      const said = element.querySelector('.skins-hint')?.textContent?.replace(/\s+/g, ' ').trim();
+      expect(said).toBe('No extra requests to AO3 in this run - it opens each work\'s page anyway. Work skins are only fetched from AO3.');
+
+      checkbox('HTML')!.click();
+      await fixture.whenStable();
+      expect(element.querySelector<HTMLInputElement>('input[name=skins]')!.disabled).toBe(true);
+      expect(element.querySelector('.skins-hint')?.textContent).toContain('Tick HTML');
+      checkbox('HTML')!.click();
+      await fixture.whenStable();
+      await advanceTo('running');
+      expect(jobs.started[0].options).toMatchObject({ skins: true });
+    });
+  }
 
   it('holds work skins while HTML is unticked, and sends none', async () => {
     debugOn();
@@ -1101,6 +1246,9 @@ describe('DownloadDialog', () => {
       reindex: true,
       // a custom run skipping its indexing may look each work up; nothing else may
       recheck: false,
+      skinsOnly: false,
+      skinScope: 'unchecked',
+      skinWorks: [],
       // offered on a full scan, but off unless it is asked for
       overwrite: false,
       // offered on a full scan too, and off unless it is asked for
@@ -1817,6 +1965,32 @@ describe('DownloadDialog', () => {
     expect(said).toContain('EPUB: failed to repair from AO3 due to a name clash - 1 Fic - Someone 2026-05-01.epub is already another file');
   });
 
+  it('lists at the end the work skins it could not fetch or save', async () => {
+    await open('bookmarks');
+    await advanceTo('running');
+    jobs.push!({ type: 'skinFailures', skinFailures: [
+      { id: '1', link: 'https://archiveofourown.org/works/1', error: 'its work page would not read: 503' }] } as JobEvent);
+    jobs.push!({ type: 'finished' } as JobEvent);
+    await fixture.whenStable();
+
+    const said = element.querySelector('.skin-failures')?.textContent?.replace(/\s+/g, ' ') ?? '';
+    expect(said).toContain('1 work skin could not be fetched or saved');
+    expect(said).toContain('its work page would not read: 503');
+    expect(said).not.toContain('HTML');
+  });
+
+  it('lists at the end the works whose skin was never fetched', async () => {
+    await open('bookmarks');
+    await advanceTo('running');
+    jobs.push!({ type: 'skinsPending', skinsPending: ['1', '2'] } as JobEvent);
+    jobs.push!({ type: 'finished' } as JobEvent);
+    await fixture.whenStable();
+
+    const said = element.querySelector('.skins-pending')?.textContent?.replace(/\s+/g, ' ') ?? '';
+    expect(said).toContain('2 works had HTML downloaded but no work skin fetched');
+    expect(said).toContain('kept with this run in History');
+  });
+
   it('asks about a file whose date is only guessed, saying what it thinks and recommends', async () => {
     await open('bookmarks');
     await advanceTo('running');
@@ -2365,6 +2539,40 @@ describe('DownloadDialog', () => {
     expect(jobs.started[0].options.collectionWorks).toBe(true);
     expect(jobs.started[0].options.series).toBe(true);
   });
+
+  for (const action of ['collection', 'collections'] as const) {
+    it(`offers work skins on a ${action} run indexing its works, and sends them when ticked`, async () => {
+      debugOn();
+      await open(action);
+      await advanceTo('options');
+      checkbox('Index and download encountered works')!.click();
+      await fixture.whenStable();
+      await advanceTo('filetypes');
+
+      const box = element.querySelector<HTMLInputElement>('input[name=skins]')!;
+      expect(box).not.toBeNull();
+      expect(box.checked).toBe(false);
+      box.click();
+      await fixture.whenStable();
+      // collection listings carry no skin: each costs a request, after the downloads
+      expect(element.querySelector('.skins-hint')?.textContent).toContain('At most one extra request');
+      await advanceTo('running');
+
+      expect(jobs.started[0].options).toMatchObject({ collectionWorks: true, skins: true });
+    });
+
+    it(`offers no work skins on a ${action} run that does not index its works`, async () => {
+      debugOn();
+      await open(action);
+      await advanceTo('options');
+      await advanceTo('credentials');
+
+      // no file types page, so no box - and nothing sent
+      expect(element.querySelector('input[name=skins]')).toBeNull();
+      await advanceTo('running');
+      expect(jobs.started[0].options).toMatchObject({ collectionWorks: false, skins: false });
+    });
+  }
 
   it('offers to follow a collection\'s subcollections and parent, and sends the choice', async () => {
     await open('collection');
@@ -3606,9 +3814,11 @@ describe('DownloadDialog', () => {
     expect(said).toContain('unrevealed collection');
     expect(said).toContain('made private, or hidden');
     // and the failures list, which is the other half of the report
-    expect(element.querySelector('.failures:not(.skipped)')?.textContent).toContain(
+    expect(element.querySelector('.failures:not(.skipped):not(.skin-failures):not(.skins-pending)')?.textContent).toContain(
       'timed out',
     );
+    // and a work skin that could not be had
+    expect(element.querySelector('.skin-failures')?.textContent).toContain('its work page would not read');
   });
 
   it('sends nothing to the helper for a made-up report', async () => {
@@ -4326,6 +4536,24 @@ describe('DownloadDialog', () => {
     button('Continue')!.click();
     await fixture.whenStable();
     expect(currentStep()).not.toBe('more-options');
+  });
+
+  it('offers a skins-only run two ways to retry it, worded for skins', async () => {
+    jobs.retryableOnRecord = [
+      ended({ action: 'custom', actionName: 'Custom run', options: { skinsOnly: true, skinWorks: ['1', '2', '3'] },
+              retry: { modes: [{ mode: 'top', available: true, reason: '' }, { mode: 'failed', available: true, reason: '' }],
+                       default: 'failed', failedWorks: 0, skinsOnly: true, missedSkins: 2 } }),
+    ];
+    await toRetryPage();
+    await pick();
+    await toHow();
+
+    const modes = Array.from(element.querySelectorAll<HTMLInputElement>('input[name="retryMode"]'));
+    expect(modes.map((m) => m.value)).toEqual(['top', 'failed']);
+    expect(modes.find((m) => m.checked)?.value).toBe('failed');
+    const said = element.querySelector('.retry-modes')?.textContent?.replace(/\s+/g, ' ') ?? '';
+    expect(said).toContain("From the top - every work's skin fetched again");
+    expect(said).toContain('Just the 2 skins it could not get - failed, or never reached');
   });
 
   it('says under a run that cannot be retried why not, where it is listed', async () => {

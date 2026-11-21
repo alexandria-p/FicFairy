@@ -12,11 +12,12 @@ import os
 import socket
 import threading
 from http.server import ThreadingHTTPServer
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
 from source_code import exceptions, parse_text, progress, server, settings_file, strings
+from source_code.repo import Repository
 from source_code.fileio import FileOps as RealFileOps
 from source_code.storage import LocalStorage
 
@@ -105,7 +106,7 @@ def test_html_is_offered_by_default_but_can_be_turned_off():
 def test_resolve_options_defaults_match_the_console_defaults():
     assert server.resolve_options(None) == {
         'start': 1, 'pages': 0, 'series': False, 'images': False, 'skins': False, 'workdates': False,
-        'reindex': True, 'dates': False, 'order': '', 'recheck': False, 'skipLogin': False, 'dateFrom': '', 'dateTo': '',
+        'reindex': True, 'dates': False, 'order': '', 'recheck': False, 'skinsOnly': False, 'skinScope': 'unchecked', 'skinWorks': [], 'skipLogin': False, 'dateFrom': '', 'dateTo': '',
         'overwrite': False, 'floorRun': '', 'nonBookmarks': False, 'resume': '', 'retryMode': '',
         'collectionWorks': False, 'subcollections': False, 'parentCollections': False,
         'replaceOutdated': False, 'indexOnly': [],
@@ -123,7 +124,7 @@ def test_resolve_options_reads_what_was_asked_for():
 
     assert result == {'start': 5, 'pages': 8, 'series': True, 'images': True, 'skins': False,
                       'workdates': True, 'reindex': False, 'dates': True, 'order': 'bookmarked',
-                      'recheck': False, 'skipLogin': False,
+                      'recheck': False, 'skinsOnly': False, 'skinScope': 'unchecked', 'skinWorks': [], 'skipLogin': False,
                       'dateFrom': '2026-01-01', 'dateTo': '2026-06-30',
                       'overwrite': True, 'floorRun': '', 'nonBookmarks': True,
                       'resume': '', 'retryMode': '', 'collectionWorks': True, 'subcollections': True,
@@ -958,7 +959,7 @@ def test_a_link_that_is_not_one_collection_is_refused_before_the_job_starts(url)
     assert 'collection' in sent['body']['error'].lower()
 
 
-def started_options(action, asked, url=''):
+def started_options(action, asked, url='', filetypes=None):
     """Post a job and hand back the options the helper decided it would run with."""
 
     sent = {}
@@ -966,7 +967,7 @@ def started_options(action, asked, url=''):
     handler.path = '/api/jobs'
     handler.read_json.return_value = {
         'action': action, 'username': 'Someone', 'password': 'a-password',
-        'filetypes': ['JSON', 'HTML'], 'options': asked, 'url': url}
+        'filetypes': filetypes or ['JSON', 'HTML'], 'options': asked, 'url': url}
     handler.send_json.side_effect = lambda status, body: sent.update(status=status, body=body)
 
     # each start on a helper running nothing: the thread is stubbed, so the run it registers
@@ -3832,3 +3833,123 @@ def test_the_downloader_leaves_alone_a_format_it_was_told_to_keep(capsys):
 
 # endregion
 
+
+
+# region the debug panel's Skip this step, on a fic run's index step
+
+def test_skipping_a_single_fics_index_step_skips_what_needs_it_and_downloads_nothing(fake_environment):
+    job = server.Job(server.ACTION_WORK, ['JSON', 'HTML'], 'Someone', None,
+                     'https://archiveofourown.org/works/111')
+    job.steps = MagicMock()
+    ao3 = MagicMock()
+    ao3.index_one_work.side_effect = exceptions.StepSkippedException()
+
+    with patch.object(server, 'Ao3', return_value=ao3), \
+         patch.object(server, 'finish_run') as finished_run, \
+         patch.object(server, 'download_planned') as download:
+        server.run_work(job, fake_environment['fileops'], fake_environment['repo'], None)
+
+    download.assert_not_called()
+    finished_run.assert_called_once()
+    assert [c.args[0] for c in job.steps.skip.call_args_list] == ['index', 'series', 'check', 'download']
+    ao3.record_failure.assert_not_called()
+
+
+def test_skipping_several_fics_index_step_keeps_the_fics_read_and_marks_it_skipped(fake_environment):
+    links = '\n'.join(f'https://archiveofourown.org/works/{n}' for n in (1, 2, 3))
+    job = server.Job(server.ACTION_WORKS, ['JSON', 'HTML'], 'Someone', None, links)
+    job.steps = MagicMock()
+    ao3 = MagicMock()
+    ao3.index_failures = []
+    ao3.index_one_work.side_effect = [finished('1'), exceptions.StepSkippedException(), finished('3')]
+
+    with patch.object(server, 'Ao3', return_value=ao3), \
+         patch.object(server, 'indexed_entries', return_value={}), \
+         patch.object(server, 'finish_run'), \
+         patch.object(server, 'download_planned') as download:
+        server.run_works(job, fake_environment['fileops'], fake_environment['repo'], None)
+
+    assert ao3.index_one_work.call_count == 2
+    assert [x['id'] for x in download.call_args.args[3]] == ['1']
+    job.steps.skip.assert_any_call('index')
+    assert call('index') not in job.steps.done.call_args_list
+
+
+def test_a_skip_lands_mid_request_and_is_never_retried():
+    repo = Repository.__new__(Repository)
+    repo.cancelled = None
+    presses = iter([True])
+    repo.skip_check = lambda: next(presses, False)
+
+    with pytest.raises(exceptions.StepSkippedException):
+        repo.check_cancelled()
+    # consumed: the next check goes on
+    repo.check_cancelled()
+
+# endregion
+
+
+# region the debug panel's Skip this step, on a download step
+
+def skip_after(n):
+    """A Skip this step pressed once `n` works have been started."""
+    asked = []
+
+    def skipping():
+        asked.append(1)
+        return len(asked) > n
+    return skipping
+
+
+def test_skipping_the_download_step_fetches_no_work_after_it():
+    ao3 = server.Ao3(MagicMock(), MagicMock(), ['HTML'], None, False, False)
+    ao3.skip_requested = skip_after(1)
+    got = []
+    records = [{'id': str(n), 'link': f'https://archiveofourown.org/works/{n}'} for n in (1, 2, 3)]
+    with patch.object(server.Ao3, 'download_one_indexed',
+                      lambda self, record, *a, **k: got.append(record['id'])):
+        ao3.download_pending(records, 50)
+
+    assert got == ['1']
+    assert ao3.download_cut is True
+    assert ao3.failures == []
+
+
+def test_the_long_way_round_reads_no_more_listing_pages_once_skipped():
+    ao3 = server.Ao3(MagicMock(), MagicMock(), ['HTML'], None, False, False)
+    ao3.skip_requested = skip_after(2)
+    page = MagicMock()  # read through the patched parsers below
+    ao3.repo.get_soup.return_value = page
+    got = []
+    with patch.object(server.Ao3, 'download_work', lambda self, link, log, chapters: got.append(link)), \
+         patch.object(server.parse_soup, 'get_total_pages', return_value=5), \
+         patch.object(server.parse_soup, 'get_work_and_series_urls',
+                      return_value=['https://archiveofourown.org/works/1', 'https://archiveofourown.org/works/2']):
+        ao3.download('https://archiveofourown.org/users/Example_Reader/bookmarks?page=1', [])
+
+    # the listing page, then its first work, then the skip: page 2 is never read
+    assert got == ['https://archiveofourown.org/works/1']
+    assert ao3.repo.get_soup.call_count == 1
+    assert ao3.download_cut is True
+
+
+@pytest.mark.parametrize('cut, marked', [(True, 'skip'), (False, 'done')])
+def test_a_download_step_cut_short_is_marked_skipped_never_done(cut, marked):
+    job = MagicMock()
+    ao3 = MagicMock()
+    ao3.download_cut = cut
+
+    server.finish_download_step(job, ao3)
+
+    getattr(job.steps, marked).assert_called_once_with('download')
+    getattr(job.steps, 'done' if marked == 'skip' else 'skip').assert_not_called()
+
+
+def test_the_full_scan_and_every_planned_download_mark_the_step_by_whether_it_was_skipped():
+    import inspect
+    # both download steps a full and quick scan use end through the one rule
+    assert 'finish_download_step' in inspect.getsource(server.run_bookmarks)
+    assert 'finish_download_step' in inspect.getsource(server.download_planned)
+    assert "steps.done('download')" not in inspect.getsource(server.download_planned)
+
+# endregion

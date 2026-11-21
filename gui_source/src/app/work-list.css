@@ -849,7 +849,8 @@
   align-items: center;
 }
 
-.hide-toggle {
+.hide-toggle,
+.skin-open {
   display: inline-flex;
   gap: 4px;
   align-items: center;
@@ -864,7 +865,9 @@
 }
 
 .hide-toggle:hover,
-.hide-toggle:focus-visible {
+.hide-toggle:focus-visible,
+.skin-open:hover,
+.skin-open:focus-visible {
   border-color: var(--border-strong);
   color: var(--text-strong);
 }
@@ -1101,6 +1104,7 @@
   height: 100%;
   fill: currentColor;
 }
+
 
 /* a file no index entry matches: shown from its name, said so */
 .badge.not-in-index {

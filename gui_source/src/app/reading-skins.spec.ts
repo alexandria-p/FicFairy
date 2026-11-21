@@ -315,6 +315,61 @@ describe('ReadingSkins', () => {
     expect(await file.text()).toBe(SKINNED);
   });
 
+  async function opened(library: Library, file: File): Promise<string> {
+    const tab = { location: { href: '' }, close: () => {} };
+    const realOpen = window.open;
+    const realCreate = URL.createObjectURL;
+    let shown: Blob | null = null;
+    window.open = (() => tab) as unknown as typeof window.open;
+    URL.createObjectURL = ((blob: Blob) => { shown = blob; return 'blob:the-work'; }) as typeof URL.createObjectURL;
+    try {
+      library.openCopy(file, 'html', null);
+      await settle();
+    } finally {
+      window.open = realOpen;
+      URL.createObjectURL = realCreate;
+    }
+    return shown!.text();
+  }
+
+  it('puts in the work skin a run saved beside the works, for html that was not downloaded again', async () => {
+    const store = new MemoryStore();
+    const saved = '#workskin .papyrus { font-family: papyrus; }';
+    await store.write('skins/1.css', new Response(saved));
+    const { library } = setUp(store);
+    const file = new File([DOWNLOADED], '1 A Work - Writer 2025-01-01.html', { type: 'text/html' });
+
+    const shown = await opened(library, file);
+
+    expect(shown).toContain('id="workskin"');
+    expect(shown).toContain(saved);
+    expect(shown).toContain('work meta group');
+    expect(await file.text()).toBe(DOWNLOADED);
+  });
+
+  it('knows which works have a skin saved, and not those noted as having none', async () => {
+    const store = new MemoryStore();
+    await store.write('skins/1.css', new Response('#workskin p {}'));
+    await store.write('skins/2.none', new Response(''));
+    await store.write('skins/custom/3.css', new Response('#workskin p {}'));
+    const { library } = setUp(store);
+
+    library.lastRead.set({ store, at: Date.now() });
+    TestBed.tick();
+    await settle();
+
+    expect([...library.skinnedWorks()]).toEqual(['1']);
+  });
+
+  it('shows a work as it is when the run found it has no skin', async () => {
+    const store = new MemoryStore();
+    await store.write('skins/1.css', new Response(''));
+    const { library } = setUp(store);
+    const file = new File([DOWNLOADED], '1 A Work - Writer 2025-01-01.html', { type: 'text/html' });
+
+    expect(await opened(library, file)).toBe(DOWNLOADED);
+  });
+
   it('shows a work with the default skin as it opens, and leaves the file alone', async () => {
     const { library, skins } = setUp(new MemoryStore());
     await skins.add('Cosy', SKIN, 'browser');
@@ -401,6 +456,8 @@ describe('ReadingSkinsSettings', () => {
     const options = [...element.querySelectorAll<HTMLOptionElement>('select[name=defaultReadingSkin] option')];
     expect(options.map((x) => x.value)).toEqual(['']);
     expect(element.querySelector('.no-skins')).not.toBeNull();
+    // a work from FicHub is laid out differently, and never has its author's skin
+    expect(element.querySelector('.fichub-look')?.textContent).toContain('FicHub');
   });
 
   it('holds Save until there is a name and some CSS', async () => {

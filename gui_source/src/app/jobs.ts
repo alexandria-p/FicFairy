@@ -96,6 +96,9 @@ export const BUILT_IN_CONFIG: ServerConfig = {
 };
 
 /** the questions the console menu asks after the file types */
+/** which works a run fetching skins alone takes, by what is saved for each */
+export type SkinScope = 'unchecked' | 'saved' | 'none' | 'all';
+
 export interface JobOptions {
   /**
    * Go without logging in to AO3. Only the runs pointed at fics by hand offer it; works only
@@ -165,6 +168,15 @@ export interface JobOptions {
   reindex: boolean;
   /** skipping the indexing, look every indexed work up on AO3 (a custom run's alone) */
   recheck?: boolean;
+  /** a custom run that only fetches work skins - nothing indexed or downloaded (debug) */
+  skinsOnly?: boolean;
+  /**
+   * fetching skins only, over the whole library: which works with html, by what is saved for each
+   * - never checked, a skin saved, noted as having none, or all of them (the helper's `SKIN_SCOPES`)
+   */
+  skinScope?: SkinScope;
+  /** fetching skins only: the works picked, by number; none is every work with html */
+  skinWorks?: string[];
   /**
    * Whether to cover a date window instead of a slice of the listing.
    *
@@ -308,6 +320,10 @@ export interface RetryChoices {
   default: RetryMode | '';
   /** how many works it could not get */
   failedWorks: number;
+  /** a run that only fetched work skins: retried from the top, or just the skins it missed */
+  skinsOnly?: boolean;
+  /** how many works' skins it did not get - failed, or never reached */
+  missedSkins?: number;
 }
 
 /** something a run stopped to ask, what was answered, and what came of it */
@@ -383,6 +399,12 @@ export interface RunHistory {
   fichubOlder?: FicHubOlder[];
   /** Resolve issues' repairs a name clash stopped - absent on older runs */
   repairClashes?: RepairClash[];
+  /** work skins the run could not get, or could not save */
+  skinFailures?: WorkFailure[];
+  /** works whose html was downloaded and whose skin was not fetched yet - kept as the run goes */
+  skinsPending?: string[];
+  /** works whose work skin the run saved as css */
+  skinsSaved?: string[];
   /** older copies marked for removal, and what became of each - absent on older runs */
   removals?: RunRemoval[];
   error: string;
@@ -560,6 +582,10 @@ export interface JobEvent {
   fichubOlder?: FicHubOlder[];
   /** on a `repairClashes` event: Resolve issues' repairs a name clash stopped */
   repairClashes?: RepairClash[];
+  /** on a `skinFailures` event: work skins the run could not get or save */
+  skinFailures?: WorkFailure[];
+  /** on a `skinsPending` event: works whose html was downloaded with its skin never fetched */
+  skinsPending?: string[];
   /** on a `question` event: the work numbers it is about, where it names them */
   ids?: string[];
   /** on a `steps` event: the checklist this run intends to work through */
@@ -740,6 +766,12 @@ export class Jobs {
    * the index question, for those works or every work with none.
    */
   readonly lookUpAsked = signal<string[] | null>(null);
+  /**
+   * Works' skins asked to be fetched from a listing, by work number - an entry's ⋯ menu or the
+   * selection bar's *Download work skin* (debug mode). `App` takes it and opens a custom run set
+   * to fetch work skins only, for those works.
+   */
+  readonly skinsAsked = signal<string[] | null>(null);
 
   async loadConfig(): Promise<ServerConfig | null> {
     try {

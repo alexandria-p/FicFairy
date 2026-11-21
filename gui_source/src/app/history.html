@@ -528,6 +528,37 @@
           </details>
         }
 
+        @if (run.skinFailures?.length) {
+          <details class="ids skin-failures">
+            <summary>
+              Work skins not fetched or saved
+              <span class="ids-count">{{ run.skinFailures!.length | number }}</span>
+            </summary>
+            <ul class="reason-list">
+              @for (item of run.skinFailures; track $index) {
+                <li>
+                  <a [href]="item.link" [appWorkLink]="item.id" target="_blank" rel="noopener">{{ item.id }}</a>
+                  <span class="reason">{{ item.error }}</span>
+                </li>
+              }
+            </ul>
+          </details>
+        }
+
+        @if (run.skinsPending?.length) {
+          <details class="ids skins-pending">
+            <summary>
+              HTML downloaded, work skin not fetched
+              <span class="ids-count">{{ run.skinsPending!.length | number }}</span>
+            </summary>
+            <ul class="reason-list">
+              @for (id of run.skinsPending; track id) {
+                <li><a [href]="workSkinLink(id)" [appWorkLink]="id" target="_blank" rel="noopener">{{ id }}</a></li>
+              }
+            </ul>
+          </details>
+        }
+
         @if (run.rescued?.length) {
           <details class="ids">
             <summary>

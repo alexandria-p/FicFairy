@@ -213,24 +213,28 @@
           }
         </fieldset>
 
-        <!-- debug mode only for now: each work's skin, which AO3's download leaves out, put
-             into its html - see the helper's `Ao3.dress` -->
+        <!-- debug mode only: each work's skin, which AO3's download leaves out, saved as css beside
+             the works - never put into the html. ticked or not decides whether any is saved -->
         @if (picksSkins()) {
-          <label class="check skins-option" [class.locked]="!htmlTicked()">
-            <input type="checkbox" name="skins" [checked]="skins()" [disabled]="!htmlTicked()"
+          <label class="check skins-option" [class.locked]="skinsHeld()">
+            <input type="checkbox" name="skins" [checked]="skins()" [disabled]="skinsHeld()"
                    (change)="skins.set($any($event.target).checked)" />
             <span>[DEBUG] Fetch work skin for HTML downloads</span>
           </label>
-          <p class="hint skins-hint">
-            @if (htmlTicked()) {
-              Puts each work's skin - its author's own styling, which AO3's download leaves out -
-              into the HTML file, and saves it as <code>skins/&lt;work number&gt;.css</code>. Only
-              HTML can take one. A work whose page this run does not read anyway costs one more
-              request to AO3.
-            } @else {
-              Tick HTML to use this - a work skin only goes into HTML files.
-            }
-          </p>
+          <!-- said only once ticked (or while it is held, to say why) -->
+          @if (skinsHeld()) {
+            <p class="hint skins-hint">Tick HTML to use this - work skins go with HTML files.</p>
+          } @else if (skins() && freeSkins()) {
+            <p class="hint skins-hint">
+              No extra requests to AO3 in this run - it opens each work's page anyway. Work skins
+              are only fetched from AO3.
+            </p>
+          } @else if (skins()) {
+            <p class="hint skins-hint">
+              At most one extra request to AO3 per fic the run picks up. Work skins are only
+              fetched from AO3.
+            </p>
+          }
         }
 
         <!-- JSON is only listed in debug mode, so only then is there anything to say about it -->
@@ -364,6 +368,36 @@
                   </span>
                 </span>
               </label>
+            }
+
+            <!-- debug only: nothing but each work's skin - no index, no download -->
+            @if (action() === 'custom' && (debugTools() || skinWorks().length)) {
+              <label class="check">
+                <input type="radio" name="coverage" [checked]="coverage() === 'skins'"
+                       (change)="coverage.set('skins')" />
+                <span>[DEBUG] Just fetch work skins</span>
+              </label>
+              @if (coverage() === 'skins') {
+                <div class="skins-only-options">
+                  @if (!skinWorks().length) {
+                    <fieldset class="skin-scope">
+                      <legend>Which works with HTML in your library</legend>
+                      @for (choice of skinScopes; track choice.value) {
+                        <label class="check">
+                          <input type="radio" name="skinScope" [value]="choice.value"
+                                 [checked]="skinScope() === choice.value" (change)="skinScope.set(choice.value)" />
+                          <span>
+                            {{ choice.label }}
+                            @if (skinScope() === choice.value) {
+                              <span class="hint coverage-hint">{{ choice.hint }}</span>
+                            }
+                          </span>
+                        </label>
+                      }
+                    </fieldset>
+                  }
+                </div>
+              }
             }
 
             <!-- no listing at all: the works already in the index (it skips the indexing) -->
@@ -1371,6 +1405,8 @@
             Log in to AO3 in case some of these works are restricted to AO3 users - logged out,
             AO3 will not show them, and they cannot be indexed or downloaded from there.
           </p>
+        } @else if (skinsOnly()) {
+          <p>Log in to AO3 in case {{ skinWorks().length === 1 ? 'this work is' : 'these works are' }} restricted to AO3 users.</p>
         } @else {
           <p>Log in to AO3 so restricted works and your own {{ listingWord() }} are visible.</p>
         }
@@ -1489,6 +1525,8 @@
                 (click)="submit($event)">
           @if (action() === 'import') {
             {{ background() ? 'Start repair in the background' : 'Start repair' }}
+          } @else if (skinsOnly()) {
+            {{ background() ? 'Fetch work skins in the background' : 'Fetch work skins' }}
           } @else {
             {{ background() ? 'Start in the background' : 'Start download' }}
           }
@@ -2281,6 +2319,41 @@
                   <a [href]="item.link" [appWorkLink]="item.id" target="_blank" rel="noopener">{{ item.id }}</a>
                   <span class="reason">{{ repairClashWords(item) }}</span>
                 </li>
+              }
+            </ul>
+          </details>
+        }
+
+        <!-- work skins the run could not get, or could not put into the HTML it downloaded -->
+        @if (skinFailures().length) {
+          <details class="failures skin-failures" [open]="skinFailures().length <= 5">
+            <summary class="failures-text">
+              <strong>{{ skinFailures().length | number }}</strong>
+              work {{ skinFailures().length === 1 ? 'skin' : 'skins' }} could not be fetched or saved.
+            </summary>
+            <ul class="failed-list">
+              @for (item of skinFailures(); track $index) {
+                <li>
+                  <a [href]="item.link" [appWorkLink]="item.id" target="_blank" rel="noopener">{{ item.id }}</a>
+                  <span class="reason">{{ item.error }}</span>
+                </li>
+              }
+            </ul>
+          </details>
+        }
+
+        <!-- works whose HTML was downloaded and whose skin was never fetched: the skins step was
+             skipped, or the run ended before it got to them -->
+        @if (skinsPending().length) {
+          <details class="failures skins-pending" [open]="skinsPending().length <= 5">
+            <summary class="failures-text">
+              <strong>{{ skinsPending().length | number }}</strong>
+              {{ skinsPending().length === 1 ? 'work' : 'works' }} had HTML downloaded but no work skin fetched.
+            </summary>
+            <p class="hint">The list is kept with this run in History.</p>
+            <ul class="failed-list">
+              @for (id of skinsPending(); track id) {
+                <li><a [href]="workSkinLink(id)" [appWorkLink]="id" target="_blank" rel="noopener">{{ id }}</a></li>
               }
             </ul>
           </details>

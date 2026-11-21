@@ -4,6 +4,7 @@
 - [[Getting started]]
 - [[Runs]]
 - [[Your library]]
+- [[Work skins]]
 - [[History and resuming]]
 - [[Logs]]
 - [[Troubleshooting]]
