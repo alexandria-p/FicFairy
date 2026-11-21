@@ -84,7 +84,7 @@ interface IniFile {
 
 /** one value Reset to defaults would change, as its window lists it */
 export interface ResetChange {
-  group: 'Appearance' | 'Prompts' | 'Answers to always use' | 'Download formats' | 'AO3 time zone' | 'Questions' | 'Visit log' | 'Run logs' | 'settings.ini';
+  group: 'Appearance' | 'Prompts' | 'Deciding whether to replace or keep a file during a run' | 'Download formats' | 'AO3 time zone' | 'Questions' | 'Visit log' | 'Run logs' | 'settings.ini';
   name: string;
   current: string;
   default: string;
@@ -679,7 +679,7 @@ export class UserSettings implements OnDestroy {
     const always = this.alwaysAnswers();
     for (const { name, label } of ALWAYS_LABELS) {
       if (always[name]) {
-        changes.push({ group: 'Answers to always use', name: label,
+        changes.push({ group: 'Deciding whether to replace or keep a file during a run', name: label,
                        current: this.alwaysWords(always[name], name), default: this.alwaysWords(undefined) });
       }
     }

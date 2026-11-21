@@ -61,7 +61,7 @@ both carry-on choices are greyed out (except on Download several fics). Instead:
 choices take some works from the index the first attempt wrote, without reading AO3 again. If AO3 has updated a work since, its download would be named with the older date, so the
 retry asks once - not for every work or file - whether to read each work again from AO3 first
 (one request a work). **No** is the default. Tick *Always do this, and do not ask me again* to
-keep your answer; change it in User settings' **Answers to always use**.
+keep your answer; change it in User settings' **Deciding whether to replace or keep a file during a run**.
 
 The window shows how each of the run's steps went and the last one that finished, and picks
 the choice that carries on from the first step that did not finish. The two download choices need the run to have reached its downloads: works are settled on as the check step starts, so a run stopped while indexing has them greyed out. The default: indexing broke off →
