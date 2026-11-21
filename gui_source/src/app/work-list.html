@@ -845,6 +845,9 @@
       @for (part of partsOf(ids); track $index; let at = $index) {
         <li [class.current]="part.id === current">
           <span class="part">Part {{ at + 1 }}</span>
+          <!-- everything about the part in a column of its own, so it wraps under itself and never
+               under the part number -->
+          <div class="part-body">
           @if (part.placeholder) {
             <a class="title" [href]="part.link" [appWorkLink]="part.id" target="_blank" rel="noopener">Work {{ part.id }}</a>
             <span class="part-meta">not in your index yet</span>
@@ -857,9 +860,14 @@
               (click)="openWork(part, $event)"
               >{{ part.title }}</a
             >
-            <ng-container *ngTemplateOutlet="formatButtons; context: { $implicit: part }"></ng-container>
             @if (part.authors.length) {
-              <span class="by">by</span> {{ part.authors.join(', ') }}
+              <span class="part-author"><span class="by">by</span>&nbsp;{{ part.authors.join(', ') }}</span>
+            }
+            <!-- a line of their own, so they never split the title from its author on a narrow screen -->
+            @if (formatsOf(part).length) {
+              <span class="part-formats">
+                <ng-container *ngTemplateOutlet="formatButtons; context: { $implicit: part }"></ng-container>
+              </span>
             }
             <span class="part-meta">
               @if (part.words !== null) { {{ part.words | number }} words &middot; }
@@ -872,6 +880,7 @@
               <span class="badge">Also bookmarked</span>
             }
           }
+          </div>
         </li>
       }
     </ol>

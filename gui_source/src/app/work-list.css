@@ -425,6 +425,9 @@
 
 .user .byline {
   margin: 0;
+  /* clear of the date in the top right corner, however long the name */
+  padding-right: 6.5rem;
+  overflow-wrap: anywhere;
   font-size: 0.88rem;
   font-weight: 600;
   color: var(--text-strong);
@@ -502,6 +505,16 @@
 /* endregion */
 
 @media (max-width: 620px) {
+  /* on a phone the date goes under the name rather than beside it */
+  .user .byline {
+    padding-right: 0;
+  }
+
+  .user .datetime {
+    position: static;
+    margin-top: 2px;
+  }
+
   .blurb-corner {
     position: static;
     flex-direction: row;
@@ -569,9 +582,18 @@
 }
 
 .series-list li {
+  display: grid;
+  grid-template-columns: 4.5em minmax(0, 1fr);
+  align-items: baseline;
   padding: 6px 0;
   border-top: 1px solid var(--border);
   font-size: 0.88rem;
+}
+
+/* the title, its format buttons and the author wrap within this column, never under 'Part N' */
+.part-body {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .series-list li:first-child {
@@ -579,15 +601,29 @@
 }
 
 .part {
-  display: inline-block;
-  min-width: 4.5em;
   color: var(--text-dim);
   font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.part-author {
+  margin-left: 0.3em;
+}
+
+.part-formats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.part-formats .format {
+  margin-left: 0;
 }
 
 .part-meta {
   display: block;
-  margin-left: 4.5em;
+  margin-top: 2px;
   color: var(--text-dim);
   font-size: 0.78rem;
 }
