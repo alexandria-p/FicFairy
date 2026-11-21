@@ -446,8 +446,10 @@ describe('ReadingSkinsSettings', () => {
       'Operates like a site skin on AO3. Will be applied to downloaded HTML files that you open through FicFairy.');
     const how = element.querySelector<HTMLDetailsElement>('details.how-it-works')!;
     expect(how.open).toBe(false);
-    // a work from FicHub is laid out differently, and never has its author's skin
-    expect(how.querySelector('.fichub-look')?.textContent).toContain('FicHub');
+    const said = how.textContent?.replace(/\s+/g, ' ') ?? '';
+    expect(said).toContain('HTML files are downloaded from AO3 without any site or work skins.');
+    expect(said).toContain('paintbrush icon');
+    expect(said).toContain('Skins will only be applied to HTML files that you open through FicFairy.');
   });
 
   it('lists None, AO3 and your skins as the choices of default, AO3 never removable', async () => {
