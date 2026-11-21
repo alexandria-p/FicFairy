@@ -4,7 +4,7 @@ A **work skin** is the styling an author gives a work on AO3 - colours, fonts, c
 
 ## Where a skin is kept
 
-Each skin is saved beside your works as `skins/<work number>.css`. A work checked and found to have no skin gets an empty `skins/<work number>.none` instead, so it isn't asked about again for nothing. When you open a work's HTML from FicFairy, its saved skin is shown with it. The file itself is not changed.
+Each skin is saved beside your works as `skins/<work number>.css`. A work checked and found to have no skin gets an empty `skins/<work number>.none` instead. **Only the custom run's [DEBUG] Just fetch work skins reads a `.none`**, to sort works for its choices: *Works never checked for a skin* leaves them out (they have been checked), and *Works last known to have no skin* takes just them, in case their authors have added one since. No other run looks at it - a run that fetches skins reads the work's page whatever is saved. When you open a work's HTML from FicFairy, its saved skin is shown with it. The file itself is not changed.
 
 ## When a skin is fetched
 
