@@ -728,7 +728,15 @@ describe('UserSettings', () => {
     expect(questions.open).toBe(false);
     // under Appearance, above Prompts
     const order = [...element.querySelectorAll('.group')].map((g) => g.classList[1]);
-    expect(order.slice(0, 6)).toEqual(['formats', 'ao3-zone', 'appearance', 'questions', 'always-answers', 'prompts']);
+    expect(order.slice(0, 7)).toEqual(['formats', 'ao3-zone', 'appearance', 'questions', 'question-waits', 'always-answers', 'prompts']);
+    // the waits are a section of their own, apart from the answers taken
+    const waits = element.querySelector<HTMLDetailsElement>('details.question-waits')!;
+    expect(waits.querySelector('summary h3')?.textContent?.trim()).toBe('How long a question waits during a run');
+    expect(waits.open).toBe(false);
+    expect(waits.querySelector('[data-question-setting="timeout"]')).not.toBeNull();
+    expect(waits.querySelector('[data-question-setting="nobody-here"]')).not.toBeNull();
+    expect(questions.querySelector('[data-question-setting="timeout"]')).toBeNull();
+    expect(questions.querySelector('[data-question-setting="fichub"]')).not.toBeNull();
     expect(questions.querySelector('summary .saved-to')?.textContent?.trim()).toBe('Saved to this browser');
 
     const fichub = element.querySelector<HTMLSelectElement>('[data-question-setting="fichub"] select')!;

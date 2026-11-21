@@ -249,6 +249,39 @@
         these.
       </p>
       <ul class="rows">
+        @for (question of questions; track question.name) {
+          <li class="row" [attr.data-question-setting]="question.name">
+            <div class="about">
+              <span class="name">
+                {{ question.label }}
+                <span class="default">default: {{ choiceLabel(question, helperAnswer(question.name)) }}</span>
+              </span>
+            </div>
+            <select
+              [attr.aria-label]="question.label"
+              (change)="setAnswer(question, $any($event.target).value)"
+            >
+              @for (choice of question.choices; track choice.value) {
+                <option [value]="choice.value" [selected]="answer(question.name) === choice.value">
+                  {{ choice.label }}
+                </option>
+              }
+            </select>
+          </li>
+        }
+      </ul>
+    </details>
+
+    <!-- the waits on their own: how long, not what is taken -->
+    <details class="group question-waits" [class.guest-locked]="guest()" [attr.inert]="guest() ? '' : null" [attr.aria-disabled]="guest() ? 'true' : null">
+      <summary class="group-head">
+        <h3>How long a question waits during a run</h3>
+        <span class="saved-to" title="Kept in this browser's own storage, on this computer - another browser, or another computer, has its own">Saved to this browser</span>
+      </summary>
+      <p class="hint">
+        How many minutes a run waits for your answer before it takes the default, chosen above.
+      </p>
+      <ul class="rows">
         <li class="row" data-question-setting="timeout">
           <div class="about">
             <span class="name">
@@ -321,26 +354,6 @@
             <option value="off" [selected]="!nobodyHere()">Off</option>
           </select>
         </li>
-        @for (question of questions; track question.name) {
-          <li class="row" [attr.data-question-setting]="question.name">
-            <div class="about">
-              <span class="name">
-                {{ question.label }}
-                <span class="default">default: {{ choiceLabel(question, helperAnswer(question.name)) }}</span>
-              </span>
-            </div>
-            <select
-              [attr.aria-label]="question.label"
-              (change)="setAnswer(question, $any($event.target).value)"
-            >
-              @for (choice of question.choices; track choice.value) {
-                <option [value]="choice.value" [selected]="answer(question.name) === choice.value">
-                  {{ choice.label }}
-                </option>
-              }
-            </select>
-          </li>
-        }
       </ul>
     </details>
   }

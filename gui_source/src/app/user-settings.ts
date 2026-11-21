@@ -84,7 +84,7 @@ interface IniFile {
 
 /** one value Reset to defaults would change, as its window lists it */
 export interface ResetChange {
-  group: 'Appearance' | 'Prompts' | 'Deciding whether to replace or keep a file during a run' | 'Download formats' | 'AO3 time zone' | 'Questions' | 'Visit log' | 'Run logs' | 'settings.ini';
+  group: 'Appearance' | 'Prompts' | 'Deciding whether to replace or keep a file during a run' | 'Download formats' | 'AO3 time zone' | 'Questions' | 'How long a question waits' | 'Visit log' | 'Run logs' | 'settings.ini';
   name: string;
   current: string;
   default: string;
@@ -639,21 +639,21 @@ export class UserSettings implements OnDestroy {
     }
     if (!this.local) {
       if (this.guessedTimeout() !== this.helperGuessedTimeout()) {
-        changes.push({ group: 'Questions', name: 'Minutes a question about a file with no date in its name waits',
+        changes.push({ group: 'How long a question waits', name: 'Minutes a question about a file with no date in its name waits',
                        current: String(this.guessedTimeout()), default: String(this.helperGuessedTimeout()) });
       }
       if (this.questionTimeout() !== this.helperTimeout()) {
-        changes.push({ group: 'Questions', name: 'Minutes a question waits for you',
+        changes.push({ group: 'How long a question waits', name: 'Minutes a question waits for you',
                        current: String(this.questionTimeout()), default: String(this.helperTimeout()) });
       }
       for (const { name, label } of OWN_WAITS) {
         if (this.ownWait(name) !== this.helperWait(name)) {
-          changes.push({ group: 'Questions', name: label,
+          changes.push({ group: 'How long a question waits', name: label,
                          current: String(this.ownWait(name)), default: String(this.helperWait(name)) });
         }
       }
       if (this.nobodyHere() !== this.helperNobodyHere()) {
-        changes.push({ group: 'Questions', name: "When nobody answers, don't wait on the rest",
+        changes.push({ group: 'How long a question waits', name: "When nobody answers, don't wait on the rest",
                        current: this.nobodyHere() ? 'On' : 'Off', default: this.helperNobodyHere() ? 'On' : 'Off' });
       }
       for (const question of QUESTION_DEFAULTS) {
