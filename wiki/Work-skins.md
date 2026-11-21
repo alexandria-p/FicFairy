@@ -30,7 +30,7 @@ Ticked, a run gets a skin in one of two ways:
 | **Custom run - all bookmarks, a page range or a date range** | Its own step. Only works whose HTML is downloaded. | Up to one request per work |
 | **Index my collections / Index collection by URL** (with *Index and download encountered works*) | Its own step. Only works whose HTML is downloaded. | Up to one request per work |
 | **Retry** | As for the run being retried - the box stays as it was. It also goes back for the skins the earlier attempt didn't get (failed, or still waiting), whether or not their HTML is downloaded again. | As for that run, plus up to one request per missed skin |
-| **Resolve issues** (a repair run) | Its own box, **[DEBUG] Fetch work skins**, on a page of its own just before the AO3 login - debug mode only. **No HTML needed**: saved for every work the repair reads from AO3, whether it is looking up a missing index or searching for updates (or repairing a file). Every time. Never from FicHub. | Free |
+| **Resolve issues** (a repair run) | Its own box, **[DEBUG] Fetch work skins**, on a page of its own just before the AO3 login - debug mode only, and only when the repair goes on to a run on AO3 (a Resolve issues that only renames, dates or removes files never asks). **No HTML needed**: saved for every work the repair reads from AO3, whether it is looking up a missing index or searching for updates (or repairing a file). Every time. Never from FicHub. | Free |
 | **[DEBUG] Just fetch work skins** (custom run) | The whole run: each work's page is read for its skin, every time the run is started. Nothing is indexed or downloaded. | One request per work |
 
 ## Fetching skins on their own (debug mode)

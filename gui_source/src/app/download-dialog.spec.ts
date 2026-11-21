@@ -3413,6 +3413,29 @@ describe('DownloadDialog', () => {
       expect(element.querySelector<HTMLInputElement>('input[name="skins"]')!.checked).toBe(true);
     });
 
+    it('offers no work skins page for an import with no works to read on AO3', async () => {
+      TestBed.overrideProvider(DebugMode, { useValue: { on: () => true } });
+      await openImport({ ...IMPORT, links: '', count: 0, indexOnly: [], lookups: 0, scope: 'skip' });
+      expect(currentStep()).toBe('credentials');
+      expect(element.querySelector('input[name="skins"]')).toBeNull();
+    });
+
+    it('never shows the Resolve issues work skins page on any other run', async () => {
+      TestBed.overrideProvider(DebugMode, { useValue: { on: () => true } });
+      for (const action of ['bookmarks', 'quick', 'custom', 'work', 'works', 'update', 'collections'] as const) {
+        fixture = TestBed.createComponent(DownloadDialog);
+        fixture.componentRef.setInput('action', action);
+        await fixture.whenStable();
+        element = fixture.nativeElement as HTMLElement;
+        await advanceTo('credentials');
+        expect(currentStep()).toBe('credentials');
+        button('Back')?.click();
+        await fixture.whenStable();
+        expect(currentStep()).not.toBe('work-skins');
+        fixture.destroy();
+      }
+    });
+
     it('sends work skins with no HTML among the formats - an import reads every work anyway', async () => {
       TestBed.overrideProvider(DebugMode, { useValue: { on: () => true } });
       // only looking works up: JSON alone
