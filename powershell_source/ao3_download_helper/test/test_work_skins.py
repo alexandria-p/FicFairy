@@ -755,6 +755,61 @@ def test_a_collection_run_not_indexing_its_works_saves_no_skins(action, url):
 # endregion
 
 
+# region resolve issues (an import)
+
+def test_an_import_keeps_work_skins_whatever_its_formats():
+    # every work it takes in is read on AO3 to index it, so the skin is free with or without html
+    for filetypes in (['JSON'], ['JSON', 'EPUB'], ['JSON', 'HTML']):
+        assert started_options(server.ACTION_IMPORT, {'skins': True}, '1 2',
+                               filetypes=filetypes)['skins'] is True
+    assert started_options(server.ACTION_IMPORT, {}, '1 2', filetypes=['JSON'])['skins'] is False
+
+
+def test_only_an_import_keeps_work_skins_without_html():
+    assert started_options(server.ACTION_WORKS, {'skins': True}, '1 2', filetypes=['JSON'])['skins'] is False
+
+
+def test_an_import_looking_works_up_only_saves_their_skins_and_lists_no_skins_step():
+    job = MagicMock()
+    job.action = server.ACTION_IMPORT
+    job.filetypes = ['JSON']
+    job.options = server.resolve_options({'skins': True, 'indexOnly': ['1']})
+    # nothing waits for a step of its own: each skin was saved as its page was read
+    assert 'skins' not in [x for x, _ in server.step_plan(job)]
+
+
+def test_an_import_fetching_skins_hands_the_option_to_its_downloader():
+    job = server.Job(server.ACTION_IMPORT, ['JSON', 'HTML'], '')
+    job.options = server.resolve_options({'skins': True})
+    ao3 = server.Ao3(MagicMock(), MagicMock(), ['JSON', 'HTML'], None, False, False)
+    job.ao3 = ao3
+    assert ao3.skins is True
+
+
+def test_every_work_an_import_looks_up_has_its_skin_saved_for_free(tmp_path):
+    # an import reads each work's page to index it - a work only looked up included - so its
+    # skin costs nothing, and is saved as css alone
+    ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWork')})
+
+    ao3.index_one_work(WORK_PAGE)
+
+    assert ao3.repo.get_soup.call_count == 1
+    assert os.listdir(tmp_path / strings.SKINS_FOLDER_NAME) == ['41822007.css']
+    assert ao3.skins_pending == []
+
+
+def test_an_import_not_fetching_skins_saves_none_while_looking_works_up(tmp_path):
+    ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWork')})
+    ao3.skins = False
+
+    ao3.index_one_work(WORK_PAGE)
+
+    assert not (tmp_path / strings.SKINS_FOLDER_NAME).exists()
+
+
+# endregion
+
+
 # region retrying a run with skins
 
 def test_the_skins_a_run_missed_are_its_failures_then_the_ones_still_waiting_each_once():

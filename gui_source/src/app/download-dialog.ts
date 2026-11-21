@@ -89,6 +89,8 @@ type Step =
   | 'retry-how'
   /** whether to run it in the background, and its answers up front - a hosted copy only */
   | 'background'
+  /** Resolve issues: whether to save each work's skin as it is read - debug mode only */
+  | 'work-skins'
   | 'acknowledge'
   | 'credentials'
   | 'running'
@@ -419,7 +421,7 @@ export class DownloadDialog implements OnDestroy {
     }
     const named: Record<string, string> = {
       overwrite: 'overwrite existing downloads',
-      series: 'get all works from encountered series',
+      series: 'if a work is a part of a series, download all its other works too',
       nonBookmarks: 'check non-bookmarks for updates',
       images: 'save embedded images',
       collectionWorks: 'index and download encountered works',
@@ -825,6 +827,10 @@ export class DownloadDialog implements OnDestroy {
     if (updated && importing.overwrite) {
       lines.push('Will re-download and overwrite existing files to repair them');
     }
+    // every work the import reads gives its skin for nothing - saved as css, never into the html
+    if (this.picksImportSkins() && this.importSkins()) {
+      lines.push('Save the work skin of each work it reads from AO3, as css - no extra requests');
+    }
     const repairs = importing.repair?.length ?? 0;
     if (repairs) {
       const files = `${repairs.toLocaleString()} ${repairs === 1 ? 'file' : 'files'} with no date`;
@@ -936,6 +942,16 @@ export class DownloadDialog implements OnDestroy {
     (this.action() === 'custom' && this.coverage() === 'existing' && this.existingCheck() === 'ao3'));
   /** the box held while HTML is unticked - on every run, at the owner's request */
   protected readonly skinsHeld = computed(() => !this.htmlTicked());
+
+  /**
+   * Resolve issues' own *[DEBUG] Fetch work skins*, on a page of its own just before the login
+   * (`work-skins`). Every work a repair takes in is read on AO3 to index it - looked up, updated
+   * or repaired - so its skin is free, and saved as css, **never into the html**. Unlike every
+   * other run it needs no HTML ticked, at the owner's request: the skin is free either way.
+   */
+  protected readonly picksImportSkins = computed(() =>
+    this.debugTools() && this.action() === 'import' && !this.resuming() && (this.importing()?.count ?? 0) > 0);
+  protected readonly importSkins = signal(false);
 
   /**
    * Which runs may fetch a work again that nothing says is out of date.
@@ -1979,6 +1995,7 @@ export class DownloadDialog implements OnDestroy {
     if (this.picksFiletypes()) earlier.push('filetypes');
     if (this.needsAcknowledgement()) earlier.push('acknowledge');
     if (this.offersBackground()) earlier.push('background');
+    if (this.picksImportSkins()) earlier.push('work-skins');
     earlier.push('credentials');
 
     const at = earlier.indexOf(step);
@@ -2009,7 +2026,12 @@ export class DownloadDialog implements OnDestroy {
    * page of its own after any acknowledgement - its answers up front are a page in themselves.
    */
   private loginStep(): Step {
-    return this.offersBackground() ? 'background' : 'credentials';
+    return this.offersBackground() ? 'background' : this.afterBackground();
+  }
+
+  /** after the background page: Resolve issues' work skins page where it is offered, then the login */
+  protected afterBackground(): Step {
+    return this.picksImportSkins() ? 'work-skins' : 'credentials';
   }
 
   protected toCredentials(): void {
@@ -2315,7 +2337,9 @@ export class DownloadDialog implements OnDestroy {
         subcollections: this.picksCollectionWorks() && this.subcollections(),
         parentCollections: this.picksCollectionWorks() && this.parentCollections(),
         images: this.images(),
-        skins: this.picksSkins() && this.skins() && !this.skinsHeld(),
+        // an import's from its own page (`work-skins`), with no HTML needed
+        skins: this.action() === 'import' ? this.picksImportSkins() && this.importSkins()
+          : this.picksSkins() && this.skins() && !this.skinsHeld(),
         workdates: this.workdates(),
         // only offered on the runs that can be pointed at a known set of works
         // an import's from its own window's *Overwrite existing downloads*

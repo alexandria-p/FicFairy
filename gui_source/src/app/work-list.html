@@ -836,8 +836,8 @@
   @if (!ids?.length) {
     <p class="not-indexed">
       This series' works have not been indexed yet. You may have only bookmarked some of this
-      series' works, not all. In the future, a scan with <em>'Get all works from encountered
-      series'</em> ticked will ensure that this series, and all its works, are downloaded - even
+      series' works, not all. In the future, a scan with <em>'If a work is a part of a series,
+      download all its other works too'</em> ticked will ensure that this series, and all its works, are downloaded - even
       if they are not bookmarked.
     </p>
   } @else {
@@ -845,6 +845,9 @@
       @for (part of partsOf(ids); track $index; let at = $index) {
         <li [class.current]="part.id === current">
           <span class="part">Part {{ at + 1 }}</span>
+          <!-- everything about the part in a column of its own, so it wraps under itself and never
+               under the part number -->
+          <div class="part-body">
           @if (part.placeholder) {
             <a class="title" [href]="part.link" [appWorkLink]="part.id" target="_blank" rel="noopener">Work {{ part.id }}</a>
             <span class="part-meta">not in your index yet</span>
@@ -857,21 +860,39 @@
               (click)="openWork(part, $event)"
               >{{ part.title }}</a
             >
-            <ng-container *ngTemplateOutlet="formatButtons; context: { $implicit: part }"></ng-container>
             @if (part.authors.length) {
-              <span class="by">by</span> {{ part.authors.join(', ') }}
+              <span class="part-author"><span class="by">by</span>&nbsp;{{ part.authors.join(', ') }}</span>
+            }
+            <!-- beside the title, where it is read with it - never after the summary -->
+            @if (part.id === current) {
+              <span class="badge">This work</span>
+            } @else if (part.bookmarked) {
+              <span class="badge">Also bookmarked</span>
+            }
+            <!-- a line of their own, so they never split the title from its author on a narrow screen -->
+            @if (formatsOf(part).length) {
+              <span class="part-formats">
+                <ng-container *ngTemplateOutlet="formatButtons; context: { $implicit: part }"></ng-container>
+              </span>
             }
             <span class="part-meta">
               @if (part.words !== null) { {{ part.words | number }} words &middot; }
               {{ chapterCount(part) }} chapters
               @if (part.date_updated) { &middot; updated {{ part.date_updated }} }
             </span>
-            @if (part.id === current) {
-              <span class="badge">This work</span>
-            } @else if (part.bookmarked) {
-              <span class="badge">Also bookmarked</span>
+            <!-- the work's summary, folded away: the series' card stays short until it is wanted -->
+            @if (part.summary) {
+              <details class="part-summary">
+                <summary>Summary</summary>
+                <blockquote>
+                  @for (line of paragraphs(part.summary); track $index) {
+                    <p>{{ line }}</p>
+                  }
+                </blockquote>
+              </details>
             }
           }
+          </div>
         </li>
       }
     </ol>

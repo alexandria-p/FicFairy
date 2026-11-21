@@ -2154,7 +2154,8 @@ describe('ImportDialog', () => {
     await open(ALL_DATED);
     await click('Continue');
     await choose('lookup', 'later');
-    // nothing left that could be updated, so the window ends here
+    // nothing left that could be updated, so the window ends here - no run window, so nothing
+    // reaches AO3 and nothing (work skins included) is offered for a run
     await click('Done');
     expect(started).toEqual([]);
     expect(closed).toEqual([null]);

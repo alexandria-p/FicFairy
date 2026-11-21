@@ -465,6 +465,27 @@ describe('WorkList, bookmarks of every kind', () => {
     expect(element.querySelector('.series-list')).toBeNull();
   });
 
+  it("folds each part's summary away under the part, and leaves it out of a part with none", async () => {
+    TestBed.inject(Library).worksById.set(new Map([
+      ['111', { ...partOne, summary: 'A lighthouse.\nAnd the keeper.' } as Bookmark],
+      ['222', { ...partTwo, summary: '' } as Bookmark],
+      ['555', single],
+    ]));
+    await listing([series]);
+    element.querySelector<HTMLButtonElement>('.series-toggle')!.click();
+    await fixture.whenStable();
+
+    const parts = Array.from(element.querySelectorAll('.series-list li'));
+    const folded = parts[0].querySelector<HTMLDetailsElement>('details.part-summary')!;
+    expect(folded.open).toBe(false);
+    expect(folded.querySelector('summary')!.textContent!.trim()).toBe('Summary');
+    expect(Array.from(folded.querySelectorAll('blockquote p')).map((p) => p.textContent!.trim())).toEqual(
+      ['A lighthouse.', 'And the keeper.']);
+    expect(parts[1].querySelector('.part-summary')).toBeNull();
+    // the placeholder knows nothing but its number
+    expect(parts[2].querySelector('.part-summary')).toBeNull();
+  });
+
   it('says so when a series has not been read for its works yet', async () => {
     await listing([{ ...series, work_ids: [] } as Bookmark]);
     element.querySelector<HTMLButtonElement>('.series-toggle')!.click();
@@ -533,6 +554,33 @@ describe('WorkList, bookmarks of every kind', () => {
     expect(parts[0].querySelector('a.title')!.classList.contains('local')).toBe(true);
   });
 
+  it("shows a work's own series laid out as a series card's, summaries folded away and the badge by the title", async () => {
+    withSeries(walked);
+    TestBed.inject(Library).worksById.set(new Map([
+      ['111', { ...partOne, summary: 'A lighthouse.' } as Bookmark],
+      ['222', partTwo],
+      ['555', { ...single, summary: 'Its own summary.' } as Bookmark],
+    ]));
+    await listing([member]);
+    element.querySelector<HTMLButtonElement>('.membership .series-toggle')!.click();
+    await fixture.whenStable();
+
+    const parts = Array.from(element.querySelectorAll('.membership .series-list li'));
+    // the same template as a series card: the part number in a column of its own, the rest beside it
+    for (const li of parts) {
+      expect(li.firstElementChild!.classList.contains('part')).toBe(true);
+      expect(li.querySelector(':scope > .part-body')).not.toBeNull();
+    }
+    expect(parts[0].querySelector('details.part-summary blockquote')!.textContent!.trim()).toBe('A lighthouse.');
+    expect(parts[1].querySelector('details.part-summary blockquote')!.textContent!.trim()).toBe('Its own summary.');
+    expect(parts[2].querySelector('.part-summary')).toBeNull();
+    // the badge comes before the summary, never after it
+    const body = parts[1].querySelector('.part-body')!;
+    const order = Array.from(body.children).map((c) => c.classList.contains('badge') ? 'badge'
+      : c.classList.contains('part-summary') ? 'summary' : '');
+    expect(order.indexOf('badge')).toBeLessThan(order.indexOf('summary'));
+  });
+
   it('opens a series on one work without opening it on every other work in it', async () => {
     withSeries(walked);
     const other = {
@@ -556,7 +604,7 @@ describe('WorkList, bookmarks of every kind', () => {
     const said = element.querySelector('.membership')?.textContent ?? '';
     expect(said).toContain("works have not been indexed yet");
     expect(said).toContain('only bookmarked some');
-    expect(said).toContain('Get all works from encountered series');
+    expect(said).toContain('If a work is a part of a series, download all its other works too');
   });
 
   it('shows no series line on a work in no series', async () => {

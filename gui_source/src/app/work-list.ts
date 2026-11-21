@@ -520,7 +520,7 @@ export class WorkList {
 
   protected readonly fetchTickedLabel = computed(() => {
     const n = this.tickedToFetch().length;
-    return `Download/update latest for ${n.toLocaleString()} ${n === 1 ? 'work' : 'works'} now from AO3`;
+    return `Download/update latest for ${n.toLocaleString()} ${n === 1 ? 'work' : 'works'} from AO3`;
   });
 
   /** a placeholder's 'download it now', or an entry's own menu item */
