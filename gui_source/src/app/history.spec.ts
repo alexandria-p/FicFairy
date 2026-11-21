@@ -487,9 +487,9 @@ describe('History', () => {
                        skinFailures: [{ id: '9', link: 'https://archiveofourown.org/works/9', error: 'its work page would not read: status 503' }] })]);
 
     const said = element.querySelector('.run')?.textContent?.replace(/\s+/g, ' ') ?? '';
-    expect(said).toContain('work skins fetched for HTML downloads');
+    expect(said).toContain('work skins saved as css');
     expect(said).toContain('Work skins saved 2');
-    expect(said).toContain('Work skins not fetched or put in 1');
+    expect(said).toContain('Work skins not fetched or saved 1');
   });
 
   it('says what a skins-only run covered', async () => {

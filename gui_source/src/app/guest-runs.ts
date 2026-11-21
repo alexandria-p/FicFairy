@@ -557,7 +557,7 @@ export class GuestRun {
         this.mark(id, 'running');
         for (const work of this.picked(works).slice(0, 2)) {
           await this.wait(pace.work);
-          this.say(`work skin put into ${work.title}`);
+          this.say(`work skin saved for ${work.title}`);
         }
         this.mark(id, 'done');
         return;

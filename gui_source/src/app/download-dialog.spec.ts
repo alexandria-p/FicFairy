@@ -584,6 +584,25 @@ describe('DownloadDialog', () => {
     expect(said).toBe('At most one extra request to AO3 per fic the run picks up. Work skins are only fetched from AO3.');
   });
 
+  for (const action of ['work', 'works', 'update'] as const) {
+    it(`says a ${action} run saves work skins at no extra request, and needs no HTML for it`, async () => {
+      debugOn();
+      await open(action);
+      await advanceTo('filetypes');
+      checkbox('HTML')!.click();
+      await fixture.whenStable();
+      const box = element.querySelector<HTMLInputElement>('input[name=skins]')!;
+      expect(box.disabled).toBe(false);
+      box.click();
+      await fixture.whenStable();
+
+      const said = element.querySelector('.skins-hint')?.textContent?.replace(/\s+/g, ' ').trim();
+      expect(said).toBe('No extra requests to AO3 in this run - it opens each work\'s page anyway. Work skins are only fetched from AO3.');
+      await advanceTo('running');
+      expect(jobs.started[0].options).toMatchObject({ skins: true });
+    });
+  }
+
   it('holds work skins while HTML is unticked, and sends none', async () => {
     debugOn();
     await open('bookmarks');
@@ -1942,7 +1961,7 @@ describe('DownloadDialog', () => {
     expect(said).toContain('EPUB: failed to repair from AO3 due to a name clash - 1 Fic - Someone 2026-05-01.epub is already another file');
   });
 
-  it('lists at the end the work skins it could not fetch or put in', async () => {
+  it('lists at the end the work skins it could not fetch or save', async () => {
     await open('bookmarks');
     await advanceTo('running');
     jobs.push!({ type: 'skinFailures', skinFailures: [
@@ -1951,9 +1970,9 @@ describe('DownloadDialog', () => {
     await fixture.whenStable();
 
     const said = element.querySelector('.skin-failures')?.textContent?.replace(/\s+/g, ' ') ?? '';
-    expect(said).toContain('1 work skin could not be fetched or put in');
+    expect(said).toContain('1 work skin could not be fetched or saved');
     expect(said).toContain('its work page would not read: 503');
-    expect(said).toContain('kept as AO3 sent it');
+    expect(said).not.toContain('HTML');
   });
 
   it('lists at the end the works whose skin was never fetched', async () => {

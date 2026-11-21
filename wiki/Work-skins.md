@@ -4,29 +4,34 @@ A **work skin** is the styling an author gives a work on AO3 - colours, fonts, c
 
 ## Where a skin is kept
 
-Each skin is saved beside your works as `skins/<work number>.css`. A work checked and found to have no skin gets an empty `skins/<work number>.none` instead. **Only the custom run's [DEBUG] Just fetch work skins reads a `.none`**, to sort works for its choices: *Works never checked for a skin* leaves them out (they have been checked), and *Works last known to have no skin* takes just them, in case their authors have added one since. No other run looks at it - a run that fetches skins reads the work's page whatever is saved. When you open a work's HTML from FicFairy, its saved skin is shown with it. The file itself is not changed.
+Each skin is saved beside your works as `skins/<work number>.css`. A work checked and found to have no skin gets an empty `skins/<work number>.none` instead. **Only the custom run's [DEBUG] Just fetch work skins reads a `.none`**, to sort works for its choices: *Works never checked for a skin* leaves them out (they have been checked), and *Works last known to have no skin* takes just them, in case their authors have added one since. No other run looks at it - a run that fetches skins reads the work's page whatever is saved. When you open a work's HTML from FicFairy, its saved skin is shown with it. The HTML file itself is never changed.
 
 ## When a skin is fetched
 
-There are two ways a run gets a skin:
+**A skin is never put into an HTML file.** It is only ever saved as CSS beside your works.
 
-- **Saved for free** - a run that already opens a work's page on AO3 (to index it or check it for updates) saves that page's skin as CSS at the same time. It costs no extra request, and it is AO3's latest. This happens whatever you tick, **every time the page is read**, whether or not the work's HTML is downloaded. The skin is **never** put into the HTML file.
-- **[DEBUG] Fetch work skin for HTML downloads** - a box on the file types page of every run (every custom run too, whatever it covers - all but *Just fetch work skins*, and not on a retry), in debug mode only, off to begin with. Ticked, the skin is also put into the HTML file - but **only when the run downloads that work's HTML** (a new download, an updated chapter, or HTML overwritten). A work whose HTML is already current is not checked. Where the run hasn't opened the work's page, that costs one more request, made in a step of its own after the downloads: **Fetch work skins for the HTML downloaded**. Unticked, nothing extra is asked of AO3.
+Only a run with **[DEBUG] Fetch work skin for HTML downloads** ticked saves skins. That box is on the file types page of every run (every custom run too, whatever it covers - all but *Just fetch work skins*, and not on a retry). It is in debug mode only and off to begin with. Unticked, a run saves no skin and asks AO3 nothing extra.
 
-| Run | Saved for free (always) | With the debug box ticked |
+Ticked, a run gets a skin in one of two ways:
+
+- **For free** - a run that already opens a work's page on AO3 (to index it or check it for updates) saves that page's skin at the same time. No extra request, and it is AO3's latest. It happens every time the page is read, whether or not the work's HTML is downloaded. These runs don't need HTML ticked.
+- **In a step of its own** - every other run reads skins only for the works whose HTML it downloads (a new download, an updated chapter, or HTML overwritten). That is one more request per work, made after the downloads: **Fetch work skins for the HTML downloaded**. A work whose HTML is already current is not checked. These runs need HTML ticked.
+
+| Run | With the debug box ticked | Cost |
 | --- | --- | --- |
-| **Download/update a specific fic** | While indexing - each fic is looked up on AO3. Every time. | Put into the HTML as it is downloaded. Free. This run always re-downloads, so every time. |
-| **Download/update several fics** | While indexing - each fic is looked up on AO3. Every time. | Put into the HTML as it is downloaded. Free. Every time, as above. |
-| **Custom run - Just update existing works**, *Check against latest on AO3* | While indexing - every work in your index is looked up on AO3. Every time. | Put into the HTML of works whose HTML is downloaded. Free. Only when the HTML changes. |
-| **Custom run - Just update existing works**, *Check against current index* | None - nothing is looked up on AO3. | Its own step after the downloads. Only works whose HTML is downloaded. |
-| **Updating unfinished fics** (the *[DEBUG] just update incomplete* run, and that part of *new bookmarks + incomplete fics*) | While re-reading each unfinished fic. Every time. | Put into the HTML of works whose HTML is downloaded. Free. Only when the HTML changes. |
-| **Resolve issues** (importing works in your library) | While looking up each work on AO3. Every time. | Not offered. |
-| **Quick Scan** | None - it reads your bookmarks listing, which carries no skin. | Its own step after the downloads. Only works whose HTML is downloaded. |
-| **(Full scan) Reindex & Update All** | None, except: with *Check all non-bookmarks for updates too*, while checking each non-bookmark; with JSON unticked, while downloading each work (that run opens each work's page). | Its own step after the downloads, for the rest. Only works whose HTML is downloaded. |
-| **Custom run - all bookmarks, a page range or a date range** | None, except with *Check all non-bookmarks for updates too*, as above. | Its own step after the downloads. Only works whose HTML is downloaded. |
-| **Index my collections / Index collection by URL** (with *Index and download encountered works*) | None - they read collection listings. | Its own step after the downloads. Only works whose HTML is downloaded. |
-| **Retry** that re-reads the works it carries on with | While re-reading each one. | As for the run being retried. |
-| **[DEBUG] Just fetch work skins** (custom run) | Its own step - the whole run. Each work's page is read for its skin, every time the run is started. Nothing is indexed or downloaded, and no HTML is changed. | - |
+| **Download/update a specific fic** | Saved while indexing - each fic is looked up on AO3. Every time. | Free |
+| **Download/update several fics** | Saved while indexing - each fic is looked up on AO3. Every time. | Free |
+| **Custom run - Just update existing works**, *Check against latest on AO3* | Saved while indexing - every work in your index is looked up on AO3. Every time. | Free |
+| **Updating unfinished fics** (the *[DEBUG] just update incomplete* run) | Saved while re-reading each unfinished fic. Every time. | Free |
+| **New bookmarks + incomplete fics** | Saved while re-reading each unfinished fic. Then its own step for the other works whose HTML was downloaded. | Free, then up to one request per work |
+| **Custom run - Just update existing works**, *Check against current index* | Its own step. Only works whose HTML is downloaded. | Up to one request per work |
+| **Quick Scan** | Its own step. Only works whose HTML is downloaded. | Up to one request per work |
+| **(Full scan) Reindex & Update All** | Its own step, for works whose HTML is downloaded. Free for the works it opens anyway: non-bookmarks checked with *Check all non-bookmarks for updates too*, and every work downloaded when JSON is unticked. | Up to one request per work |
+| **Custom run - all bookmarks, a page range or a date range** | Its own step. Only works whose HTML is downloaded. | Up to one request per work |
+| **Index my collections / Index collection by URL** (with *Index and download encountered works*) | Its own step. Only works whose HTML is downloaded. | Up to one request per work |
+| **Retry** | As for the run being retried - the box stays as it was. | As for that run |
+| **Resolve issues** | Not offered - no skin is saved. | - |
+| **[DEBUG] Just fetch work skins** (custom run) | The whole run: each work's page is read for its skin, every time the run is started. Nothing is indexed or downloaded. | One request per work |
 
 ## Fetching skins on their own (debug mode)
 
@@ -37,8 +42,8 @@ A work with a skin saved shows a brush button on the Works tab, just left of the
 
 ## In History
 
-A run that saved any skin lists them under **Work skins saved**. A run with the debug box ticked says so in its options (*work skins fetched for HTML downloads*); a *Just fetch work skins* run says what it covered.
+A run that saved any skin lists them under **Work skins saved**. A run with the debug box ticked says so in its options (*work skins saved as css*); a *Just fetch work skins* run says what it covered.
 
 ## If a skin can't be fetched
 
-The HTML is kept exactly as AO3 sent it. The run lists the work as a skin that *could not be fetched or put in*, in the run window at the end, in History, and in the **Download issues** file. If a run is stopped, fails, or skips the skins step, the works whose HTML is still waiting for its skin are listed too (*HTML downloaded, work skin not fetched*), so you can fetch them later.
+The run lists the work as a skin that *could not be fetched or saved*, in the run window at the end, in History, and in the **Download issues** file. If a run is stopped, fails, or skips the skins step, the works whose HTML is still waiting for its skin are listed too (*HTML downloaded, work skin not fetched*), so you can fetch them later.

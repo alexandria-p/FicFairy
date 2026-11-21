@@ -31,7 +31,7 @@ import requests
 
 from source_code import access, dropbox_library, exceptions, fichub, settings_file, indexing, naming, parse_soup, parse_text, progress, runs, strings, updater as updates
 from source_code.actions import shared
-from source_code.ao3 import REASON_MAINTENANCE, SKIN_NOTES, with_skin, SORT_DATE_SELECTORS, failure_reason, Ao3, index_gaps, was_bookmark
+from source_code.ao3 import REASON_MAINTENANCE, SKIN_NOTES, SORT_DATE_SELECTORS, failure_reason, Ao3, index_gaps, was_bookmark
 from source_code.fileio import FileOps
 from source_code.repo import Repository
 from source_code.storage import PageStorage
@@ -5176,15 +5176,14 @@ def run_skins_only(job: Job, fileops: FileOps, repo: Repository, report) -> None
 
 def fetch_pending_skins(job: Job, fileops: FileOps, ao3, report) -> None:
     """The work skins of the works whose html this run downloaded without the skin to hand -
-    read in one pass, after every download, as a step of its own (`STEP_SKINS_FOR_HTML`).
+    read in one pass, after every download, as a step of its own (`STEP_SKINS_FOR_HTML`), and
+    saved as css (`skins/<worknum>.css`, or `.none`). **Never put into the html file.**
 
     A skin is to hand where the run read the work's page anyway (the fic runs, the update pass,
-    any re-read); the scans index from listing pages, which carry none, so their downloads leave
-    each work here (`Ao3.skins_pending`) rather than reading its page between two downloads. Each
-    page is read once; the skin is saved beside the works, and put into the html file the run
-    downloaded - written beside it and swapped in (`Ao3.swap_in`), so the file is never part-
-    written. A skin that cannot be had or put in is listed (`Ao3.skin_failures`): the html stays as
-    AO3 sent it. Stop ends it; Skip this step leaves the rest without skins.
+    any re-read), and saved then; the scans index from listing pages, which carry none, so their
+    downloads leave each work here (`Ao3.skins_pending`) rather than reading its page between two
+    downloads. Each page is read once. A skin that cannot be had or saved is listed
+    (`Ao3.skin_failures`). Stop ends it; Skip this step leaves the rest without skins.
     """
 
     planned = any(step == 'skins' for step, _ in getattr(job.steps, 'plan', []) or [])
@@ -5196,10 +5195,6 @@ def fetch_pending_skins(job: Job, fileops: FileOps, ao3, report) -> None:
         return
     job.steps.start('skins')
     print(strings.AO3_INFO_SKINS_PENDING.format(len(pending)))
-    try:
-        copies = shared.scan_downloaded_works(fileops.worksfolder, ['HTML'], storage=fileops.storage)
-    except Exception:
-        copies = {}
     for done, work in enumerate(pending, 1):
         ao3.check_cancelled()
         if job.skipping():
@@ -5209,39 +5204,13 @@ def fetch_pending_skins(job: Job, fileops: FileOps, ao3, report) -> None:
         progress.report(report, progress.WORK, title=f'work {work}',
                         link=f'{strings.AO3_BASE_URL}/works/{work}', filetype='skin',
                         phase=progress.DOWNLOADING, done=done - 1, total=len(pending))
-        css = ao3.skin_for(work)
-        if work not in ao3.skins_unread and ao3.save_skin(work, css) and css:
-            put_in_skin(fileops, ao3, work, css, ((copies.get(work) or {}).get('HTML') or {}).get('path'))
+        # reading the page saves its skin (`note_skin`); one that will not read is listed
+        ao3.skin_for(work)
         # dealt with: had, or listed as a failure - no longer waiting
         if work in ao3.skins_pending:
             ao3.skins_pending.remove(work)
             ao3.skins_pending_changed()
     job.steps.done('skins')
-
-
-def put_in_skin(fileops: FileOps, ao3, work: str, css: str, path: str | None) -> None:
-    """Put a work's skin into its html file, as a download would have - written beside it and
-    swapped in, never over it. Any trouble is listed, and the file left as it is."""
-
-    if not path:
-        ao3.note_skin_failure(work, strings.SKIN_FAILED_NO_HTML)
-        return
-    name = os.path.relpath(path, fileops.downloadfolder)
-    shown = os.path.basename(path)
-    try:
-        content = fileops.read_text(path).encode('utf-8')
-        dressed = with_skin(content, css)
-        if dressed is None:
-            print(strings.AO3_INFO_SKIN_NOT_ADDED.format(work))
-            ao3.note_skin_failure(work, strings.SKIN_FAILED_NOT_PUT_IN.format(
-                'the file is not shaped as AO3 sends it, or has a skin already'))
-            return
-        ao3.swap_in(name, dressed)
-        print(strings.AO3_INFO_SKIN_PUT_IN.format(shown))
-    except exceptions.CancelledException:
-        raise
-    except Exception as e:
-        ao3.note_skin_failure(work, strings.SKIN_FAILED_NOT_PUT_IN.format(e))
 
 
 def finish_run(job: Job, fileops: FileOps, ao3, report) -> None:

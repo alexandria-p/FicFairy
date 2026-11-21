@@ -376,7 +376,7 @@ export class History {
     if (options['parentCollections']) said.push('with parent collections');
     if (options['series']) said.push('all works from encountered series');
     if (options['images']) said.push('save images separately');
-    if (options['skins']) said.push('work skins fetched for HTML downloads');
+    if (options['skins']) said.push('work skins saved as css');
     if (options['skinsOnly']) {
       const picked = Array.isArray(options['skinWorks']) ? options['skinWorks'].length : 0;
       const scopes: Record<string, string> = {

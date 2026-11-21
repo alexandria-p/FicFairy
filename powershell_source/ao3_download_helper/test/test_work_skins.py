@@ -1,10 +1,9 @@
 """Work skins: the CSS an author attaches to a work on AO3, which AO3's own download leaves out.
 
-A run asked to (`skins`, a debug option for now) puts each work's skin into the html it
-downloads, and keeps it beside the works as `skins/<worknum>.css`. A work page the run reads
-anyway gives the skin for nothing, put in as the file is written; otherwise the work is noted and
-its page read once, in a step of its own after every download (`fetch_pending_skins`), which puts
-the skin into the file then.
+A run asked to (`skins`, a debug option for now) saves each work's skin beside the works as
+`skins/<worknum>.css` - never in the html. A work page the run reads anyway gives the skin for
+nothing; otherwise, for each work whose html it downloads, the work is noted and its page read
+once, in a step of its own after every download (`fetch_pending_skins`).
 """
 
 import os
@@ -14,7 +13,6 @@ import pytest
 from bs4 import BeautifulSoup
 
 from source_code import exceptions, parse_soup, server, strings
-from source_code.ao3 import with_skin
 from source_code.fileio import FileOps
 from source_code.storage import LocalStorage
 from test.test_ao3 import saving_for_real
@@ -51,39 +49,24 @@ def test_a_work_page_without_a_skin_gives_none():
 # endregion
 
 
-# region putting a skin into AO3's downloaded html
+# region a skin is never put into the html
 
 def test_ao3s_downloaded_html_carries_no_skin_of_its_own():
-    # the reason for all of this: no author css, and no #workskin for its rules to match
+    # the reason for fetching it at all: AO3's download leaves the author's css out
     text = downloaded().decode('utf-8')
 
     assert 'id="workskin"' not in text
 
 
-def test_the_skin_goes_after_ao3s_own_styles_and_the_body_inside_workskin():
-    dressed = with_skin(downloaded(), SKIN).decode('utf-8')
+def test_nothing_in_the_helper_writes_a_skin_into_html():
+    # at the owner's instruction: a skin is saved as css beside the works, never put into html
+    import inspect
+    from source_code import ao3 as ao3_module
+    for module in (ao3_module, server):
+        source = inspect.getsource(module)
+        assert 'with_skin' not in source
+        assert 'id="workskin"' not in source
 
-    head, body = dressed.split('</head>')
-    assert head.rindex(SKIN) > head.index('.toc-heading')
-    assert '<body>\n<div id="workskin">' in body
-    assert body.rstrip().endswith('</div>\n</body>\n</html>')
-    # nothing of AO3's own file is lost
-    original = downloaded().decode('utf-8')
-    assert BeautifulSoup(dressed, 'html.parser').get_text().count('My Aim Is Steady And True') == \
-        BeautifulSoup(original, 'html.parser').get_text().count('My Aim Is Steady And True')
-
-
-@pytest.mark.parametrize('content, css', [
-    (b'\xff\xfe not utf-8', SKIN),
-    (b'<html><body>no head</body></html>', SKIN),
-    (b'<html><head></head>no body</html>', SKIN),
-    (b'<html><head></head><body><div id="workskin">x</div></body></html>', SKIN),
-    (b'<html><head></head><body>x</body></html>', '.a{} </style><script>'),
-])
-def test_a_file_that_cannot_take_a_skin_as_it_is_is_left_alone(content, css):
-    assert with_skin(content, css) is None
-
-# endregion
 
 
 # region during a download
@@ -136,16 +119,15 @@ def test_an_indexed_download_leaves_the_skin_for_its_own_step_and_never_holds_up
     assert ao3.skins_pending == ['41822007']
 
 
-def test_the_skins_step_reads_each_page_once_and_puts_its_skin_in_the_html(tmp_path):
+def test_the_skins_step_reads_each_page_once_and_saves_its_skin_as_css_only(tmp_path):
     ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWork')})
     ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
 
     job, _ = the_skins_step(ao3, tmp_path)
 
     assert ao3.repo.get_soup.call_count == 1
-    html = saved(tmp_path, '.html').decode('utf-8')
-    assert '<div id="workskin">' in html and '#workskin .centered' in html
-    # only the html: an epub is left exactly as AO3 sent it
+    # never put into the html - every file stays exactly as AO3 sent it
+    assert saved(tmp_path, '.html') == downloaded()
     assert saved(tmp_path, '.epub') == b'epub bytes'
     css = (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').read_text(encoding='utf-8')
     assert css.startswith('#workskin .centered')
@@ -161,7 +143,8 @@ def test_a_work_page_the_run_already_read_costs_no_second_request(tmp_path):
     ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
 
     assert ao3.repo.get_soup.call_count == 1
-    assert '<div id="workskin">' in saved(tmp_path, '.html').decode('utf-8')
+    assert saved(tmp_path, '.html') == downloaded()
+    assert (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').exists()
     # nothing left for the step, which then has nothing to do
     assert ao3.skins_pending == []
     job, _ = the_skins_step(ao3, tmp_path)
@@ -169,32 +152,31 @@ def test_a_work_page_the_run_already_read_costs_no_second_request(tmp_path):
     job.steps.skip.assert_called_once_with('skins')
 
 
-def test_a_work_page_the_run_read_has_its_skin_saved_as_css_even_unticked(tmp_path):
-    # the fic runs and the update pass read each work's page anyway: its skin is free, and
-    # AO3's latest, so it is saved as css whether or not the box was ticked
+def test_ticked_a_work_page_the_run_read_anyway_has_its_skin_saved_as_css_for_free(tmp_path):
+    # the fic runs and the update pass read each work's page anyway: its skin costs nothing
     ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWork')})
-    ao3.skins = False
 
     ao3.fetch_page(WORK_PAGE, work=True)
 
+    assert ao3.repo.get_soup.call_count == 1
     css = (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').read_text(encoding='utf-8')
     assert css.startswith('#workskin .centered')
 
 
-def test_unticked_the_saved_skin_is_not_put_into_the_html(tmp_path):
+def test_unticked_a_work_page_the_run_read_saves_no_skin(tmp_path):
     ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWork')})
     ao3.skins = False
     ao3.fetch_page(WORK_PAGE, work=True)
 
     ao3.download_one_indexed(dict(RECORD), 100, {}, 1, 1)
 
+    assert not (tmp_path / strings.SKINS_FOLDER_NAME).exists()
     assert saved(tmp_path, '.html') == downloaded()
     assert ao3.skins_pending == []
 
 
 def test_a_page_read_without_a_skin_is_noted_as_having_none(tmp_path):
     ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWorkNoSkin')})
-    ao3.skins = False
 
     ao3.fetch_page(WORK_PAGE, work=True)
 
@@ -286,16 +268,6 @@ def test_a_page_that_will_not_read_is_listed_and_costs_the_skin_and_nothing_else
     assert 'could not read the work skin of work 41822007' in capsys.readouterr().out
     assert [x['id'] for x in ao3.skin_failures] == ['41822007']
     assert '503' in ao3.skin_failures[0]['error']
-
-
-def test_a_skin_with_no_html_file_to_go_in_is_listed(tmp_path):
-    ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWork')})
-    ao3.skins_pending = ['41822007']  # its html since gone
-
-    the_skins_step(ao3, tmp_path)
-
-    assert (tmp_path / strings.SKINS_FOLDER_NAME / '41822007.css').exists()
-    assert ao3.skin_failures[0]['error'] == strings.SKIN_FAILED_NO_HTML
 
 
 def test_a_stop_in_the_skins_step_still_ends_the_run(tmp_path):

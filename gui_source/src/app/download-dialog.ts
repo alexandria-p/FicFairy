@@ -645,7 +645,7 @@ export class DownloadDialog implements OnDestroy {
   protected readonly fichubOlder = signal<FicHubOlder[]>([]);
   /** Resolve issues' repairs not done: the name each would get is taken (`repairClashes`) */
   protected readonly repairClashes = signal<RepairClash[]>([]);
-  /** work skins the run could not get or put in (`skinFailures`): their HTML is as AO3 sent it */
+  /** work skins the run could not get or save (`skinFailures`) */
   protected readonly skinFailures = signal<WorkFailure[]>([]);
   /** works whose html was downloaded and whose skin was never fetched (`skinsPending`) */
   protected readonly skinsPending = signal<string[]>([]);
@@ -905,19 +905,28 @@ export class DownloadDialog implements OnDestroy {
   protected readonly picksImages = computed(() => this.action() === 'custom');
 
   /**
-   * Work skins - the CSS an author gives a work, which AO3's own download leaves out - put into
-   * the html this run downloads (the helper's `Ao3.dress`) - debug mode only, at the owner's
-   * request - on every run that has file types to pick (`SKIN_ACTIONS`), and only when HTML is
-   * ticked. Unticked, no skin is asked for at all. A
-   * work page the run reads anyway gives the skin for nothing; otherwise each work's page is read
-   * once, and only for a work whose HTML is downloaded.
+   * Work skins - the CSS an author gives a work, which AO3's own download leaves out - saved as
+   * css beside the works (`skins/<work number>.css`), **never put into the html** - debug mode
+   * only, at the owner's request - on every run that has file types to pick (`SKIN_ACTIONS`).
+   * Ticked: a work page the run reads anyway gives its skin for nothing (`freeSkins`); otherwise
+   * each work whose HTML is downloaded has its page read once. Unticked, no skin is saved at all.
    */
   protected readonly picksSkins = computed(() =>
     this.debugTools() && !this.resuming() && !this.skinsOnly() && SKIN_ACTIONS.includes(this.action()));
 
-  /** whether HTML is among the file types - the only format a skin goes into */
+  /** whether HTML is among the file types - the downloads a scan reads skins for */
   protected readonly htmlTicked = computed(() =>
     this.selected().some((x) => x.toUpperCase() === 'HTML'));
+  /**
+   * A run that opens each work's page on AO3 anyway - the fic runs, the update pass, a custom run
+   * checking existing works against AO3 - so a skin costs it no request at all, and does not
+   * hang on the HTML being downloaded.
+   */
+  protected readonly freeSkins = computed(() =>
+    ['work', 'works', 'update'].includes(this.action()) ||
+    (this.action() === 'custom' && this.coverage() === 'existing' && this.existingCheck() === 'ao3'));
+  /** the box held: a run that reads skins only for the HTML it downloads, with HTML unticked */
+  protected readonly skinsHeld = computed(() => !this.freeSkins() && !this.htmlTicked());
 
   /**
    * Which runs may fetch a work again that nothing says is out of date.
@@ -1125,7 +1134,7 @@ export class DownloadDialog implements OnDestroy {
     if (this.workdates()) chosen.push('look up publication dates');
     if (this.picksSeries() && this.series()) chosen.push('the rest of each series');
     if (this.picksImages() && this.images()) chosen.push('save images separately');
-    if (this.picksSkins() && this.skins() && this.htmlTicked()) chosen.push('work skins in html');
+    if (this.picksSkins() && this.skins() && !this.skinsHeld()) chosen.push('work skins saved as css');
     if (this.picksReindex() && !this.reindex()) {
       chosen.push(this.recheck() ? 'each indexed work looked up on AO3' : 'no reindexing');
     }
@@ -1266,7 +1275,7 @@ export class DownloadDialog implements OnDestroy {
     if (this.picksSkins()) {
       rows.push({
         label: 'Work skins',
-        value: this.skins() && this.htmlTicked() ? 'put into html downloads' : 'not fetched',
+        value: this.skins() && !this.skinsHeld() ? 'saved as css' : 'not fetched',
       });
     }
     if (this.picksOverwrite()) {
@@ -2297,7 +2306,7 @@ export class DownloadDialog implements OnDestroy {
         subcollections: this.picksCollectionWorks() && this.subcollections(),
         parentCollections: this.picksCollectionWorks() && this.parentCollections(),
         images: this.images(),
-        skins: this.picksSkins() && this.skins() && this.htmlTicked(),
+        skins: this.picksSkins() && this.skins() && !this.skinsHeld(),
         workdates: this.workdates(),
         // only offered on the runs that can be pointed at a known set of works
         // an import's from its own window's *Overwrite existing downloads*

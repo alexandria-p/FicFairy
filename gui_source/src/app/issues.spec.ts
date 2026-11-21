@@ -117,7 +117,7 @@ describe('repairs a name clash stopped', () => {
   });
 });
 
-describe('work skins a run could not fetch or put in', () => {
+describe('work skins a run could not fetch or save', () => {
   const run = {
     skinFailures: [{ id: '1', link: 'https://archiveofourown.org/works/1', error: 'its work page would not read: 503' }],
   } as unknown as RunHistory;
@@ -126,7 +126,7 @@ describe('work skins a run could not fetch or put in', () => {
     const issues = issuesOf(run);
     expect(issueCount(issues)).toBe(1);
     const report = issuesReport(issues, 'Issues', new Date('2026-11-08T00:00:00Z'));
-    expect(report).toContain('## 1 work skin that could not be fetched or put in');
+    expect(report).toContain('## 1 work skin that could not be fetched or saved');
     expect(report).toContain('1\thttps://archiveofourown.org/works/1\tits work page would not read: 503');
   });
 });

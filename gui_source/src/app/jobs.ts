@@ -395,7 +395,7 @@ export interface RunHistory {
   fichubOlder?: FicHubOlder[];
   /** Resolve issues' repairs a name clash stopped - absent on older runs */
   repairClashes?: RepairClash[];
-  /** work skins the run could not get, or could not put into the work's html */
+  /** work skins the run could not get, or could not save */
   skinFailures?: WorkFailure[];
   /** works whose html was downloaded and whose skin was not fetched yet - kept as the run goes */
   skinsPending?: string[];
@@ -578,7 +578,7 @@ export interface JobEvent {
   fichubOlder?: FicHubOlder[];
   /** on a `repairClashes` event: Resolve issues' repairs a name clash stopped */
   repairClashes?: RepairClash[];
-  /** on a `skinFailures` event: work skins the run could not get or put in */
+  /** on a `skinFailures` event: work skins the run could not get or save */
   skinFailures?: WorkFailure[];
   /** on a `skinsPending` event: works whose html was downloaded with its skin never fetched */
   skinsPending?: string[];

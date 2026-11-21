@@ -17,7 +17,7 @@ export interface RunIssues {
   fichubOlder?: FicHubOlder[];
   /** files Resolve issues asked to repair, not repaired: the name each would get is taken */
   repairClashes?: RepairClash[];
-  /** work skins the run could not get, or could not put into the work's html */
+  /** work skins the run could not get, or could not save */
   skinFailures?: WorkFailure[];
   /** works whose html was downloaded and whose skin was never fetched */
   skinsPending?: string[];
@@ -169,16 +169,16 @@ export function issuesReport(issues: RunIssues, heading = 'Issues from this run'
   );
   section(
     plural(issues.skinFailures?.length ?? 0,
-      'work skin that could not be fetched or put in',
-      'work skins that could not be fetched or put in'),
-    'work id, link, reason (its HTML is kept as AO3 sent it)',
+      'work skin that could not be fetched or saved',
+      'work skins that could not be fetched or saved'),
+    'work id, link, reason',
     (issues.skinFailures ?? []).map((row) => [row.id, row.link, row.error].join('\t')),
   );
   section(
     plural(issues.skinsPending?.length ?? 0,
       'work whose skin was not fetched',
       'works whose skin was not fetched'),
-    'work id, link (its HTML is kept as AO3 sent it)',
+    'work id, link',
     (issues.skinsPending ?? []).map((id) => [id, workSkinLink(id)].join('\t')),
   );
   return lines.join('\n') + '\n';

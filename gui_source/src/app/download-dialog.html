@@ -213,18 +213,22 @@
           }
         </fieldset>
 
-        <!-- debug mode only: each work's skin, which AO3's download leaves out, fetched with its
-             html - see the helper's `Ao3.dress`. unticked, no skin is asked for, but a work page
-             the run read anyway (fic runs, the update pass) has its skin saved as css, free -->
+        <!-- debug mode only: each work's skin, which AO3's download leaves out, saved as css beside
+             the works - never put into the html. ticked or not decides whether any is saved -->
         @if (picksSkins()) {
-          <label class="check skins-option" [class.locked]="!htmlTicked()">
-            <input type="checkbox" name="skins" [checked]="skins()" [disabled]="!htmlTicked()"
+          <label class="check skins-option" [class.locked]="skinsHeld()">
+            <input type="checkbox" name="skins" [checked]="skins()" [disabled]="skinsHeld()"
                    (change)="skins.set($any($event.target).checked)" />
             <span>[DEBUG] Fetch work skin for HTML downloads</span>
           </label>
-          <!-- said only once ticked (or while HTML is unticked, to say why it is held) -->
-          @if (!htmlTicked()) {
-            <p class="hint skins-hint">Tick HTML to use this - a work skin only goes with HTML files.</p>
+          <!-- said only once ticked (or while it is held, to say why) -->
+          @if (skinsHeld()) {
+            <p class="hint skins-hint">Tick HTML to use this - this run fetches skins for the HTML it downloads.</p>
+          } @else if (skins() && freeSkins()) {
+            <p class="hint skins-hint">
+              No extra requests to AO3 in this run - it opens each work's page anyway. Work skins
+              are only fetched from AO3.
+            </p>
           } @else if (skins()) {
             <p class="hint skins-hint">
               At most one extra request to AO3 per fic the run picks up. Work skins are only
@@ -2325,9 +2329,8 @@
           <details class="failures skin-failures" [open]="skinFailures().length <= 5">
             <summary class="failures-text">
               <strong>{{ skinFailures().length | number }}</strong>
-              work {{ skinFailures().length === 1 ? 'skin' : 'skins' }} could not be fetched or put in.
+              work {{ skinFailures().length === 1 ? 'skin' : 'skins' }} could not be fetched or saved.
             </summary>
-            <p class="hint">Their HTML is kept as AO3 sent it, without the skin.</p>
             <ul class="failed-list">
               @for (item of skinFailures(); track $index) {
                 <li>
@@ -2347,7 +2350,7 @@
               <strong>{{ skinsPending().length | number }}</strong>
               {{ skinsPending().length === 1 ? 'work' : 'works' }} had HTML downloaded but no work skin fetched.
             </summary>
-            <p class="hint">Their HTML is kept as AO3 sent it. The list is kept with this run in History.</p>
+            <p class="hint">The list is kept with this run in History.</p>
             <ul class="failed-list">
               @for (id of skinsPending(); track id) {
                 <li><a [href]="workSkinLink(id)" [appWorkLink]="id" target="_blank" rel="noopener">{{ id }}</a></li>
