@@ -52,6 +52,13 @@ export class ReadingSkinsSettings {
     this.problem.set('');
   }
 
+  /** the section opened or shut by its own heading */
+  protected toggled(open: boolean): void {
+    if (open === this.adding()) return;
+    if (open) this.openAdd();
+    else this.closeAdd();
+  }
+
   protected closeAdd(): void {
     this.adding.set(false);
     this.name.set('');

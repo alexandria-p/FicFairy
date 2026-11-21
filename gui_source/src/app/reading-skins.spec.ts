@@ -437,6 +437,12 @@ describe('ReadingSkinsSettings', () => {
     await fixture.whenStable();
     return { fixture, element: fixture.nativeElement as HTMLElement };
   }
+  async function openAdd(fixture: ComponentFixture<ReadingSkinsSettings>, element: HTMLElement): Promise<void> {
+    const section = element.querySelector<HTMLDetailsElement>('details.add-section')!;
+    section.open = true;
+    section.dispatchEvent(new Event('toggle'));
+    await fixture.whenStable();
+  }
   const picks = (element: HTMLElement) =>
     [...element.querySelectorAll<HTMLInputElement>('input[name=defaultReadingSkin]')].map((x) => x.value);
 
@@ -473,23 +479,32 @@ describe('ReadingSkinsSettings', () => {
     expect(TestBed.inject(ReadingSkins).defaultId()).toBe('');
   });
 
-  it('folds the add form behind its button, and Cancel folds it again', async () => {
+  it('folds the add form away under its heading, and Cancel folds it again', async () => {
     const { fixture, element } = await make();
+    const section = element.querySelector<HTMLDetailsElement>('details.add-section')!;
+    expect(section.open).toBe(false);
+    expect(section.querySelector('summary')?.textContent?.trim()).toBe('Create or upload a new site skin');
     expect(element.querySelector('textarea[name=skinCss]')).toBeNull();
-    element.querySelector<HTMLButtonElement>('.add-skin-open')!.click();
-    await fixture.whenStable();
+    await openAdd(fixture, element);
     expect(element.querySelector('textarea[name=skinCss]')).not.toBeNull();
     expect(element.querySelector<HTMLButtonElement>('button.save-skin')!.disabled).toBe(true);
     [...element.querySelectorAll<HTMLButtonElement>('.add-actions button')].find((b) => b.textContent?.trim() === 'Cancel')!.click();
     await fixture.whenStable();
     expect(element.querySelector('textarea[name=skinCss]')).toBeNull();
+    expect(section.open).toBe(false);
+  });
+
+  it('marks the skins you added as yours', async () => {
+    localStorage.setItem(BROWSER_SKINS_KEY, JSON.stringify([{ name: 'Cosy', css: SKIN }]));
+    const { element } = await make();
+    expect(element.querySelector('[data-skin="browser:Cosy"] .mine')?.textContent?.trim()).toBe('my skin');
+    expect(element.querySelector('[data-skin="builtin:AO3"] .mine')).toBeNull();
   });
 
   it('saves a pasted skin where chosen, folds the form, and offers it as the default', async () => {
     TestBed.inject(Library).store.set(new MemoryStore());
     const { fixture, element } = await make();
-    element.querySelector<HTMLButtonElement>('.add-skin-open')!.click();
-    await fixture.whenStable();
+    await openAdd(fixture, element);
 
     const name = element.querySelector<HTMLInputElement>('input[name=skinName]')!;
     name.value = 'Cosy';
@@ -511,8 +526,8 @@ describe('ReadingSkinsSettings', () => {
 
   it('offers layering ticked, first of the choices, with one line on what it does', async () => {
     const { fixture, element } = await make();
-    const order = [...element.querySelectorAll('.layer-skin, .skin-list, .add-heading')].map((x) => x.className.split(' ').pop());
-    expect(order).toEqual(['layer-skin', 'skin-list', 'add-heading']);
+    const order = [...element.querySelectorAll('.layer-skin, .skin-list, .add-section')].map((x) => x.className.split(' ').pop());
+    expect(order).toEqual(['layer-skin', 'skin-list', 'add-section']);
     expect(element.querySelector('.add-heading')?.textContent?.trim()).toBe('Create or upload a new site skin');
     const box = element.querySelector<HTMLInputElement>('input[name=layerReadingSkin]')!;
     expect(box.checked).toBe(true);
