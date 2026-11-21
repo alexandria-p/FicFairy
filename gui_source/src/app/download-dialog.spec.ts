@@ -4500,6 +4500,24 @@ describe('DownloadDialog', () => {
     expect(currentStep()).not.toBe('more-options');
   });
 
+  it('offers a skins-only run two ways to retry it, worded for skins', async () => {
+    jobs.retryableOnRecord = [
+      ended({ action: 'custom', actionName: 'Custom run', options: { skinsOnly: true, skinWorks: ['1', '2', '3'] },
+              retry: { modes: [{ mode: 'top', available: true, reason: '' }, { mode: 'failed', available: true, reason: '' }],
+                       default: 'failed', failedWorks: 0, skinsOnly: true, missedSkins: 2 } }),
+    ];
+    await toRetryPage();
+    await pick();
+    await toHow();
+
+    const modes = Array.from(element.querySelectorAll<HTMLInputElement>('input[name="retryMode"]'));
+    expect(modes.map((m) => m.value)).toEqual(['top', 'failed']);
+    expect(modes.find((m) => m.checked)?.value).toBe('failed');
+    const said = element.querySelector('.retry-modes')?.textContent?.replace(/\s+/g, ' ') ?? '';
+    expect(said).toContain("From the top - every work's skin fetched again");
+    expect(said).toContain('Just the 2 skins it could not get - failed, or never reached');
+  });
+
   it('says under a run that cannot be retried why not, where it is listed', async () => {
     jobs.retryableOnRecord = [
       ended({ id: 'r3', actionName: 'Collection',

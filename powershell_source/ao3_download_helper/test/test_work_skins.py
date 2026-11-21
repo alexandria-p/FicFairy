@@ -727,3 +727,116 @@ def test_a_custom_run_keeps_work_skins_whatever_it_covers(options):
     assert sent['skins'] is True and sent['skinsOnly'] is False
 
 # endregion
+
+
+# region retrying a run with skins
+
+def test_the_skins_a_run_missed_are_its_failures_then_the_ones_still_waiting_each_once():
+    record = {'skinFailures': [{'id': '5', 'link': 'x', 'error': 'e'}], 'skinsPending': ['6', '5', '7']}
+
+    assert server.missed_skins(record) == ['5', '6', '7']
+    assert server.missed_skins({}) == []
+    assert server.missed_skins(None) == []
+
+
+def test_a_retry_fetching_skins_goes_back_for_the_ones_its_earlier_attempt_missed(tmp_path):
+    ao3 = skinning(tmp_path, {})
+    job = server.Job(server.ACTION_QUICK, ['HTML'], 'Someone', server.resolve_options({'skins': True}))
+    job.record = MagicMock()
+    job.record.data = {}
+    job.resume = {'missedSkins': ['5', '6']}
+
+    job.ao3 = ao3
+
+    assert ao3.skins_pending == ['5', '6']
+    assert job.record.data['skinsPending'] == ['5', '6']
+
+
+def test_a_retry_not_fetching_skins_leaves_the_missed_ones_alone(tmp_path):
+    ao3 = skinning(tmp_path, {})
+    job = server.Job(server.ACTION_QUICK, ['HTML'], 'Someone', server.resolve_options({}))
+    job.resume = {'missedSkins': ['5']}
+
+    job.ao3 = ao3
+
+    assert ao3.skins_pending == []
+
+
+@pytest.mark.parametrize('action', [server.ACTION_WORKS, server.ACTION_WORK, server.ACTION_UPDATE])
+def test_a_retry_going_back_for_missed_skins_lists_the_skins_step_whatever_it_downloads(action):
+    job = MagicMock()
+    job.action = action
+    job.filetypes = ['JSON']  # no html: these runs save skins from the pages they read anyway
+    job.options = server.resolve_options({'skins': True})
+    job.resume = None
+    assert 'skins' not in [x for x, _ in server.step_plan(job)]
+
+    job.resume = {'missedSkins': ['5']}
+    assert 'skins' in [x for x, _ in server.step_plan(job)]
+
+
+def test_the_skins_step_of_a_retry_reads_the_missed_works_and_saves_their_skins(tmp_path):
+    other = 'https://archiveofourown.org/works/7'
+    ao3 = skinning(tmp_path, {other: page('unlockedWork')})
+    ao3.skins_pending = ['7']  # missed by the earlier attempt; its html is not downloaded again
+
+    the_skins_step(ao3, tmp_path)
+
+    assert (tmp_path / strings.SKINS_FOLDER_NAME / '7.css').exists()
+    assert ao3.skins_pending == []
+
+
+SKINS_ONLY = {'id': 'r1', 'action': server.ACTION_CUSTOM, 'status': 'stopped',
+              'options': {'skinsOnly': True, 'skinWorks': ['1', '2', '3']}, 'filetypes': [],
+              'skinFailures': [{'id': '1', 'link': 'x', 'error': 'e'}], 'skinsPending': ['3']}
+
+
+def test_a_skins_only_run_offers_two_ways_to_retry_it():
+    choices = server.retry_choices(SKINS_ONLY, set())
+
+    assert [m['mode'] for m in choices['modes']] == [server.RETRY_TOP, server.RETRY_FAILED]
+    assert all(m['available'] for m in choices['modes'])
+    assert choices['default'] == server.RETRY_FAILED
+    assert choices['skinsOnly'] is True and choices['missedSkins'] == 2
+
+
+def test_a_skins_only_run_that_missed_nothing_retries_from_the_top():
+    record = dict(SKINS_ONLY, skinFailures=[], skinsPending=[], status='success')
+    choices = server.retry_choices(record, set())
+
+    failed = next(m for m in choices['modes'] if m['mode'] == server.RETRY_FAILED)
+    assert not failed['available'] and failed['reason'] == strings.RETRY_NO_SKINS_MISSED
+    assert choices['default'] == server.RETRY_TOP
+
+
+@pytest.mark.parametrize('mode, picked', [(server.RETRY_FAILED, ['1', '3']), (server.RETRY_TOP, ['1', '2', '3'])])
+def test_retrying_a_skins_only_run_takes_just_the_missed_works_or_all_of_them(monkeypatch, mode, picked):
+    monkeypatch.setattr(server.runs, 'find_run', lambda fileops, run_id: dict(SKINS_ONLY))
+    job = server.Job(server.ACTION_CUSTOM, [], 'Someone', server.resolve_options({'resume': 'r1', 'retryMode': mode}))
+
+    server.prepare_resume(job, MagicMock())
+
+    assert job.options['skinsOnly'] is True
+    assert job.options['skinWorks'] == picked
+
+
+def test_a_skins_only_run_keeps_the_works_it_never_reached_with_the_run(tmp_path, monkeypatch):
+    pages = {f'https://archiveofourown.org/works/{n}': page('unlockedWork') for n in '12'}
+    ao3, job, build = skins_only(tmp_path, pages, {'skinWorks': ['1', '2']})
+    seen = []
+    ao3.on_skins_pending = lambda works: seen.append(list(works))
+    real = ao3.skin_for
+
+    def stop_on_the_second(work, saving_only=False):
+        if work == '2': raise exceptions.CancelledException()
+        return real(work, saving_only)
+
+    ao3.skin_for = stop_on_the_second
+    monkeypatch.setattr(server, 'Ao3', build)
+    with pytest.raises(exceptions.CancelledException):
+        server.run_custom(job, ao3.fileops, ao3.repo, lambda event: None)
+
+    assert seen[0] == ['1', '2']
+    assert ao3.skins_pending == ['2']
+
+# endregion

@@ -974,6 +974,12 @@ class Job:
         if real: value.skip_requested = self.skipping
         # the works waiting for their skin go into the run record as the list grows
         if real: value.on_skins_pending = self.note_skins_pending
+        # a retry fetching skins goes back for the ones its earlier attempt did not get, whether
+        # or not their html is downloaded again - read in the skins step with the rest
+        if real and value.skins is True:
+            for work in (getattr(self, 'resume', None) or {}).get('missedSkins') or []:
+                if work not in value.skins_pending: value.skins_pending.append(str(work))
+            if value.skins_pending: value.skins_pending_changed()
         done = self.earlier_progress().get('formatsDone') if getattr(self, 'resume', None) else None
         if value is not None and isinstance(done, dict):
             value.formats_done = {str(work): {str(x).upper() for x in formats or []}
@@ -1202,7 +1208,11 @@ def checks_non_bookmarks(job: Job) -> bool:
 def fetches_skins(job: Job) -> bool:
     """Whether the run fetches work skins with the html it downloads - and so lists the step
     that reads the ones not to hand (`fetch_pending_skins`)."""
-    return bool((job.options or {}).get('skins')) and 'HTML' in [str(x).upper() for x in job.filetypes]
+    if not (job.options or {}).get('skins'): return False
+    # a retry going back for skins its earlier attempt missed reads them whatever it downloads
+    resume = getattr(job, 'resume', None)
+    carried = isinstance(resume, dict) and bool(resume.get('missedSkins'))
+    return carried or 'HTML' in [str(x).upper() for x in job.filetypes]
 
 
 def step_plan(job: Job) -> list[tuple[str, str]]:
@@ -1588,7 +1598,12 @@ def prepare_resume(job: Job, fileops: FileOps) -> None:
         'first': earlier.get('resumesFirst') or earlier['id'],
         'baseline': earlier.get('baseline') or '',
         'progress': retry_progress(earlier, mode),
+        # the skins it did not get: a retry fetching skins goes back for them (`Job.ao3`)
+        'missedSkins': missed_skins(earlier),
     }
+    if mode == RETRY_FAILED and skins_only_record(earlier):
+        # just the skins it did not get: those works, picked, whatever is saved for them
+        job.options['skinWorks'] = missed_skins(earlier)
     if mode == RETRY_FAILED and job.action in FIC_ACTIONS:
         # a fic run's failures are fics it could not read: just those, by their links
         links = [str(x.get('link') or '') for x in earlier.get('failures') or []
@@ -1797,6 +1812,25 @@ def finished_both(record: dict) -> bool:
     return bool(wanted) and all(steps.get(step) in over for step in wanted)
 
 
+def missed_skins(record: dict | None) -> list[str]:
+    """The works whose skin a run did not get: the ones it could not fetch or save
+    (`skinFailures`) and the ones still waiting (`skinsPending` - for a skins-only run, every work
+    it never reached). In order, each once."""
+
+    if not isinstance(record, dict): return []
+    found: list[str] = []
+    for item in list(record.get('skinFailures') or []) + list(record.get('skinsPending') or []):
+        work = str(item.get('id') if isinstance(item, dict) else item or '')
+        if work and work not in found: found.append(work)
+    return found
+
+
+def skins_only_record(record: dict | None) -> bool:
+    """Whether `record` is a run that only fetched work skins."""
+    return isinstance(record, dict) and record.get('action') == ACTION_CUSTOM and \
+        bool((record.get('options') or {}).get('skinsOnly'))
+
+
 def retry_problem(record: dict | None, mode: str, active: set[str]) -> str:
     """Why `record` cannot be retried this way, or '' when it can."""
 
@@ -1809,6 +1843,10 @@ def retry_problem(record: dict | None, mode: str, active: set[str]) -> str:
     if action == ACTION_COLLECTION and not record.get('url'): return strings.RESUME_NO_LINK
     if action in FIC_ACTIONS and not record.get('url'): return strings.RETRY_NO_FIC_LINKS
     if mode == RETRY_TOP: return ''
+    if skins_only_record(record):
+        # it indexes and downloads nothing: from the top, or just the skins it did not get
+        if mode != RETRY_FAILED: return strings.RETRY_SKINS_ONLY_TWO_WAYS
+        return '' if missed_skins(record) else strings.RETRY_NO_SKINS_MISSED
     if mode in (RETRY_INDEX, RETRY_DOWNLOADS) and action not in LIST_ACTIONS and \
             record.get('status') == runs.STATUS_PARTIAL:
         # it reached the end: there is nothing to carry on from, only what it missed
@@ -1846,6 +1884,8 @@ def retry_default(record: dict, available: set[str]) -> str:
     retries just those; anything else starts again from the top.
     """
 
+    if skins_only_record(record):
+        return RETRY_FAILED if RETRY_FAILED in available else RETRY_TOP
     if record.get('status') == runs.STATUS_PARTIAL:
         # some of its indexing failed: everything is indexed again (a fic run re-reads its
         # failed fics anyway); only downloads failed: just those
@@ -1878,9 +1918,13 @@ def retry_choices(record: dict, active: set[str]) -> dict:
         kept = (RETRY_TOP, RETRY_DOWNLOADS, RETRY_FAILED) \
             if record.get('action') in LIST_ACTIONS else (RETRY_TOP, RETRY_FAILED)
         modes = [m for m in modes if m['mode'] in kept]
+    if skins_only_record(record):
+        # a skins-only run has two ways: every work again, or just the skins it did not get
+        modes = [m for m in modes if m['mode'] in (RETRY_TOP, RETRY_FAILED)]
     available = {m['mode'] for m in modes if m['available']}
     return {'modes': modes, 'default': retry_default(record, available) if available else '',
-            'failedWorks': len(failed_work_ids(record))}
+            'failedWorks': len(failed_work_ids(record)), 'skinsOnly': skins_only_record(record),
+            'missedSkins': len(missed_skins(record))}
 
 
 def retryable_among(records: list[dict], active: set[str]) -> list[dict]:
@@ -5138,8 +5182,9 @@ def run_skins_only(job: Job, fileops: FileOps, repo: Repository, report) -> None
 
     ao3 = Ao3(repo, fileops, [], None, False, False, progress=report,
               cancelled=job.cancel.is_set)
-    ao3.skins = True
     job.ao3 = ao3
+    # after handing it over: the run's own options say no skins (it is not a download run)
+    ao3.skins = True
     job.steps.start('skins')
     picked = list(job.options.get('skinWorks') or [])
     if picked:
@@ -5156,6 +5201,10 @@ def run_skins_only(job: Job, fileops: FileOps, repo: Repository, report) -> None
         report_failures(ao3, report)
         return
     print(strings.AO3_INFO_SKINS_ONLY_START.format(len(works)))
+    # every work still to do is kept with the run as it goes, so a retry can take just the ones
+    # it never reached (`missed_skins`)
+    ao3.skins_pending = [str(x) for x in works]
+    ao3.skins_pending_changed()
     found = none = 0
     for done, work in enumerate(works, 1):
         ao3.check_cancelled()
@@ -5163,10 +5212,13 @@ def run_skins_only(job: Job, fileops: FileOps, repo: Repository, report) -> None
                         link=f'{strings.AO3_BASE_URL}/works/{work}', filetype='skin',
                         phase=progress.DOWNLOADING, done=done - 1, total=len(works))
         css = ao3.skin_for(work, saving_only=True)
-        if work in ao3.skins_unread: continue
-        if ao3.save_skin(work, css):
+        if work not in ao3.skins_unread and ao3.save_skin(work, css):
             if css: found += 1
             else: none += 1
+        # dealt with: had, or listed as a failure - no longer waiting
+        if str(work) in ao3.skins_pending:
+            ao3.skins_pending.remove(str(work))
+            ao3.skins_pending_changed()
     print(strings.AO3_INFO_SKINS_ONLY_DONE.format(found, none, len(ao3.skins_unread)))
     job.steps.done('skins')
     # not `finish_run`: its FicHub, cleanup (collection links written into index entries) and

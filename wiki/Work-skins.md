@@ -29,7 +29,7 @@ Ticked, a run gets a skin in one of two ways:
 | **(Full scan) Reindex & Update All** | Its own step, for works whose HTML is downloaded. Free for the works it opens anyway: non-bookmarks checked with *Check all non-bookmarks for updates too*, and every work downloaded when JSON is unticked. | Up to one request per work |
 | **Custom run - all bookmarks, a page range or a date range** | Its own step. Only works whose HTML is downloaded. | Up to one request per work |
 | **Index my collections / Index collection by URL** (with *Index and download encountered works*) | Its own step. Only works whose HTML is downloaded. | Up to one request per work |
-| **Retry** | As for the run being retried - the box stays as it was. | As for that run |
+| **Retry** | As for the run being retried - the box stays as it was. It also goes back for the skins the earlier attempt didn't get (failed, or still waiting), whether or not their HTML is downloaded again. | As for that run, plus up to one request per missed skin |
 | **Resolve issues** | Not offered - no skin is saved. | - |
 | **[DEBUG] Just fetch work skins** (custom run) | The whole run: each work's page is read for its skin, every time the run is started. Nothing is indexed or downloaded. | One request per work |
 
@@ -39,6 +39,11 @@ Ticked, a run gets a skin in one of two ways:
 - **[DEBUG] Download work skin** - in a work's **⋯** menu, or on the selection bar for the works you've ticked. It opens a window of its own, **Download work skin** (or **Download work skins** for several), straight on the AO3 login - there is nothing else to choose. **Fetch work skins** starts it, and each work picked is checked again whatever is saved for it.
 
 A work with a skin saved shows a brush button on the Works tab, just left of the eye at the bottom of its entry. Hover says **Open downloaded workskin**; clicking it opens the saved CSS in a new tab.
+
+## Retrying
+
+- **A run with the box ticked** - any retry goes back for the skins its earlier attempt didn't get: the ones that failed and the ones still waiting when it stopped. They are read in **Fetch work skins for the HTML downloaded**, even though their HTML isn't downloaded again. This works for every run, *Download/update several fics* included - whichever way it is retried (from the top, carrying on, or just the fics it could not get). A page the retry reads anyway costs nothing extra.
+- **A skins-only run** (*Just fetch work skins*, or **Download work skin**) offers two ways: **From the top** fetches every work's skin again; **Just the skins it could not get** fetches only the ones that failed and the works it never reached. The second is offered first when there are any.
 
 ## In History
 

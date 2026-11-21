@@ -850,6 +850,8 @@ RETRY_NOT_FOUND = 'That run is not in this library\'s history any more.'
 RETRY_STILL_RUNNING = 'That run is still going - wait for it to finish, or stop it first.'
 RETRY_NO_INDEX = 'Only a full scan, quick scan, custom run or collection run can carry on with its indexing.'
 RETRY_NO_DOWNLOADS = 'It never got as far as settling which works to check and download.'
+RETRY_SKINS_ONLY_TWO_WAYS = 'A run that only fetches work skins indexes and downloads nothing - retry it from the top, or just the skins it did not get.'
+RETRY_NO_SKINS_MISSED = 'It got every work skin it set out to get - there is nothing it missed to retry.'
 RETRY_NO_FAILURES = 'Every work it set out to get arrived - there is nothing that failed to retry.'
 # a run that did not finish - stopped, force stopped, interrupted, abandoned, failed or partly
 # done - has no failures to retry, but did not get everything either: never say it did

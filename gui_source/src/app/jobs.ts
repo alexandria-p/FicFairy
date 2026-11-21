@@ -320,6 +320,10 @@ export interface RetryChoices {
   default: RetryMode | '';
   /** how many works it could not get */
   failedWorks: number;
+  /** a run that only fetched work skins: retried from the top, or just the skins it missed */
+  skinsOnly?: boolean;
+  /** how many works' skins it did not get - failed, or never reached */
+  missedSkins?: number;
 }
 
 /** something a run stopped to ask, what was answered, and what came of it */

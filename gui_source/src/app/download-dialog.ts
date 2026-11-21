@@ -483,6 +483,15 @@ export class DownloadDialog implements OnDestroy {
   }
 
   protected retryLabel(mode: RetryMode, run: RetryableRun): string {
+    if (run.retry.skinsOnly) {
+      const missed = run.retry.missedSkins ?? 0;
+      if (mode === 'top') return 'From the top - every work\'s skin fetched again';
+      if (mode === 'failed') {
+        return missed
+          ? `Just the ${missed} ${missed === 1 ? 'skin' : 'skins'} it could not get - failed, or never reached`
+          : 'Just the skins it could not get (none missed)';
+      }
+    }
     switch (mode) {
       case 'top':
         return run.action === 'quick'
