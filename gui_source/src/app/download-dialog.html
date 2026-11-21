@@ -738,7 +738,7 @@
           </p>
         }
 
-        <!-- after series and non-bookmarks: the last choice on a full scan; a custom run's images follow it -->
+        <!-- after series and non-bookmarks; work skins follow it, and a custom run's images come last -->
         @if (picksOverwrite()) {
           <label class="check">
             <input
@@ -756,22 +756,6 @@
           <!-- the non-bookmarks it re-reads are downloaded with the rest, so they are overwritten too -->
           @if (overwrite() && picksNonBookmarks() && nonBookmarks()) {
             <p class="hint overwrite-non-bookmarks">This will include any non-bookmarks in this scan too.</p>
-          }
-        }
-
-        @if (picksImages()) {
-          <label class="check">
-            <input type="checkbox" [checked]="images()" (change)="images.set($any($event.target).checked)" />
-            <span>Also save embedded images separately</span>
-          </label>
-          <!-- only once ticked: a note about a choice not made yet is one more thing to read -->
-          @if (images()) {
-            <p class="hint">
-              <strong>Please note:</strong> images are already embedded inside all regular
-              downloaded works, and display when you read them. This option just also exports
-              any images to their own folder in your downloads directory, for you to look at
-              separately. It will make the download longer.
-            </p>
           }
         }
 
@@ -794,6 +778,22 @@
             <p class="hint skins-hint">
               At most one extra request to AO3 per fic the run picks up. Work skins are only
               fetched from AO3, and only with HTML downloads.
+            </p>
+          }
+        }
+
+        @if (picksImages()) {
+          <label class="check">
+            <input type="checkbox" [checked]="images()" (change)="images.set($any($event.target).checked)" />
+            <span>Also save embedded images separately</span>
+          </label>
+          <!-- only once ticked: a note about a choice not made yet is one more thing to read -->
+          @if (images()) {
+            <p class="hint">
+              <strong>Please note:</strong> images are already embedded inside all regular
+              downloaded works, and display when you read them. This option just also exports
+              any images to their own folder in your downloads directory, for you to look at
+              separately. It will make the download longer.
             </p>
           }
         }
