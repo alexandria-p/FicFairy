@@ -4206,7 +4206,7 @@ def ask_about_unsure_copies(job: 'Job | None', records: list[dict], existing: di
     own version, and its own case - (`INFERRED_DATE_QUESTION`, carrying `scenario`), saying what
     it thinks and recommending: replace when it thinks yours is older, keep otherwise. `yes`
     replaces that file, `no` keeps it. The default is the scenario's own (`SCENARIO_SETTINGS` in settings.ini, or the
-    page's *Defaults used during a run*) - keep unless changed - and an answer you chose to
+    page's *Choose what happens during a run when a question times out*) - keep unless changed - and an answer you chose to
     **always** use for a scenario (`Job.always_answers`, from the page's User settings) is taken
     without asking. A file to replace goes in `superseded` (the work in `stale`); one kept
     leaves it, into `plan['keep']`.
