@@ -162,8 +162,7 @@
                     <summary>See exactly what will be sent</summary>
                     <pre>{{ logPreview() }}</pre>
                   </details>
-                  <p class="hint">Your AO3 username is taken out of it. It never holds your password.</p>
-                } @else if (logNote()) {
+                  } @else if (logNote()) {
                   <p class="hint">{{ logNote() }}</p>
                 } @else if (logChoice() === 'latest' || chosenRun()) {
                   <p class="hint">Reading the log...</p>
