@@ -280,7 +280,7 @@ describe('History', () => {
     expect(said).toContain('no reindexing');
     expect(said).toContain('up to page 3');
     expect(said).toContain('from page 5');
-    expect(said).toContain('all works from encountered series');
+    expect(said).toContain('other works of each series downloaded too');
     // an option left off is not listed at all
     expect(said).not.toContain('save images');
   });

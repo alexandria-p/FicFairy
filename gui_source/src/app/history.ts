@@ -374,7 +374,7 @@ export class History {
     if (options['collectionWorks']) said.push('indexed and downloaded the works in them');
     if (options['subcollections']) said.push('with subcollections');
     if (options['parentCollections']) said.push('with parent collections');
-    if (options['series']) said.push('all works from encountered series');
+    if (options['series']) said.push('other works of each series downloaded too');
     if (options['images']) said.push('save images separately');
     if (options['skins']) said.push('work skins saved as css');
     if (options['skinsOnly']) {

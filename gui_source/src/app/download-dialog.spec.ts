@@ -4835,7 +4835,7 @@ describe('DownloadDialog', () => {
       expect(terms).toContain('Back to 2026-09-01, and up to 2026-09-20');
       expect(terms).toContain('File types: JSON, PDF');
       expect(terms).toContain('overwrite existing downloads');
-      expect(terms).toContain('get all works from encountered series');
+      expect(terms).toContain('if a work is a part of a series, download all its other works too');
       expect(button('Continue')!.disabled).toBe(true);
 
       await acknowledge();

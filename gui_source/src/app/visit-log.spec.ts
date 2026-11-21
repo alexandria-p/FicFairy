@@ -55,7 +55,7 @@ describe('VisitLog', () => {
     document.body.innerHTML = `
       <div class="dialog"><h2>Quick Scan</h2>
         <button type="button">Continue</button>
-        <label><input type="checkbox" name="series" /> Get all works from encountered series</label>
+        <label><input type="checkbox" name="series" /> If a work is a part of a series, download all its other works too</label>
         <a href="https://archiveofourown.org/works/123">A made-up work</a>
         <details><summary>See exactly what will be sent</summary></details>
         <input type="password" name="password" />
@@ -72,7 +72,7 @@ describe('VisitLog', () => {
 
     const text = visit.text();
     expect(text).toContain('Clicked "Continue" in "Quick Scan"');
-    expect(text).toContain('Ticked "Get all works from encountered series" in "Quick Scan"');
+    expect(text).toContain('Ticked "If a work is a part of a series, download all its other works too" in "Quick Scan"');
     expect(text).toContain('Clicked link "A made-up work" (work 123) in "Quick Scan"');
     expect(text).toContain('Opened "See exactly what will be sent" in "Quick Scan"');
     // what is typed is never noted

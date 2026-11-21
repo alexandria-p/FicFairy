@@ -577,7 +577,7 @@ describe('WorkList, bookmarks of every kind', () => {
     const said = element.querySelector('.membership')?.textContent ?? '';
     expect(said).toContain("works have not been indexed yet");
     expect(said).toContain('only bookmarked some');
-    expect(said).toContain('Get all works from encountered series');
+    expect(said).toContain('If a work is a part of a series, download all its other works too');
   });
 
   it('shows no series line on a work in no series', async () => {

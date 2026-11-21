@@ -421,7 +421,7 @@ export class DownloadDialog implements OnDestroy {
     }
     const named: Record<string, string> = {
       overwrite: 'overwrite existing downloads',
-      series: 'get all works from encountered series',
+      series: 'if a work is a part of a series, download all its other works too',
       nonBookmarks: 'check non-bookmarks for updates',
       images: 'save embedded images',
       collectionWorks: 'index and download encountered works',
