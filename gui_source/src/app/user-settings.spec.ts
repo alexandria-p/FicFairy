@@ -649,7 +649,7 @@ describe('UserSettings', () => {
     const options = [...element.querySelectorAll('[data-setting="FicHubAnswer"] option')]
       .map((x) => x.textContent?.trim());
     // in the words of the question's own buttons; the file still holds yes / no
-    expect(options).toEqual(['Try FicHub', 'No, leave them']);
+    expect(options).toEqual(['Try FicHub (default)', 'No, leave them']);
 
     choose('[data-setting="FicHubAnswer"] select', 'no');
     await settle();
@@ -664,8 +664,9 @@ describe('UserSettings', () => {
     await open();
 
     const row = element.querySelector('[data-setting="AO3GuessedOlderAnswer"]')!;
-    expect([...row.querySelectorAll('option')].map((x) => x.textContent?.trim())).toEqual(['Keep mine', 'Replace it']);
-    expect(row.querySelector('.default')?.textContent).toContain('default: Keep mine');
+    // the default is marked in the list itself, never in a line of its own
+    expect([...row.querySelectorAll('option')].map((x) => x.textContent?.trim())).toEqual(['Keep mine (default)', 'Replace it']);
+    expect(row.querySelector('.default')).toBeNull();
 
     // the file still holds no / yes
     choose('[data-setting="AO3GuessedOlderAnswer"] select', 'yes');
@@ -680,8 +681,8 @@ describe('UserSettings', () => {
     await open();
 
     const row = element.querySelector('[data-setting="NobodyHereTakeDefaults"]')!;
-    expect([...row.querySelectorAll('option')].map((x) => x.textContent?.trim())).toEqual(['On', 'Off']);
-    expect(row.querySelector('.default')?.textContent).toContain('default: On');
+    expect([...row.querySelectorAll('option')].map((x) => x.textContent?.trim())).toEqual(['On (default)', 'Off']);
+    expect(row.querySelector('.default')).toBeNull();
 
     choose('[data-setting="NobodyHereTakeDefaults"] select', 'false');
     await settle();
@@ -728,7 +729,15 @@ describe('UserSettings', () => {
     expect(questions.open).toBe(false);
     // under Appearance, above Prompts
     const order = [...element.querySelectorAll('.group')].map((g) => g.classList[1]);
-    expect(order.slice(0, 6)).toEqual(['formats', 'ao3-zone', 'appearance', 'questions', 'always-answers', 'prompts']);
+    expect(order.slice(0, 7)).toEqual(['formats', 'ao3-zone', 'appearance', 'questions', 'question-waits', 'always-answers', 'prompts']);
+    // the waits are a section of their own, apart from the answers taken
+    const waits = element.querySelector<HTMLDetailsElement>('details.question-waits')!;
+    expect(waits.querySelector('summary h3')?.textContent?.trim()).toBe('How long a question waits during a run');
+    expect(waits.open).toBe(false);
+    expect(waits.querySelector('[data-question-setting="timeout"]')).not.toBeNull();
+    expect(waits.querySelector('[data-question-setting="nobody-here"]')).not.toBeNull();
+    expect(questions.querySelector('[data-question-setting="timeout"]')).toBeNull();
+    expect(questions.querySelector('[data-question-setting="fichub"]')).not.toBeNull();
     expect(questions.querySelector('summary .saved-to')?.textContent?.trim()).toBe('Saved to this browser');
 
     const fichub = element.querySelector<HTMLSelectElement>('[data-question-setting="fichub"] select')!;
@@ -767,7 +776,30 @@ describe('UserSettings', () => {
     // the defaults are worded as the buttons a question offers
     const options = [...element.querySelectorAll('[data-question-setting="overwrite-older"] option')]
       .map((x) => x.textContent?.trim());
-    expect(options).toEqual(['No, keep my newer copy', 'Yes, replace it']);
+    expect(options).toEqual(['No, keep my newer copy (default)', 'Yes, replace it']);
+  });
+
+  it('keeps a retry reading its works again in Advanced, apart from the lists of answers', async () => {
+    TestBed.inject(HelperConnection).settings.set({ ...DEFAULT_PAGE_CONFIG, helperUrl: 'https://helper.example.com' });
+    await open();
+    const advanced = element.querySelector('details.advanced .advanced-part.retry-reread')!;
+    expect(advanced.querySelector('h4')?.textContent?.trim()).toBe('Retries');
+    expect(advanced.querySelector('[data-always="retry-reread"]')).not.toBeNull();
+    expect(advanced.querySelector('[data-question-setting="retry-reread"]')).not.toBeNull();
+    expect(element.querySelector('details.always-answers [data-always="retry-reread"]')).toBeNull();
+    expect(element.querySelector('details.questions [data-question-setting="retry-reread"]')).toBeNull();
+  });
+
+  it('on this computer, shows settings.ini\'s retry default in Advanced and not in the settings.ini list', async () => {
+    iniAnswer = { editable: true, file: 'settings.ini', settings: [
+      { key: 'RetryRereadAnswer', value: 'no', default: 'no', kind: 'choice', choices: ['no', 'yes'], about: 'retry' },
+      { key: 'ExtraWaitTime', value: '15', default: '40', kind: 'integer', about: 'seconds to wait' },
+    ] };
+    await open();
+    const advanced = element.querySelector('.advanced-part.retry-reread')!;
+    expect(advanced.querySelector('[data-setting="RetryRereadAnswer"]')).not.toBeNull();
+    expect(element.querySelectorAll('[data-setting="RetryRereadAnswer"]').length).toBe(1);
+    expect(element.querySelector('[data-setting="ExtraWaitTime"]')).not.toBeNull();
   });
 
   it('lists the six cases and the retry question a run can always answer, changes one, and forgets one so it asks again', async () => {
@@ -866,10 +898,14 @@ describe('UserSettings', () => {
     expect(prompts.querySelector('summary .saved-to')?.textContent?.trim()).toBe('Saved to this browser');
   });
 
-  it('shows each setting\'s default beside it', async () => {
+  it('marks a setting\'s default in its list, or on hovering a box with no list', async () => {
     await open();
 
-    expect(element.querySelector('[data-setting="ExtraWaitTime"] .default')?.textContent).toContain('default: 40');
+    // no line of its own any more
+    expect(element.querySelector('.default')).toBeNull();
+    expect(element.querySelector('[data-setting="ExtraWaitTime"] input')!.getAttribute('title')).toBe('Default: 40');
+    expect([...element.querySelectorAll('[data-setting="EnableDebugLogging"] option')].map((x) => x.textContent?.trim()))
+      .toEqual(['true', 'false (default)']);
   });
 
   it('asks before resetting, and Cancel changes nothing', async () => {

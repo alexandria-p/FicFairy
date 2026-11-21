@@ -81,6 +81,70 @@ textarea {
   font-family: inherit;
 }
 
+/* tick boxes, radio buttons and sliders take the palette's accent, never the browser's blue */
+input[type='checkbox'],
+input[type='radio'],
+input[type='range'],
+progress {
+  accent-color: var(--accent);
+}
+
+/*
+ * Every dropdown in the palette's colours, with an arrow drawn in them too: two gradients make a
+ * chevron in --text-dim, so it follows the palette (an svg in a data url could not). A component
+ * may set its own box colours, padding and border; the arrow is below.
+ */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 5px 28px 5px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background-color: var(--bg);
+  color: var(--text-strong);
+  font-size: inherit;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+/*
+ * The arrow, and the room it sits in. `:not(#_)` lifts this above any component's own select rule
+ * (an id outranks the attribute Angular scopes them with), so a component writing the background
+ * shorthand or its own padding cannot wipe the arrow or put its text under it.
+ */
+select:not(#_) {
+  padding-right: 28px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-dim) 50%),
+    linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
+  background-position:
+    calc(100% - 15px) 50%,
+    calc(100% - 10px) 50%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+}
+
+select:hover:not(:disabled) {
+  border-color: var(--accent-line);
+}
+
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* the open list, as far as a browser lets a page colour it */
+option,
+optgroup {
+  background-color: var(--surface);
+  color: var(--text);
+}
+
 a {
   color: var(--link);
   text-decoration: underline;

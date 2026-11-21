@@ -240,7 +240,7 @@
     <!-- collapsible: a long list, seldom changed -->
     <details class="group questions" [class.guest-locked]="guest()" [attr.inert]="guest() ? '' : null" [attr.aria-disabled]="guest() ? 'true' : null">
       <summary class="group-head">
-        <h3>Defaults used during a run</h3>
+        <h3>Choose what happens during a run when a question times out</h3>
         <span class="saved-to" title="Kept in this browser's own storage, on this computer - another browser, or another computer, has its own">Saved to this browser</span>
       </summary>
       <p class="hint">
@@ -249,11 +249,42 @@
         these.
       </p>
       <ul class="rows">
+        @for (question of questions; track question.name) {
+          <li class="row" [attr.data-question-setting]="question.name">
+            <div class="about">
+              <span class="name">
+                {{ question.label }}
+              </span>
+            </div>
+            <select
+              [attr.aria-label]="question.label"
+              (change)="setAnswer(question, $any($event.target).value)"
+            >
+              @for (choice of question.choices; track choice.value) {
+                <option [value]="choice.value" [selected]="answer(question.name) === choice.value">
+                  {{ choice.label }}{{ choice.value === helperAnswer(question.name) ? ' (default)' : '' }}
+                </option>
+              }
+            </select>
+          </li>
+        }
+      </ul>
+    </details>
+
+    <!-- the waits on their own: how long, not what is taken -->
+    <details class="group question-waits" [class.guest-locked]="guest()" [attr.inert]="guest() ? '' : null" [attr.aria-disabled]="guest() ? 'true' : null">
+      <summary class="group-head">
+        <h3>How long a question waits during a run</h3>
+        <span class="saved-to" title="Kept in this browser's own storage, on this computer - another browser, or another computer, has its own">Saved to this browser</span>
+      </summary>
+      <p class="hint">
+        How many minutes a run waits for your answer before it takes the default, chosen above.
+      </p>
+      <ul class="rows">
         <li class="row" data-question-setting="timeout">
           <div class="about">
             <span class="name">
               Minutes a question waits for you
-              <span class="default">default: {{ helperTimeout() }}</span>
             </span>
             <span class="description">0 takes the default answer at once, without asking.</span>
           </div>
@@ -262,6 +293,7 @@
             min="0"
             step="1"
             aria-label="Minutes a question waits for you"
+            [title]="'Default: ' + helperTimeout()"
             [value]="questionTimeout()"
             (change)="setQuestionTimeout($any($event.target).value, $any($event.target))"
           />
@@ -270,7 +302,6 @@
           <div class="about">
             <span class="name">
               Minutes a question about a file with no date in its name waits
-              <span class="default">default: {{ helperGuessedTimeout() }}</span>
             </span>
             <span class="description">Replace it, or keep it? A run can ask one for every work and format, so these wait less. 0 takes the default at once.</span>
           </div>
@@ -279,6 +310,7 @@
             min="0"
             step="1"
             aria-label="Minutes a question about a file with no date in its name waits"
+            [title]="'Default: ' + helperGuessedTimeout()"
             [value]="guessedTimeout()"
             (change)="setGuessedTimeout($any($event.target).value, $any($event.target))"
           />
@@ -288,7 +320,6 @@
             <div class="about">
               <span class="name">
                 {{ wait.label }}
-                <span class="default">default: {{ helperWait(wait.name) }}</span>
               </span>
               <span class="description">{{ wait.about }} 0 takes the default at once.</span>
             </div>
@@ -297,6 +328,7 @@
               min="0"
               step="1"
               [attr.aria-label]="wait.label"
+              [title]="'Default: ' + helperWait(wait.name)"
               [value]="ownWait(wait.name)"
               (change)="setOwnWait(wait.name, wait.label, $any($event.target).value, $any($event.target))"
             />
@@ -306,7 +338,6 @@
           <div class="about">
             <span class="name">
               When nobody answers, don't wait on the rest
-              <span class="default">default: {{ helperNobodyHere() ? 'On' : 'Off' }}</span>
             </span>
             <span class="description">
               On: once a question goes unanswered, the rest of the same kind in that run take
@@ -317,30 +348,10 @@
           </div>
           <select aria-label="When nobody answers, don't wait on the rest"
                   (change)="setNobodyHere($any($event.target).value === 'on')">
-            <option value="on" [selected]="nobodyHere()">On</option>
-            <option value="off" [selected]="!nobodyHere()">Off</option>
+            <option value="on" [selected]="nobodyHere()">On{{ helperNobodyHere() ? ' (default)' : '' }}</option>
+            <option value="off" [selected]="!nobodyHere()">Off{{ helperNobodyHere() ? '' : ' (default)' }}</option>
           </select>
         </li>
-        @for (question of questions; track question.name) {
-          <li class="row" [attr.data-question-setting]="question.name">
-            <div class="about">
-              <span class="name">
-                {{ question.label }}
-                <span class="default">default: {{ choiceLabel(question, helperAnswer(question.name)) }}</span>
-              </span>
-            </div>
-            <select
-              [attr.aria-label]="question.label"
-              (change)="setAnswer(question, $any($event.target).value)"
-            >
-              @for (choice of question.choices; track choice.value) {
-                <option [value]="choice.value" [selected]="answer(question.name) === choice.value">
-                  {{ choice.label }}
-                </option>
-              }
-            </select>
-          </li>
-        }
       </ul>
     </details>
   }
@@ -348,7 +359,7 @@
   <!-- collapsible: a long list, seldom changed -->
   <details class="group always-answers" [class.guest-locked]="guest()" [attr.inert]="guest() ? '' : null" [attr.aria-disabled]="guest() ? 'true' : null">
     <summary class="group-head">
-      <h3>Answers to always use</h3>
+      <h3>Deciding whether to replace or keep a file during a run</h3>
       <span class="saved-to" title="Kept in this browser's own storage, on this computer - another browser, or another computer, has its own">Saved to this browser</span>
     </summary>
     <p class="hint">
@@ -462,12 +473,11 @@
         <ul class="rows">
           <!-- FileNamePattern is changed from the DEBUG tab alone, which offers the renames it needs -->
           @for (setting of file.settings; track setting.key) {
-            @if (setting.key !== 'FileNamePattern' && !RUN_LOG_KEYS.includes(setting.key)) {
+            @if (setting.key !== 'FileNamePattern' && !ADVANCED_KEYS.includes(setting.key)) {
             <li class="row" [attr.data-setting]="setting.key">
               <div class="about">
                 <span class="name">
                   <code>{{ setting.key }}</code>
-                  <span class="default">default: {{ setting.default === '' ? '(empty)' : iniWords(setting.key, setting.default) }}</span>
                 </span>
                 <span class="description">{{ setting.about }}</span>
               </div>
@@ -478,8 +488,8 @@
                     [value]="setting.value"
                     (change)="editIni(setting, $any($event.target).value, $any($event.target))"
                   >
-                    <option value="true" [selected]="setting.value === 'true'">{{ iniWords(setting.key, 'true') }}</option>
-                    <option value="false" [selected]="setting.value === 'false'">{{ iniWords(setting.key, 'false') }}</option>
+                    <option value="true" [selected]="setting.value === 'true'">{{ iniWords(setting.key, 'true') }}{{ setting.default === 'true' ? ' (default)' : '' }}</option>
+                    <option value="false" [selected]="setting.value === 'false'">{{ iniWords(setting.key, 'false') }}{{ setting.default === 'false' ? ' (default)' : '' }}</option>
                   </select>
                 }
                 @case ('choice') {
@@ -489,7 +499,7 @@
                     (change)="editIni(setting, $any($event.target).value, $any($event.target))"
                   >
                     @for (choice of setting.choices ?? []; track choice) {
-                      <option [value]="choice" [selected]="setting.value === choice">{{ iniWords(setting.key, choice) }}</option>
+                      <option [value]="choice" [selected]="setting.value === choice">{{ iniWords(setting.key, choice) }}{{ choice === setting.default ? ' (default)' : '' }}</option>
                     }
                   </select>
                 }
@@ -499,6 +509,7 @@
                     min="0"
                     step="1"
                     [attr.aria-label]="setting.key"
+                    [title]="'Default: ' + setting.default"
                     [value]="setting.value"
                     (change)="editIni(setting, $any($event.target).value, $any($event.target))"
                   />
@@ -507,6 +518,7 @@
                   <input
                     type="text"
                     [attr.aria-label]="setting.key"
+                    [title]="'Default: ' + (setting.default === '' ? '(empty)' : setting.default)"
                     [value]="setting.value"
                     (change)="editIni(setting, $any($event.target).value, $any($event.target))"
                   />
@@ -641,6 +653,68 @@
           }
         </div>
       }
+
+      <!-- a retry carrying on its downloads reading its works again: here, not in the lists above -->
+      <div class="advanced-part retry-reread">
+        <div class="group-head">
+          <h4>Retries</h4>
+          <span class="saved-to" title="Kept in this browser's own storage, on this computer - another browser, or another computer, has its own">Saved to this browser</span>
+        </div>
+        <p class="hint">
+          A retry that carries on from where its earlier attempt got to asks once whether to read
+          its works again from AO3 first, in case AO3 updated any of them in between.
+        </p>
+        <ul class="rows">
+          <li class="row" [attr.data-always]="retryAlways.name">
+            <div class="about">
+              <span class="name">{{ retryAlways.label }}</span>
+              <span class="description">Choose an answer to always use, or be asked every time.</span>
+            </div>
+            <select
+              [attr.aria-label]="retryAlways.label"
+              (change)="setAlways(retryAlways.name, retryAlways.label, $any($event.target).value)"
+            >
+              <option value="" [selected]="!alwaysAnswers()[retryAlways.name]">Ask every time</option>
+              <option value="yes" [selected]="alwaysAnswers()[retryAlways.name] === 'yes'">Always: {{ retryAlways.yes }}</option>
+              <option value="no" [selected]="alwaysAnswers()[retryAlways.name] === 'no'">Always: {{ retryAlways.no }}</option>
+            </select>
+          </li>
+          @if (!local) {
+            <li class="row" [attr.data-question-setting]="retryQuestion.name">
+              <div class="about">
+                <span class="name">When nobody answers it in time</span>
+              </div>
+              <select
+                [attr.aria-label]="retryQuestion.label + ' - when nobody answers'"
+                (change)="setAnswer(retryQuestion, $any($event.target).value)"
+              >
+                @for (choice of retryQuestion.choices; track choice.value) {
+                  <option [value]="choice.value" [selected]="answer(retryQuestion.name) === choice.value">
+                    {{ choice.label }}{{ choice.value === helperAnswer(retryQuestion.name) ? ' (default)' : '' }}
+                  </option>
+                }
+              </select>
+            </li>
+          } @else if (ini()?.editable && retryIni(); as setting) {
+            <!-- on this computer the same default is settings.ini's -->
+            <li class="row" [attr.data-setting]="setting.key">
+              <div class="about">
+                <span class="name">When nobody answers it in time</span>
+                <span class="description">Saved to <code>settings.ini</code> as <code>{{ setting.key }}</code>.</span>
+              </div>
+              <select
+                [attr.aria-label]="setting.key"
+                [value]="setting.value"
+                (change)="editIni(setting, $any($event.target).value, $any($event.target))"
+              >
+                @for (choice of setting.choices ?? []; track choice) {
+                  <option [value]="choice" [selected]="setting.value === choice">{{ iniWords(setting.key, choice) }}{{ choice === setting.default ? ' (default)' : '' }}</option>
+                }
+              </select>
+            </li>
+          }
+        </ul>
+      </div>
 
       <div class="advanced-part import-exclusions">
         <div class="group-head">

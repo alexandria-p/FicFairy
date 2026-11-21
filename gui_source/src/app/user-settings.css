@@ -143,13 +143,6 @@ h4 {
   color: var(--text-dim);
 }
 
-.default {
-  margin-left: 8px;
-  color: var(--text-dim);
-  font-size: 0.8rem;
-  font-weight: 400;
-}
-
 .hint {
   margin: 0 0 10px;
   color: var(--text-dim);
@@ -279,6 +272,14 @@ input[type='text'] {
   color: var(--text-strong);
   font: inherit;
   font-size: 0.85rem;
+}
+
+/* a dropdown is as wide as its longest answer - with ' (default)' after one - up to a point,
+   so an answer is never cut short where a fixed width did */
+.row > select {
+  width: auto;
+  min-width: 170px;
+  max-width: min(100%, 360px);
 }
 
 .format-list {
@@ -441,7 +442,7 @@ input[type='text'] {
 }
 
 .font-preview {
-  margin: 6px 0 0;
+  margin: 6px 0 18px;
   padding: 8px 10px;
   border: 1px dashed var(--border-strong);
   border-radius: 4px;

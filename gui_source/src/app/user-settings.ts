@@ -84,7 +84,7 @@ interface IniFile {
 
 /** one value Reset to defaults would change, as its window lists it */
 export interface ResetChange {
-  group: 'Appearance' | 'Prompts' | 'Answers to always use' | 'Download formats' | 'AO3 time zone' | 'Questions' | 'Visit log' | 'Run logs' | 'settings.ini';
+  group: 'Appearance' | 'Prompts' | 'Deciding whether to replace or keep a file during a run' | 'Download formats' | 'AO3 time zone' | 'Questions' | 'How long a question waits' | 'Visit log' | 'Run logs' | 'settings.ini';
   name: string;
   current: string;
   default: string;
@@ -140,6 +140,10 @@ const KEEP_OR_REPLACE_SETTINGS = new Set([
   'AO3GuessedOlderAnswer', 'AO3GuessedNewerAnswer', 'AO3UnknownDateAnswer',
   'FicHubGuessedOlderAnswer', 'FicHubGuessedNewerAnswer', 'FicHubUnknownDateAnswer',
 ]);
+
+
+/** settings.ini's default answer for a retry reading its works again - in Advanced with its always-answer */
+const RETRY_REREAD_SETTING = 'RetryRereadAnswer';
 
 @Component({
   selector: 'app-user-settings',
@@ -270,7 +274,8 @@ export class UserSettings implements OnDestroy {
 
   // run logs: settings.ini's two keys on a helper on this computer, this browser's own on a
   // hosted copy (sent with every run). shown in Advanced, so left out of the settings.ini list
-  protected readonly RUN_LOG_KEYS = [RUN_LOG_LINES_SETTING, TRIM_OLD_RUN_LOGS_SETTING, ...LOG_FILE_SETTINGS];
+  /** settings.ini keys shown in Advanced rather than in the settings.ini list */
+  protected readonly ADVANCED_KEYS = [RUN_LOG_LINES_SETTING, TRIM_OLD_RUN_LOGS_SETTING, ...LOG_FILE_SETTINGS, RETRY_REREAD_SETTING];
   // the helper's log file and the update logs: on this computer only, where the files are
   protected readonly LOG_FILE_SETTINGS = LOG_FILE_SETTINGS;
   protected logFileSetting(key: string): IniSetting | undefined {
@@ -510,7 +515,10 @@ export class UserSettings implements OnDestroy {
    * A hosted copy's question defaults, kept by this browser (its settings.ini cannot be
    * edited from here): what is saved, and what the helper's own deployment says when not.
    */
-  protected readonly questions = QUESTION_DEFAULTS;
+  /** every question's default but a retry's, which is in Advanced (`retryQuestion`) */
+  protected readonly questions = QUESTION_DEFAULTS.filter((q) => q.name !== 'retry-reread');
+  /** a retry carrying on its downloads reading its works again - Advanced, at the owner's request */
+  protected readonly retryQuestion = QUESTION_DEFAULTS.find((q) => q.name === 'retry-reread')!;
   private readonly savedAnswers = signal(savedAnswerDefaults());
   private readonly savedTimeout = signal(savedQuestionTimeout());
   protected helperAnswer(name: DefaultName): string {
@@ -548,7 +556,11 @@ export class UserSettings implements OnDestroy {
    * Answers chosen to always use for a file without the app's own date, by case - ticked on a
    * question during a run, or set here. Every page sends them with every run, local or hosted.
    */
-  protected readonly scenarios = ALWAYS_LABELS;
+  /** the answers kept for a file with no date of ours; the retry's own is in Advanced (`retryAlways`) */
+  protected readonly scenarios = ALWAYS_LABELS.filter((a) => a.name !== 'retry-reread');
+  protected readonly retryAlways = ALWAYS_LABELS.find((a) => a.name === 'retry-reread')!;
+  /** settings.ini's default for it, on a helper on this computer - shown in Advanced, not the list */
+  protected readonly retryIni = computed(() => this.ini()?.settings.find((x) => x.key === RETRY_REREAD_SETTING));
   protected readonly alwaysAnswers = signal(savedAlwaysAnswers());
   /** an answer kept for good, in the words of its question's button */
   protected alwaysWords(choice: string | undefined, kind: AlwaysKind = 'ao3-older'): string {
@@ -639,21 +651,21 @@ export class UserSettings implements OnDestroy {
     }
     if (!this.local) {
       if (this.guessedTimeout() !== this.helperGuessedTimeout()) {
-        changes.push({ group: 'Questions', name: 'Minutes a question about a file with no date in its name waits',
+        changes.push({ group: 'How long a question waits', name: 'Minutes a question about a file with no date in its name waits',
                        current: String(this.guessedTimeout()), default: String(this.helperGuessedTimeout()) });
       }
       if (this.questionTimeout() !== this.helperTimeout()) {
-        changes.push({ group: 'Questions', name: 'Minutes a question waits for you',
+        changes.push({ group: 'How long a question waits', name: 'Minutes a question waits for you',
                        current: String(this.questionTimeout()), default: String(this.helperTimeout()) });
       }
       for (const { name, label } of OWN_WAITS) {
         if (this.ownWait(name) !== this.helperWait(name)) {
-          changes.push({ group: 'Questions', name: label,
+          changes.push({ group: 'How long a question waits', name: label,
                          current: String(this.ownWait(name)), default: String(this.helperWait(name)) });
         }
       }
       if (this.nobodyHere() !== this.helperNobodyHere()) {
-        changes.push({ group: 'Questions', name: "When nobody answers, don't wait on the rest",
+        changes.push({ group: 'How long a question waits', name: "When nobody answers, don't wait on the rest",
                        current: this.nobodyHere() ? 'On' : 'Off', default: this.helperNobodyHere() ? 'On' : 'Off' });
       }
       for (const question of QUESTION_DEFAULTS) {
@@ -679,7 +691,7 @@ export class UserSettings implements OnDestroy {
     const always = this.alwaysAnswers();
     for (const { name, label } of ALWAYS_LABELS) {
       if (always[name]) {
-        changes.push({ group: 'Answers to always use', name: label,
+        changes.push({ group: 'Deciding whether to replace or keep a file during a run', name: label,
                        current: this.alwaysWords(always[name], name), default: this.alwaysWords(undefined) });
       }
     }
