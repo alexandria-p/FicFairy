@@ -576,7 +576,7 @@ describe('ReadingSkinsSettings', () => {
       .map((x) => x.className.split(' ').pop());
     expect(order).toEqual(['skin-list', 'add-section', 'divider', 'work-skins-heading', 'about-work-skins', 'layer-skin']);
     expect(element.querySelector('.work-skins-heading')?.textContent?.trim()).toBe('How to display creator/individual work skins');
-    expect(element.querySelector('.layer-skin legend')?.textContent?.trim()).toBe('If a work skin is available:');
+    expect(element.querySelector('.layer-skin legend span')?.textContent?.trim()).toBe('If a work skin is available:');
     const choices = [...element.querySelectorAll<HTMLInputElement>('input[name=layerReadingSkin]')];
     expect(choices.map((x) => x.closest('label')?.textContent?.trim())).toEqual([
       'Only use the work skin', "Layer my site skin under a work's own skin"]);
@@ -588,14 +588,22 @@ describe('ReadingSkinsSettings', () => {
     expect(element.querySelector('.skin-outcome')).toBeNull();
   });
 
-  for (const [which, layered] of [['.preview-layer', true], ['.preview-only', false]] as [string, boolean][]) {
-    it(`previews a made-up work skin ${layered ? 'with the site skin layered under it' : 'alone'}`, { timeout: 30_000 }, async () => {
+  it('has one Preview for the work-skin choice', async () => {
+    const { element } = await make();
+    expect(element.querySelectorAll('.layer-skin button')).toHaveLength(1);
+    expect(element.querySelector('.layer-skin legend .preview-work-skin')).toBeTruthy();
+  });
+
+  for (const layered of [true, false]) {
+    it(`previews the choice picked: a made-up work skin ${layered ? 'with the site skin layered under it' : 'alone'}`, { timeout: 30_000 }, async () => {
       const tab = { opener: {}, location: { href: '' } };
       const open = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
       const made = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:work-skin');
       try {
-        const { element } = await make();
-        element.querySelector<HTMLButtonElement>(which)!.click();
+        const { element, fixture } = await make();
+        element.querySelector<HTMLInputElement>(`input[name=layerReadingSkin][value=${layered ? 'layer' : 'only'}]`)!.click();
+        await fixture.whenStable();
+        element.querySelector<HTMLButtonElement>('.preview-work-skin')!.click();
         await vi.waitFor(() => expect(tab.location.href).not.toBe(''), { timeout: 20_000, interval: 20 });
         const html = await (made.mock.calls[0][0] as Blob).text();
         expect(html).toContain('id="workskin"');

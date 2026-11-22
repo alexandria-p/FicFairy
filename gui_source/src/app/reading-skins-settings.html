@@ -105,20 +105,22 @@
   next to them.
 </p>
 <fieldset class="layer-skin">
-  <legend>If a work skin is available:</legend>
+  <!-- one Preview, of whichever choice is picked -->
+  <legend>
+    <span>If a work skin is available:</span>
+    <button type="button" class="button subtle small preview-work-skin" (click)="previewWorkSkin(skins.layer())">Preview</button>
+  </legend>
   <div class="layer-choice" [class.active]="!skins.layer()">
     <label class="check">
       <input type="radio" name="layerReadingSkin" value="only" [checked]="!skins.layer()" (change)="setLayer(false)" />
       Only use the work skin
     </label>
-    <button type="button" class="button subtle small preview-only" (click)="previewWorkSkin(false)">Preview</button>
   </div>
   <div class="layer-choice" [class.active]="skins.layer()">
     <label class="check">
       <input type="radio" name="layerReadingSkin" value="layer" [checked]="skins.layer()" (change)="setLayer(true)" />
       Layer my site skin under a work's own skin
     </label>
-    <button type="button" class="button subtle small preview-layer" (click)="previewWorkSkin(true)">Preview</button>
   </div>
 </fieldset>
 

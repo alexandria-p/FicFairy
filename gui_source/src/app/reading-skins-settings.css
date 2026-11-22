@@ -50,6 +50,18 @@
   color: var(--text-strong);
 }
 
+/* the work-skin choice's bar holds its one Preview */
+.layer-skin legend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.layer-skin legend .button {
+  font-weight: normal;
+}
+
 .skin,
 .layer-choice {
   clear: both;
