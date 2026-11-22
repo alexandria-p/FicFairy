@@ -793,6 +793,41 @@
                     </button>
                   </li>
                 }
+                <!-- works only: a series or an external work has no such item at all -->
+                @if (!work.error && worksToFetch(work).length) {
+                  <li role="none">
+                    <!-- aria-disabled rather than disabled, so hovering still says why -->
+                    <button type="button" role="menuitem" class="fetch-now"
+                      [class.unavailable]="runGoing()"
+                      [attr.aria-disabled]="runGoing()"
+                      [title]="runGoing() ? 'Unavailable while a run is already in progress' : ''"
+                      (click)="!runGoing() && downloadNow(work)">
+                      Download/update latest now from AO3
+                    </button>
+                  </li>
+                }
+                @if (canSelect() && canMark(work)) {
+                  <li role="none">
+                    <button type="button" role="menuitem" [class.unavailable]="runGoing()"
+                      [attr.aria-disabled]="runGoing() || busy()"
+                      [title]="runGoing() ? 'Cannot be changed while an active run is in progress' : ''"
+                      (click)="runGoing() || menuMark(work, !isBookmark(work))">
+                      {{ isBookmark(work) ? 'Unmark as bookmark' : 'Mark as bookmark' }}
+                    </button>
+                  </li>
+                }
+                @if (canSelect()) {
+                  <li role="none">
+                    <!-- aria-disabled rather than disabled, so hovering still says why -->
+                    <button type="button" role="menuitem" [class.unavailable]="!canCollect(work)"
+                      [attr.aria-disabled]="!canCollect(work)"
+                      [title]="canCollect(work) ? '' : 'A series cannot be added to a collection - only works can'"
+                      (click)="menuAdd(work)">
+                      Add to a collection...
+                    </button>
+                  </li>
+                }
+                <!-- the work skin items together at the foot, only View index history below them -->
                 <!-- a custom run that fetches this work's skin and nothing else -->
                 @if (!work.error && worksToFetch(work).length) {
                   <li role="none">
@@ -827,40 +862,6 @@
                       </button>
                     </li>
                   }
-                }
-                <!-- works only: a series or an external work has no such item at all -->
-                @if (!work.error && worksToFetch(work).length) {
-                  <li role="none">
-                    <!-- aria-disabled rather than disabled, so hovering still says why -->
-                    <button type="button" role="menuitem" class="fetch-now"
-                      [class.unavailable]="runGoing()"
-                      [attr.aria-disabled]="runGoing()"
-                      [title]="runGoing() ? 'Unavailable while a run is already in progress' : ''"
-                      (click)="!runGoing() && downloadNow(work)">
-                      Download/update latest now from AO3
-                    </button>
-                  </li>
-                }
-                @if (canSelect() && canMark(work)) {
-                  <li role="none">
-                    <button type="button" role="menuitem" [class.unavailable]="runGoing()"
-                      [attr.aria-disabled]="runGoing() || busy()"
-                      [title]="runGoing() ? 'Cannot be changed while an active run is in progress' : ''"
-                      (click)="runGoing() || menuMark(work, !isBookmark(work))">
-                      {{ isBookmark(work) ? 'Unmark as bookmark' : 'Mark as bookmark' }}
-                    </button>
-                  </li>
-                }
-                @if (canSelect()) {
-                  <li role="none">
-                    <!-- aria-disabled rather than disabled, so hovering still says why -->
-                    <button type="button" role="menuitem" [class.unavailable]="!canCollect(work)"
-                      [attr.aria-disabled]="!canCollect(work)"
-                      [title]="canCollect(work) ? '' : 'A series cannot be added to a collection - only works can'"
-                      (click)="menuAdd(work)">
-                      Add to a collection...
-                    </button>
-                  </li>
                 }
                 <!-- every entry with an index file: its readings, in a tab of their own -->
                 @if (canViewIndex(work)) {

@@ -374,6 +374,17 @@ describe('downloading or updating from the Works tab', () => {
     expect(menu.querySelector('button.remove-own-skin')).toBeTruthy();
   });
 
+  it('keeps every work skin item together at the foot of the menu, with only View index history below', async () => {
+    await listing([work('12')]);
+    const library = TestBed.inject(Library);
+    library.skinnedWorks.set(new Set(['12']));
+    library.userSkinnedWorks.set(new Set(['12']));
+    await settle();
+
+    const items = [...(await menuOf('Work 12')).querySelectorAll('button')].map((b) => b.className.split(' ')[0]);
+    expect(items.slice(-5)).toEqual(['skin-now', 'toggle-skin', 'upload-skin', 'remove-own-skin', 'view-index']);
+  });
+
   it('offers no work skin upload, replace, remove or toggle on a series bookmark or an external work', async () => {
     await listing([series, external]);
     // a work numbered the same as each, with both skins: none of it is theirs

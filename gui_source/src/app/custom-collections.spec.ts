@@ -425,11 +425,11 @@ describe('ticking works in the listing', () => {
     const menu = await openMenu(0);
     expect([...menu.querySelectorAll('button')].map((b) => b.textContent?.trim())).toEqual([
       'Hide',
-      'Fetch work skin from AO3',
-      'Upload my own work skin for this fic',
       'Download/update latest now from AO3',
       'Mark as bookmark',
       'Add to a collection...',
+      'Fetch work skin from AO3',
+      'Upload my own work skin for this fic',
       'View index history',
     ]);
   });
