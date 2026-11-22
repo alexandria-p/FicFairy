@@ -1,1 +1,1 @@
-Guests on the hosted copy can now try reading skins in User settings, saved to their own browser.
+Guests on the hosted copy can now try reading skins in User settings. The Works filter can show only works with a work skin.

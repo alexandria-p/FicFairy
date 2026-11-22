@@ -121,6 +121,8 @@ export class WorkList {
   protected readonly recommended = signal(false);
   /** only what has no index entry: a file the index does not match, or a work a collection lists */
   protected readonly missingIndex = signal(false);
+  /** works with a work skin saved - AO3's, or one you uploaded */
+  protected readonly withSkin = signal(false);
   /** hidden works are left out unless this is ticked - and then shown, marked as hidden */
   protected readonly showHidden = signal(false);
   /** tags a work must carry, every one of them, and tags it must not carry - as on ao3 */
@@ -167,6 +169,7 @@ export class WorkList {
         this.withNotes() ||
         this.recommended() ||
         this.missingIndex() ||
+        this.withSkin() ||
         this.includeTags().length ||
         this.excludeTags().length
       ),
@@ -202,6 +205,7 @@ export class WorkList {
     const withNotes = this.withNotes();
     const recommended = this.recommended();
     const missingIndex = this.missingIndex();
+    const withSkin = this.withSkin();
 
     return this.visibleWorks().filter((work) => {
       if (missingIndex && !work.unindexed && !work.placeholder) return false;
@@ -215,6 +219,7 @@ export class WorkList {
       }
       if (withNotes && !(work.bookmark_notes ?? '').trim()) return false;
       if (recommended && !work.bookmark_rec) return false;
+      if (withSkin && !this.hasSkin(work)) return false;
       if (!matchesTags(work, include, exclude)) return false;
       if (title && !(work.title ?? '').toLowerCase().includes(title)) return false;
       if (author && !(work.authors ?? []).some((name) =>
@@ -1024,6 +1029,7 @@ export class WorkList {
     this.formatFilter.set('');
     this.withNotes.set(false);
     this.missingIndex.set(false);
+    this.withSkin.set(false);
     this.recommended.set(false);
     this.includeTags.set([]);
     this.excludeTags.set([]);

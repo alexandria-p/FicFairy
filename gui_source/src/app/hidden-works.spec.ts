@@ -238,6 +238,20 @@ describe('the listing, with works from elsewhere and works hidden', () => {
     expect(titles()).toEqual(['Work 9']);
   });
 
+  it('narrows to works with a work skin, whether fetched from AO3 or uploaded', async () => {
+    await listing([MINE, NOTED, RECCED]);
+    const library = TestBed.inject(Library);
+    library.skinnedWorks.set(new Set(['8']));
+    library.userSkinnedWorks.set(new Set(['9']));
+    element.querySelector<HTMLInputElement>('input[name="withSkin"]')!.click();
+    await settle();
+    expect(titles()).toEqual(['Work 8', 'Work 9']);
+
+    library.userSkinnedWorks.set(new Set());
+    await settle();
+    expect(titles()).toEqual(['Work 8']);
+  });
+
   it('warns before hiding, then hides it from the list and keeps the choice in the library', async () => {
     await listing([MINE, BY_LINK]);
 
