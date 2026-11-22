@@ -1289,6 +1289,25 @@ export class Library {
     this.userSkinnedWorks.update((ids) => new Set(ids).add(id));
   }
 
+  /**
+   * Delete the work skin you uploaded for a work - never AO3's, which a run fetched and only a run
+   * replaces. AO3's, if it has one, is read with again, and the work's choice is forgotten.
+   */
+  async removeUserSkin(id: string): Promise<void> {
+    const store = this.store();
+    if (!store) throw new Error('this library can only be read, so nothing can be removed from it');
+    await store.delete(skinPath(id, 'mine'));
+    this.userSkinnedWorks.update((ids) => {
+      const left = new Set(ids);
+      left.delete(id);
+      return left;
+    });
+    if (id in this.workSkinChoices()) {
+      const { [id]: _gone, ...rest } = this.workSkinChoices();
+      await this.writeSkinChoices(store, rest);
+    }
+  }
+
   /** read a work with both skins with this one from now on, on every device */
   async chooseWorkSkin(id: string, source: WorkSkinSource): Promise<void> {
     const store = this.store();

@@ -435,6 +435,23 @@ describe('ReadingSkins', () => {
     expect(JSON.parse((await store.read('skins/work-skin-choices.json'))!)).toEqual({ '1': 'ao3' });
   });
 
+  it('deletes only the work skin you uploaded, forgetting the choice, and reads with AO3s again', async () => {
+    const store = new MemoryStore();
+    await store.write('skins/1.css', new Response('#workskin .from-ao3 { color: red; }'));
+    const { library } = setUp(store);
+    await library.saveUserSkin('1', '#workskin .mine { color: blue; }');
+    await library.chooseWorkSkin('1', 'ao3');
+
+    await library.removeUserSkin('1');
+
+    expect(await store.read('skins/1_submittedbyuser.css')).toBeNull();
+    expect(await store.read('skins/1.css')).toBe('#workskin .from-ao3 { color: red; }');
+    expect(library.userSkinnedWorks().size).toBe(0);
+    expect(library.workSkinChoices()).toEqual({});
+    expect(await opened(library, new File([DOWNLOADED], '1 A Work - Writer 2025-01-01.html', { type: 'text/html' })))
+      .toContain('.from-ao3');
+  });
+
   it('knows which works have a skin saved, and not those noted as having none', async () => {
     const store = new MemoryStore();
     await store.write('skins/1.css', new Response('#workskin p {}'));

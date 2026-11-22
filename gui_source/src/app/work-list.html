@@ -298,7 +298,7 @@
 <!-- a work with AO3's skin and one you uploaded: which it is read with, and each to look at -->
 @if (skinChooser(); as work) {
   <div class="hide-modal">
-    <div class="backdrop" (click)="skinChooser.set(null)"></div>
+    <div class="backdrop" (click)="closeSkinChooser()"></div>
     <div class="dialog skin-chooser" role="dialog" aria-modal="true" aria-labelledby="skin-chooser-title">
       <header><h2 id="skin-chooser-title">Work skins for {{ work.title || work.id }}</h2></header>
       <section class="body">
@@ -312,12 +312,18 @@
                 {{ source.label }}
               </label>
               <button type="button" class="button small export-work-skin" (click)="openSkin(work, source.value)">Export</button>
+              <!-- only yours can be deleted: AO3's is the work's own, and a run keeps it -->
+              @if (source.value === 'mine') {
+                <button type="button" class="button small delete-work-skin" (click)="deleteOwnSkin(work)">
+                  {{ confirmingSkinDelete() === work.id ? 'Click again to delete' : 'Delete' }}
+                </button>
+              }
             </div>
           }
         </fieldset>
       </section>
       <footer>
-        <button type="button" class="button primary" (click)="skinChooser.set(null)">Done</button>
+        <button type="button" class="button primary" (click)="closeSkinChooser()">Done</button>
       </footer>
     </div>
   </div>

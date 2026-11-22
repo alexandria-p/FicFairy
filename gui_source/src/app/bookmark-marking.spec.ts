@@ -471,6 +471,36 @@ describe('downloading or updating from the Works tab', () => {
     expect(element.querySelector('.entry-menu-items')).toBeNull();
   });
 
+  it('lets the work skins window delete the uploaded skin, asking first, and never AO3s', async () => {
+    await listing([work('12')]);
+    const library = TestBed.inject(Library);
+    library.skinnedWorks.set(new Set(['12']));
+    library.userSkinnedWorks.set(new Set(['12']));
+    const removed: string[] = [];
+    library.removeUserSkin = async (id: string) => {
+      removed.push(id);
+      library.userSkinnedWorks.set(new Set());
+    };
+    await settle();
+    element.querySelector<HTMLButtonElement>('.entry-actions .skin-open')!.click();
+    await settle();
+
+    const rows = [...element.querySelectorAll('.skin-chooser .skin-source')];
+    // one Delete, on the row of the skin you uploaded
+    expect(rows.map((r) => !!r.querySelector('.delete-work-skin'))).toEqual([false, true]);
+    const button = rows[1].querySelector<HTMLButtonElement>('.delete-work-skin')!;
+    button.click();
+    await settle();
+    expect(removed).toEqual([]);
+    expect(button.textContent?.trim()).toBe('Click again to delete');
+    button.click();
+    await settle();
+
+    expect(removed).toEqual(['12']);
+    expect(element.querySelector('.skin-chooser')).toBeNull();
+    expect(element.querySelector('.skin-note')?.textContent).toContain('Deleted the work skin you uploaded');
+  });
+
   it('opens a skin you uploaded straight away when it is the only one', async () => {
     await listing([work('12')]);
     const library = TestBed.inject(Library);

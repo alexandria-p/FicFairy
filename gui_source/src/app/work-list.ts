@@ -471,7 +471,7 @@ export class WorkList {
 
   /** the work whose skins the chooser window is open on, or null */
   protected readonly skinChooser = signal<Bookmark | null>(null);
-  /** what the last upload or choice of a work skin did, or why it could not */
+  /** what the last upload, deletion or choice of a work skin did, or why it could not */
   protected readonly skinNote = signal('');
   protected readonly skinProblem = signal('');
 
@@ -503,6 +503,37 @@ export class WorkList {
       this.skinProblem.set(said);
       this.visit.note(`Upload my own work skin: not saved (${said})`);
     }
+  }
+
+  /** the uploaded skin a Delete in the work skins window has been pressed once for, by work */
+  protected readonly confirmingSkinDelete = signal<string | null>(null);
+
+  /**
+   * Delete the work skin you uploaded, from the work skins window - AO3's has no Delete. The first
+   * press asks, the second deletes; with one skin left the window has nothing to choose, so it shuts.
+   */
+  protected async deleteOwnSkin(work: Bookmark): Promise<void> {
+    if (!work.id) return;
+    if (this.confirmingSkinDelete() !== work.id) {
+      this.confirmingSkinDelete.set(work.id);
+      return;
+    }
+    this.confirmingSkinDelete.set(null);
+    this.skinNote.set('');
+    this.skinProblem.set('');
+    try {
+      await this.library.removeUserSkin(work.id);
+      this.skinChooser.set(null);
+      this.skinNote.set(`Deleted the work skin you uploaded for ${work.title || work.id}.`);
+      this.visit.note('Work skins window: the uploaded work skin deleted');
+    } catch (error) {
+      this.skinProblem.set(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  protected closeSkinChooser(): void {
+    this.skinChooser.set(null);
+    this.confirmingSkinDelete.set(null);
   }
 
   /** open the window that chooses between a work's two skins, from its ⋯ menu */
