@@ -37,7 +37,7 @@ export class ReadingSkinsSettings {
 
   protected placeWords(skin: ReadingSkin): string {
     return skin.place === 'builtin' ? 'built in'
-      : skin.place === 'browser' ? 'this browser' : 'library';
+      : skin.place === 'browser' ? 'saved to this browser' : 'saved to my library';
   }
 
   protected placeTitle(skin: ReadingSkin): string {

@@ -2,21 +2,7 @@
   Operates like a site skin on AO3. Will be applied to downloaded HTML files that you open through
   FicFairy.
 </p>
-<p class="hint about-work-skins">
-  Some authors also create their own skins for their works (for example, social media fics) - these
-  are called "work skins". Files with a work skin that you've downloaded will have a paintbrush icon
-  next to them.
-</p>
 <p class="hint">Skins will only be applied to HTML files that you open through FicFairy.</p>
-
-<label class="check layer-skin">
-  <input type="checkbox" name="layerReadingSkin" [checked]="skins.layer()"
-         (change)="setLayer($any($event.target).checked)" />
-  <span>
-    Layer my reading skin under a work's own skin
-    <span class="hint layer-hint">The author's work skin wins where they disagree.</span>
-  </span>
-</label>
 
 @if (skins.reading()) {
   <p class="hint reading">Reading the skins saved in your library...</p>
@@ -40,7 +26,7 @@
                [checked]="skins.defaultId() === id(skin)" (change)="setDefault(id(skin))" />
         <span class="skin-name">{{ skin.name }}</span>
         @if (skin.place !== 'builtin') {
-          <span class="mine">my skin</span>
+          <span class="mine">uploaded by me</span>
         }
         <span class="skin-place" [title]="placeTitle(skin)">{{ placeWords(skin) }}</span>
       </label>
@@ -56,8 +42,6 @@
     </div>
   }
 </fieldset>
-
-
 
 <!-- folded away to begin with: the form is drawn only once it is opened -->
 <details class="add-section" [open]="adding()" (toggle)="toggled($any($event.target).open)">
@@ -102,6 +86,24 @@
   </div>
   }
 </details>
+
+<hr class="divider" />
+
+<!-- the authors' own skins: what they are, and how yours sits with them -->
+<h4 class="work-skins-heading">How to display creator/individual work skins</h4>
+<p class="hint about-work-skins">
+  Some authors also create their own skins for their works (for example, social media fics) - these
+  are called "work skins". Files with a work skin that you've downloaded will have a paintbrush icon
+  next to them.
+</p>
+<label class="check layer-skin">
+  <input type="checkbox" name="layerReadingSkin" [checked]="skins.layer()"
+         (change)="setLayer($any($event.target).checked)" />
+  <span>
+    Layer my reading skin under a work's own skin
+    <span class="hint layer-hint">The author's work skin wins where they disagree.</span>
+  </span>
+</label>
 
 @if (problem()) {
   <p class="error skin-problem">{{ problem() }}</p>

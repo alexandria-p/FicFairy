@@ -246,3 +246,16 @@
   font-size: 0.75rem;
   white-space: nowrap;
 }
+
+.divider {
+  margin: 16px 0 12px;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.work-skins-heading {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-strong);
+}

@@ -501,7 +501,7 @@ describe('ReadingSkinsSettings', () => {
   it('marks the skins you added as yours', async () => {
     localStorage.setItem(BROWSER_SKINS_KEY, JSON.stringify([{ name: 'Cosy', css: SKIN }]));
     const { element } = await make();
-    expect(element.querySelector('[data-skin="browser:Cosy"] .mine')?.textContent?.trim()).toBe('my skin');
+    expect(element.querySelector('[data-skin="browser:Cosy"] .mine')?.textContent?.trim()).toBe('uploaded by me');
     expect(element.querySelector('[data-skin="builtin:AO3"] .mine')).toBeNull();
   });
 
@@ -523,15 +523,17 @@ describe('ReadingSkinsSettings', () => {
     await fixture.whenStable();
 
     expect(element.querySelector('.skin-outcome')?.textContent).toContain('saved in your library');
-    expect(element.querySelector('[data-skin="library:Cosy"] .skin-place')?.textContent?.trim()).toBe('library');
+    expect(element.querySelector('[data-skin="library:Cosy"] .skin-place')?.textContent?.trim()).toBe('saved to my library');
     expect(picks(element)).toEqual(['', 'builtin:AO3', 'library:Cosy']);
     expect(element.querySelector('textarea[name=skinCss]')).toBeNull();
   });
 
-  it('offers layering ticked, first of the choices, with one line on what it does', async () => {
+  it('offers layering ticked, under the work skins heading below the divider, with one line on what it does', async () => {
     const { fixture, element } = await make();
-    const order = [...element.querySelectorAll('.layer-skin, .skin-list, .add-section')].map((x) => x.className.split(' ').pop());
-    expect(order).toEqual(['layer-skin', 'skin-list', 'add-section']);
+    const order = [...element.querySelectorAll('.layer-skin, .skin-list, .add-section, .divider, .work-skins-heading, .about-work-skins')]
+      .map((x) => x.className.split(' ').pop());
+    expect(order).toEqual(['skin-list', 'add-section', 'divider', 'work-skins-heading', 'about-work-skins', 'layer-skin']);
+    expect(element.querySelector('.work-skins-heading')?.textContent?.trim()).toBe('How to display creator/individual work skins');
     expect(element.querySelector('.add-heading')?.textContent?.trim()).toBe('Create or upload a new site skin');
     const box = element.querySelector<HTMLInputElement>('input[name=layerReadingSkin]')!;
     expect(box.checked).toBe(true);
