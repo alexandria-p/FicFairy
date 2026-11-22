@@ -333,7 +333,9 @@ describe('downloading or updating from the Works tab', () => {
     const buttons = [...actions.querySelectorAll(':scope > button')];
     expect(buttons[0].classList).toContain('skin-open');
     expect(buttons[1].classList).toContain('hide-toggle');
-    expect(buttons[0].getAttribute('title')).toBe('Open downloaded workskin');
+    expect(buttons[0].getAttribute('title')).toBe('Active work skin: AO3');
+    // a rainbow whichever skin it has
+    expect(buttons[0].classList).toContain('rainbow');
   });
 
   it('opens the saved work skin in a new tab', async () => {
@@ -406,8 +408,15 @@ describe('downloading or updating from the Works tab', () => {
     await settle();
 
     const brushes = [...element.querySelectorAll<HTMLButtonElement>('.entry-actions .skin-open')];
-    expect(brushes.map((b) => b.classList.contains('rainbow'))).toEqual([false, true]);
-    expect(brushes[1].getAttribute('title')).toBe('Two work skins - choose which to read with');
+    expect(brushes.map((b) => b.classList.contains('rainbow'))).toEqual([true, true]);
+    expect(brushes[0].getAttribute('title')).toBe('Active work skin: AO3');
+    expect(brushes[1].getAttribute('title')).toBe('Active work skin: user uploaded (click to choose)');
+    // AO3's chosen: the tooltip follows
+    library.workSkinChoices.set({ '12': 'ao3' });
+    await settle();
+    expect(brushes[1].getAttribute('title')).toBe('Active work skin: AO3 (click to choose)');
+    library.workSkinChoices.set({});
+    await settle();
     brushes[1].click();
     await settle();
 
@@ -463,7 +472,8 @@ describe('downloading or updating from the Works tab', () => {
     await settle();
 
     const brush = element.querySelector<HTMLButtonElement>('.entry-actions .skin-open')!;
-    expect(brush.getAttribute('title')).toBe('Open the work skin I uploaded');
+    expect(brush.getAttribute('title')).toBe('Active work skin: user uploaded');
+    expect(brush.classList).toContain('rainbow');
     brush.click();
     await settle();
 

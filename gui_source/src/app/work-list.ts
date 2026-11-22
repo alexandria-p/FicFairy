@@ -452,10 +452,11 @@ export class WorkList {
     return this.hasAo3Skin(work) && this.hasOwnSkin(work);
   }
 
-  /** what the brush says it does */
+  /** which skin a work opens with, on hover - and, with two, that a click chooses between them */
   protected skinTitle(work: Bookmark): string {
-    if (this.hasBothSkins(work)) return 'Two work skins - choose which to read with';
-    return this.hasAo3Skin(work) ? 'Open downloaded workskin' : 'Open the work skin I uploaded';
+    const active = this.hasBothSkins(work) ? this.skinSource(work) : this.hasAo3Skin(work) ? 'ao3' : 'mine';
+    const words = `Active work skin: ${active === 'ao3' ? 'AO3' : 'user uploaded'}`;
+    return this.hasBothSkins(work) ? `${words} (click to choose)` : words;
   }
 
   /** a work you can upload a skin of your own for: a work, in a library the page can write */

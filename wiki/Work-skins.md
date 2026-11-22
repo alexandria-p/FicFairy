@@ -36,16 +36,16 @@ Ticked, a run gets a skin in one of two ways:
 ## Fetching skins on their own
 
 - **Custom run > Just fetch work skins** - for works with HTML in your library: works *never checked for a skin* (the default), works *that already have a skin saved*, works *last known to have no skin*, or *all works*.
-- **Download work skin** - in a work's **⋯** menu, or on the selection bar for the works you've ticked. It opens a window of its own, **Download work skin** (or **Download work skins** for several), straight on the AO3 login - there is nothing else to choose. **Fetch work skins** starts it, and each work picked is checked again whatever is saved for it.
+- **Fetch work skin from AO3** in a work's **⋯** menu, or **Download work skin** on the selection bar for the works you've ticked. It opens a window of its own, **Download work skin** (or **Download work skins** for several), straight on the AO3 login - there is nothing else to choose. **Fetch work skins** starts it, and each work picked is checked again whatever is saved for it.
 
-A work with a skin saved shows a brush button on the Works tab, just left of the eye at the bottom of its entry. Hover says **Open downloaded workskin**; clicking it opens the saved CSS in a new tab.
+A work with a skin saved shows a rainbow brush button on the Works tab, just left of the eye at the bottom of its entry. Hovering says which skin is active - **AO3** or **user uploaded**. With one skin, clicking it opens that skin's CSS in a new tab.
 
-You can also give a work a skin of your own: in the work's **⋯** menu, choose **Upload my own work skin for this fic** and pick a `.css` file. It is kept beside the one from AO3, which is never replaced. Uploading again replaces only yours, and **Remove my own work skin** takes it away. A work with both skins has a rainbow brush. Clicking it - or **Toggle active work skin** in the work's **⋯** menu - lets you choose which skin is used when you read the work in FicFairy (**Original from AO3** or **Uploaded by me** - yours to begin with), and **Export** either one. The choice is saved in your library, so it is the same on every device.
+You can also give a work a skin of your own: in the work's **⋯** menu, choose **Upload my own work skin for this fic** and pick a `.css` file. It is kept beside the one from AO3, which is never replaced. Uploading again replaces only yours, and **Remove my own work skin** takes it away. With both skins, clicking the brush - or **Toggle active work skin** in the work's **⋯** menu - lets you choose which skin is used when you read the work in FicFairy (**Original from AO3** or **Uploaded by me** - yours to begin with), and **Export** either one. The choice is saved in your library, so it is the same on every device.
 
 ## Retrying
 
 - **A run with the box ticked** - any retry goes back for the skins its earlier attempt didn't get: the ones that failed and the ones still waiting when it stopped. They are read in **Fetch work skins for the HTML downloaded**, even though their HTML isn't downloaded again. This works for every run, *Download/update several fics* included - whichever way it is retried (from the top, carrying on, or just the fics it could not get). A page the retry reads anyway costs nothing extra.
-- **A skins-only run** (*Just fetch work skins*, or **Download work skin**) offers two ways: **From the top** fetches every work's skin again; **Just the skins it could not get** fetches only the ones that failed and the works it never reached. The second is offered first when there are any.
+- **A skins-only run** (*Just fetch work skins*, or **Fetch work skin from AO3**) offers two ways: **From the top** fetches every work's skin again; **Just the skins it could not get** fetches only the ones that failed and the works it never reached. The second is offered first when there are any.
 
 ## In History
 

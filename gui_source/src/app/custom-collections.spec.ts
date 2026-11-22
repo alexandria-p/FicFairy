@@ -425,7 +425,7 @@ describe('ticking works in the listing', () => {
     const menu = await openMenu(0);
     expect([...menu.querySelectorAll('button')].map((b) => b.textContent?.trim())).toEqual([
       'Hide',
-      'Download work skin',
+      'Fetch work skin from AO3',
       'Upload my own work skin for this fic',
       'Download/update latest now from AO3',
       'Mark as bookmark',
