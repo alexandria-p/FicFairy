@@ -452,7 +452,7 @@ describe('ReadingSkinsSettings', () => {
       'You can choose a default reading skin for FicFairy. It works like a "site skin" does on AO3. ' +
       'Your default skin and any work skins are applied to downloaded HTML files if you open them through FicFairy.');
     expect(element.querySelector('.no-styling')?.textContent?.trim()).toBe(
-      'HTML works are always downloaded from AO3 with no styling.');
+      'HTML works are always downloaded from AO3 with no styling. Works downloaded from FicHub may look different to AO3.');
     expect(element.querySelector('details.how-it-works')).toBeNull();
     const said = element.textContent?.replace(/\s+/g, ' ') ?? '';
     expect(said).toContain('paintbrush icon');
