@@ -16,10 +16,16 @@
      FicFairy, so there is always one to pick -->
 <fieldset class="skin-list">
   <legend>Active site skin</legend>
-  <label class="skin none-skin" [class.active]="!skins.defaultSkin()">
-    <input type="radio" name="defaultReadingSkin" value="" [checked]="!skins.defaultSkin()" (change)="setDefault('')" />
-    <span class="skin-name">None</span>
-  </label>
+  <div class="skin none-skin" [class.active]="!skins.defaultSkin()">
+    <label class="skin-pick">
+      <input type="radio" name="defaultReadingSkin" value="" [checked]="!skins.defaultSkin()" (change)="setDefault('')" />
+      <span class="skin-name">None</span>
+    </label>
+    <span class="skin-actions">
+      <!-- the work as it is downloaded, with no skin at all -->
+      <button type="button" class="button subtle small preview-skin" (click)="preview('')">Preview</button>
+    </span>
+  </div>
   @for (skin of skins.skins(); track id(skin)) {
     <div class="skin" [attr.data-skin]="id(skin)" [class.active]="skins.defaultId() === id(skin)">
       <label class="skin-pick">
@@ -35,6 +41,7 @@
         <button type="button" class="button subtle small preview-skin" (click)="preview(skin.css)">Preview</button>
         <!-- one that comes with FicFairy is always there to choose -->
         @if (skin.place !== 'builtin') {
+          <button type="button" class="button subtle small export-skin" (click)="exportSkin(skin)">Export</button>
           <button type="button" class="button subtle small remove-skin" (click)="remove(skin)">
             {{ confirmingRemove() === id(skin) ? 'Click again to remove' : 'Remove' }}
           </button>

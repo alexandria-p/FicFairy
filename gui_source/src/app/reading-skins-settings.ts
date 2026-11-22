@@ -129,6 +129,19 @@ export class ReadingSkinsSettings {
     this.adding.set(false);
   }
 
+  /**
+   * Your own skin's CSS, as text in a tab of its own - opened at once, as View index history and
+   * the saved work skins are, so the browser shows it rather than offering to save it
+   */
+  protected exportSkin(skin: ReadingSkin): void {
+    const tab = window.open('', '_blank');
+    if (!tab) return;
+    tab.opener = null;
+    const url = URL.createObjectURL(new Blob([skin.css], { type: 'text/plain' }));
+    tab.location.href = url;
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }
+
   protected async remove(skin: ReadingSkin): Promise<void> {
     if (this.confirmingRemove() !== skinId(skin)) {
       this.confirmingRemove.set(skinId(skin));

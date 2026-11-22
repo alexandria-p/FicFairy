@@ -504,6 +504,45 @@ describe('ReadingSkinsSettings', () => {
     const { element } = await make();
     expect(element.querySelector('[data-skin="browser:Cosy"] .mine')?.textContent?.trim()).toBe('uploaded by me');
     expect(element.querySelector('[data-skin="builtin:AO3"] .mine')).toBeNull();
+    // only your own can be exported
+    expect(element.querySelector('[data-skin="browser:Cosy"] .export-skin')).not.toBeNull();
+    expect(element.querySelector('[data-skin="builtin:AO3"] .export-skin')).toBeNull();
+  });
+
+  it('exports your own skin as its CSS in a tab of its own', async () => {
+    localStorage.setItem(BROWSER_SKINS_KEY, JSON.stringify([{ name: 'Cosy', css: SKIN }]));
+    const tab = { opener: {}, location: { href: '' } };
+    const open = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+    const made = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:css');
+    try {
+      const { element } = await make();
+      element.querySelector<HTMLButtonElement>('[data-skin="browser:Cosy"] .export-skin')!.click();
+      expect(tab.opener).toBeNull();
+      expect(tab.location.href).toBe('blob:css');
+      const blob = made.mock.calls[0][0] as Blob;
+      expect(blob.type).toContain('text/plain');
+      expect(await blob.text()).toBe(SKIN);
+    } finally {
+      open.mockRestore();
+      made.mockRestore();
+    }
+  });
+
+  it('previews None as the work is downloaded, with no skin', { timeout: 30_000 }, async () => {
+    const tab = { opener: {}, location: { href: '' } };
+    const open = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+    const made = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:none');
+    try {
+      const { element } = await make();
+      element.querySelector<HTMLButtonElement>('.none-skin .preview-skin')!.click();
+      await vi.waitFor(() => expect(tab.location.href).not.toBe(''), { timeout: 20_000, interval: 20 });
+      const html = await (made.mock.calls[0][0] as Blob).text();
+      expect(html).toContain('Spooky Scary Skeletons');
+      expect(html).not.toContain('id="workskin"');
+    } finally {
+      open.mockRestore();
+      made.mockRestore();
+    }
   });
 
   it('saves a pasted skin where chosen, folds the form, and offers it as the default', async () => {

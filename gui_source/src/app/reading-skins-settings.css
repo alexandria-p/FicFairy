@@ -44,18 +44,13 @@
   border-top: 1px solid var(--border);
 }
 
-.skin-pick,
-.none-skin {
+.skin-pick {
   display: flex;
   align-items: center;
   gap: 8px;
   flex: 1 1 auto;
   min-width: 0;
   cursor: pointer;
-}
-
-.none-skin {
-  padding: 6px 10px;
 }
 
 /* the active skin's whole row */
