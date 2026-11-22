@@ -588,6 +588,11 @@ describe('ReadingSkinsSettings', () => {
     expect(element.querySelector('.skin-outcome')).toBeNull();
   });
 
+  it('shows the paintbrush a work with a skin has, where work skins are explained', async () => {
+    const { element } = await make();
+    expect(element.querySelector('.about-work-skins .brush-icon svg')).toBeTruthy();
+  });
+
   it('has one Preview for the work-skin choice', async () => {
     const { element } = await make();
     expect(element.querySelectorAll('.layer-skin button')).toHaveLength(1);

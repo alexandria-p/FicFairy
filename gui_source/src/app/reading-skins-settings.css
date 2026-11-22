@@ -315,3 +315,15 @@
   font-weight: 600;
   color: var(--text-strong);
 }
+
+/* the paintbrush the Works tab shows beside a work with a skin, drawn as it is there */
+.brush-icon {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 2px 0 6px;
+  padding: 2px 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  color: var(--text-strong);
+  vertical-align: middle;
+}
