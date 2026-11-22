@@ -4,7 +4,7 @@ import { LOOSE_PREFIX } from './unindexed-works';
 import { Component, computed, inject, input, linkedSignal, signal } from '@angular/core';
 import { WorkLink } from './work-link';
 import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
-import { Library, LocalCopy, OPENABLE_FORMATS, OpenableFormat, copyName, hiddenKey, viewableInBrowser } from './library';
+import { Library, LocalCopy, OPENABLE_FORMATS, OpenableFormat, WorkSkinSource, copyName, hiddenKey, viewableInBrowser } from './library';
 import { safeGet, safeSet } from './storage';
 import { Jobs } from './jobs';
 import { Collection, isCustomCollection } from './collections';
@@ -433,7 +433,105 @@ export class WorkList {
 
   /** whether a work skin is saved for this entry's work - shown as an icon in its corner */
   protected hasSkin(work: Bookmark): boolean {
+    return this.hasAo3Skin(work) || this.hasOwnSkin(work);
+  }
+
+  private hasAo3Skin(work: Bookmark): boolean {
     return !!work.id && this.library.skinnedWorks().has(work.id);
+  }
+
+  /** a work skin you uploaded for it (`skins/<n>_submittedbyuser.css`) */
+  protected hasOwnSkin(work: Bookmark): boolean {
+    return !!work.id && this.library.userSkinnedWorks().has(work.id);
+  }
+
+  /** both AO3's skin and yours: the brush is a rainbow, and opens a window to choose between them */
+  protected hasBothSkins(work: Bookmark): boolean {
+    return this.hasAo3Skin(work) && this.hasOwnSkin(work);
+  }
+
+  /** what the brush says it does */
+  protected skinTitle(work: Bookmark): string {
+    if (this.hasBothSkins(work)) return 'Two work skins - choose which to read with';
+    return this.hasAo3Skin(work) ? 'Open downloaded workskin' : 'Open the work skin I uploaded';
+  }
+
+  /** a work you can upload a skin of your own for: a work, in a library the page can write */
+  protected canUploadSkin(work: Bookmark): boolean {
+    return this.canSelect() && !work.error && this.worksToFetch(work).length > 0;
+  }
+
+  protected readonly skinSources: { value: WorkSkinSource; label: string }[] = [
+    { value: 'ao3', label: 'Original from AO3' },
+    { value: 'mine', label: 'Uploaded by me' },
+  ];
+
+  /** the work whose skins the chooser window is open on, or null */
+  protected readonly skinChooser = signal<Bookmark | null>(null);
+  /** what the last upload, removal or choice of a work skin did, or why it could not */
+  protected readonly skinNote = signal('');
+  protected readonly skinProblem = signal('');
+
+  /** pick a .css file and save it as this work's own skin, over any you uploaded before */
+  protected uploadSkin(work: Bookmark): void {
+    this.menuFor.set(null);
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.css,text/css';
+    input.addEventListener('change', () => {
+      const file = input.files?.[0];
+      if (file) void this.saveSkinFile(work, file);
+    });
+    input.click();
+  }
+
+  /** save a chosen file as a work's own skin, saying how it went */
+  protected async saveSkinFile(work: Bookmark, file: Blob): Promise<void> {
+    if (!work.id) return;
+    this.skinNote.set('');
+    this.skinProblem.set('');
+    const replaced = this.hasOwnSkin(work);
+    try {
+      await this.library.saveUserSkin(work.id, await file.text());
+      this.skinNote.set(`${replaced ? 'Replaced the work skin you uploaded' : 'Saved your work skin'} for ${work.title || work.id}.`);
+      this.visit.note(`Upload my own work skin: ${replaced ? 'replaced the one uploaded before' : 'saved'}`);
+    } catch (error) {
+      const said = error instanceof Error ? error.message : String(error);
+      this.skinProblem.set(said);
+      this.visit.note(`Upload my own work skin: not saved (${said})`);
+    }
+  }
+
+  /** take away the work skin you uploaded for a work */
+  protected async removeOwnSkin(work: Bookmark): Promise<void> {
+    this.menuFor.set(null);
+    if (!work.id) return;
+    this.skinNote.set('');
+    this.skinProblem.set('');
+    try {
+      await this.library.removeUserSkin(work.id);
+      if (this.skinChooser() === work) this.skinChooser.set(null);
+      this.skinNote.set(`Removed the work skin you uploaded for ${work.title || work.id}.`);
+      this.visit.note('Remove my uploaded work skin: removed');
+    } catch (error) {
+      this.skinProblem.set(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  /** which of a work's two skins it is read with */
+  protected skinSource(work: Bookmark): WorkSkinSource {
+    return work.id ? this.library.skinSourceFor(work.id) : 'mine';
+  }
+
+  protected async chooseSkin(work: Bookmark, source: WorkSkinSource): Promise<void> {
+    if (!work.id) return;
+    this.skinProblem.set('');
+    try {
+      await this.library.chooseWorkSkin(work.id, source);
+      this.visit.note(`Choose a work skin: ${source === 'ao3' ? 'original from AO3' : 'uploaded by me'}`);
+    } catch (error) {
+      this.skinProblem.set(error instanceof Error ? error.message : String(error));
+    }
   }
 
   /** the ticked works whose skins can be fetched - works only, as for downloading */
@@ -1040,13 +1138,20 @@ export class WorkList {
    * The work skin saved for it (`skins/<work number>.css`), as text in a tab of its own - opened at
    * once, as View index history is, since a tab opened after waiting is blocked as a pop-up.
    */
-  protected async openSkin(work: Bookmark): Promise<void> {
+  protected async openSkin(work: Bookmark, source?: WorkSkinSource): Promise<void> {
+    // with two to choose from, the brush opens the window that chooses between them
+    if (!source && this.hasBothSkins(work)) {
+      this.skinChooser.set(work);
+      this.visit.note('Work skins window opened');
+      return;
+    }
+    const which: WorkSkinSource = source ?? (this.hasAo3Skin(work) ? 'ao3' : 'mine');
     const tab = window.open('', '_blank');
     if (!tab) return;
     tab.opener = null;
     let css: string | null = null;
     try {
-      css = work.id ? await this.library.skinText(work.id) : null;
+      css = work.id ? await this.library.skinText(work.id, which) : null;
     } catch {
       css = null;
     }

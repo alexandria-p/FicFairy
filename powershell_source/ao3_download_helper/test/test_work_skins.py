@@ -924,3 +924,22 @@ def test_a_skins_only_run_keeps_the_works_it_never_reached_with_the_run(tmp_path
     assert ao3.skins_pending == ['2']
 
 # endregion
+
+
+# region a skin uploaded in the page
+
+def test_a_skin_uploaded_in_the_page_is_never_taken_for_one_a_run_saved(tmp_path):
+    skins = tmp_path / strings.SKINS_FOLDER_NAME
+    skins.mkdir()
+    (skins / '12.css').write_text('#workskin p { color: red; }')
+    (skins / '12_submittedbyuser.css').write_text('#workskin p { color: blue; }')
+    (skins / '34_submittedbyuser.css').write_text('#workskin p { color: green; }')
+    (skins / 'work-skin-choices.json').write_text('{"12": "ao3"}')
+    fileops = MagicMock()
+    fileops.downloadfolder = str(tmp_path)
+    fileops.list_files = lambda folder: os.listdir(folder)
+    # work 34 has only an uploaded skin: a run fetching skins still counts it as never checked
+    assert server.saved_skin_states(fileops) == {'12': 'css'}
+    assert server.skin_scope_takes('unchecked', server.saved_skin_states(fileops).get('34'))
+
+# endregion

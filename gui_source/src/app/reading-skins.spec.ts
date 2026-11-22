@@ -378,6 +378,80 @@ describe('ReadingSkins', () => {
     expect(await file.text()).toBe(DOWNLOADED);
   });
 
+  it('keeps a work skin you upload beside the one fetched from AO3, and replaces only yours', async () => {
+    const store = new MemoryStore();
+    await store.write('skins/1.css', new Response('#workskin p { color: red; }'));
+    const { library } = setUp(store);
+
+    await library.saveUserSkin('1', '#workskin p { color: blue; }');
+    await library.saveUserSkin('1', '#workskin p { color: green; }');
+
+    expect(await store.read('skins/1.css')).toBe('#workskin p { color: red; }');
+    expect(await store.read('skins/1_submittedbyuser.css')).toBe('#workskin p { color: green; }');
+    expect([...library.userSkinnedWorks()]).toEqual(['1']);
+  });
+
+  it('refuses a work skin with no css, or one that would close its style', async () => {
+    const store = new MemoryStore();
+    const { library } = setUp(store);
+
+    await expect(library.saveUserSkin('1', '  ')).rejects.toThrow('no CSS');
+    await expect(library.saveUserSkin('1', 'p {} </style><script>')).rejects.toThrow('</style');
+    expect(await store.list('skins', false)).toEqual([]);
+  });
+
+  it('knows which works have a skin you uploaded, and which of two each is read with', async () => {
+    const store = new MemoryStore();
+    await store.write('skins/1.css', new Response('#workskin p {}'));
+    await store.write('skins/1_submittedbyuser.css', new Response('#workskin p {}'));
+    await store.write('skins/2_submittedbyuser.css', new Response('#workskin p {}'));
+    await store.write('skins/work-skin-choices.json', new Response('{"1": "ao3", "x": "mine", "2": "bogus"}'));
+    const { library } = setUp(store);
+
+    library.lastRead.set({ store, at: Date.now() });
+    TestBed.tick();
+    await settle();
+
+    expect([...library.skinnedWorks()]).toEqual(['1']);
+    expect([...library.userSkinnedWorks()].sort()).toEqual(['1', '2']);
+    expect(library.workSkinChoices()).toEqual({ '1': 'ao3' });
+  });
+
+  it('reads a work with both skins with yours, until AO3s is chosen - for every device', async () => {
+    const store = new MemoryStore();
+    await store.write('skins/1.css', new Response('#workskin .from-ao3 { color: red; }'));
+    await store.write('skins/1_submittedbyuser.css', new Response('#workskin .mine { color: blue; }'));
+    const { library } = setUp(store);
+    const file = () => new File([DOWNLOADED], '1 A Work - Writer 2025-01-01.html', { type: 'text/html' });
+
+    let shown = await opened(library, file());
+    expect(shown).toContain('.mine');
+    expect(shown).not.toContain('.from-ao3');
+
+    await library.chooseWorkSkin('1', 'ao3');
+    shown = await opened(library, file());
+    expect(shown).toContain('.from-ao3');
+    expect(shown).not.toContain('.mine');
+    expect(JSON.parse((await store.read('skins/work-skin-choices.json'))!)).toEqual({ '1': 'ao3' });
+  });
+
+  it('forgets the choice and reads with AO3s skin again once yours is removed', async () => {
+    const store = new MemoryStore();
+    await store.write('skins/1.css', new Response('#workskin .from-ao3 { color: red; }'));
+    const { library } = setUp(store);
+    await library.saveUserSkin('1', '#workskin .mine { color: blue; }');
+    await library.chooseWorkSkin('1', 'mine');
+    await library.chooseWorkSkin('1', 'ao3');
+
+    await library.removeUserSkin('1');
+
+    expect(await store.read('skins/1_submittedbyuser.css')).toBeNull();
+    expect(library.userSkinnedWorks().size).toBe(0);
+    expect(library.workSkinChoices()).toEqual({});
+    expect(await opened(library, new File([DOWNLOADED], '1 A Work - Writer 2025-01-01.html', { type: 'text/html' })))
+      .toContain('.from-ao3');
+  });
+
   it('knows which works have a skin saved, and not those noted as having none', async () => {
     const store = new MemoryStore();
     await store.write('skins/1.css', new Response('#workskin p {}'));

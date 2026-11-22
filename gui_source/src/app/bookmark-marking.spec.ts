@@ -358,6 +358,89 @@ describe('downloading or updating from the Works tab', () => {
     made.mockRestore();
   });
 
+  it('offers to upload a work skin of your own from a work menu, and to replace or remove it after', async () => {
+    await listing([work('11')]);
+    let menu = await menuOf('Work 11');
+    expect(menu.querySelector('button.upload-skin')?.textContent?.trim()).toBe('Upload my own work skin for this fic');
+    expect(menu.querySelector('button.remove-own-skin')).toBeNull();
+
+    // the menu is still open: it shows what is saved as soon as it changes
+    TestBed.inject(Library).userSkinnedWorks.set(new Set(['11']));
+    await settle();
+    menu = element.querySelector('.entry-menu-items') as HTMLElement;
+    expect(menu.querySelector('button.upload-skin')?.textContent?.trim()).toBe('Replace my own work skin for this fic');
+    expect(menu.querySelector('button.remove-own-skin')).toBeTruthy();
+  });
+
+  it('offers no work skin upload for a series or an external work', async () => {
+    await listing([series, external]);
+    expect((await menuOf('Work 500')).querySelector('button.upload-skin')).toBeNull();
+    expect((await menuOf('Work 600')).querySelector('button.upload-skin')).toBeNull();
+  });
+
+  it('shows a rainbow brush for a work with two skins, which opens a window to choose and export them', async () => {
+    await listing([work('11'), work('12')]);
+    const library = TestBed.inject(Library);
+    library.skinnedWorks.set(new Set(['11', '12']));
+    library.userSkinnedWorks.set(new Set(['12']));
+    const chosen: [string, string][] = [];
+    library.chooseWorkSkin = async (id: string, source: 'ao3' | 'mine') => { chosen.push([id, source]); };
+    const asked: [string, string][] = [];
+    library.skinText = async (id: string, source: 'ao3' | 'mine' = 'ao3') => { asked.push([id, source]); return 'p {}'; };
+    const tab = { opener: {}, location: { href: '' }, document: { title: '', body: { textContent: '' } } };
+    const open = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+    const made = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:skin');
+    await settle();
+
+    const brushes = [...element.querySelectorAll<HTMLButtonElement>('.entry-actions .skin-open')];
+    expect(brushes.map((b) => b.classList.contains('rainbow'))).toEqual([false, true]);
+    expect(brushes[1].getAttribute('title')).toBe('Two work skins - choose which to read with');
+    brushes[1].click();
+    await settle();
+
+    const dialog = element.querySelector('.skin-chooser')!;
+    expect(dialog.querySelector('h2')?.textContent).toContain('Work 12');
+    expect(open).not.toHaveBeenCalled();
+    const radios = [...dialog.querySelectorAll<HTMLInputElement>('input[name=workSkinSource]')];
+    expect(radios.map((r) => r.closest('label')?.textContent?.trim())).toEqual(['Original from AO3', 'Uploaded by me']);
+    // yours, until AO3's is chosen
+    expect(radios.map((r) => r.checked)).toEqual([false, true]);
+    radios[0].click();
+    await settle();
+    expect(chosen).toEqual([['12', 'ao3']]);
+
+    const exports = [...dialog.querySelectorAll<HTMLButtonElement>('.export-work-skin')];
+    expect(exports).toHaveLength(2);
+    exports[1].click();
+    await settle();
+    expect(asked).toEqual([['12', 'mine']]);
+    expect(tab.location.href).toBe('blob:skin');
+    open.mockRestore();
+    made.mockRestore();
+  });
+
+  it('opens a skin you uploaded straight away when it is the only one', async () => {
+    await listing([work('12')]);
+    const library = TestBed.inject(Library);
+    library.userSkinnedWorks.set(new Set(['12']));
+    const asked: [string, string][] = [];
+    library.skinText = async (id: string, source: 'ao3' | 'mine' = 'ao3') => { asked.push([id, source]); return 'p {}'; };
+    const tab = { opener: {}, location: { href: '' }, document: { title: '', body: { textContent: '' } } };
+    const open = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+    const made = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:skin');
+    await settle();
+
+    const brush = element.querySelector<HTMLButtonElement>('.entry-actions .skin-open')!;
+    expect(brush.getAttribute('title')).toBe('Open the work skin I uploaded');
+    brush.click();
+    await settle();
+
+    expect(element.querySelector('.skin-chooser')).toBeNull();
+    expect(asked).toEqual([['12', 'mine']]);
+    open.mockRestore();
+    made.mockRestore();
+  });
+
   it('offers no download/update item for a series or an external work', async () => {
     await listing([series, external]);
     expect((await menuOf('Work 500')).querySelector('button.fetch-now')).toBeNull();
