@@ -40,7 +40,7 @@ Ticked, a run gets a skin in one of two ways:
 
 A work with a skin saved shows a brush button on the Works tab, just left of the eye at the bottom of its entry. Hover says **Open downloaded workskin**; clicking it opens the saved CSS in a new tab.
 
-You can also give a work a skin of your own: in the work's **⋯** menu, choose **Upload my own work skin for this fic** and pick a `.css` file. It is kept beside the one from AO3, which is never replaced. Uploading again replaces only yours, and **Remove my own work skin** takes it away. A work with both skins has a rainbow brush. Clicking it lets you choose which skin is used when you read the work in FicFairy (**Original from AO3** or **Uploaded by me** - yours to begin with), and **Export** either one. The choice is saved in your library, so it is the same on every device.
+You can also give a work a skin of your own: in the work's **⋯** menu, choose **Upload my own work skin for this fic** and pick a `.css` file. It is kept beside the one from AO3, which is never replaced. Uploading again replaces only yours, and **Remove my own work skin** takes it away. A work with both skins has a rainbow brush. Clicking it - or **Toggle active work skin** in the work's **⋯** menu - lets you choose which skin is used when you read the work in FicFairy (**Original from AO3** or **Uploaded by me** - yours to begin with), and **Export** either one. The choice is saved in your library, so it is the same on every device.
 
 ## Retrying
 

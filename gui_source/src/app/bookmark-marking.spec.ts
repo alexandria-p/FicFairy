@@ -419,6 +419,25 @@ describe('downloading or updating from the Works tab', () => {
     made.mockRestore();
   });
 
+  it('offers Toggle active work skin in the menu of a work with two skins, opening the same window', async () => {
+    await listing([work('11'), work('12')]);
+    const library = TestBed.inject(Library);
+    library.skinnedWorks.set(new Set(['11', '12']));
+    library.userSkinnedWorks.set(new Set(['12']));
+    await settle();
+
+    expect((await menuOf('Work 11')).querySelector('button.toggle-skin')).toBeNull();
+    // the first menu is shut by opening the second
+    const menu = await menuOf('Work 12');
+    const toggle = menu.querySelector<HTMLButtonElement>('button.toggle-skin')!;
+    expect(toggle.textContent?.trim()).toBe('Toggle active work skin');
+    toggle.click();
+    await settle();
+
+    expect(element.querySelector('.skin-chooser h2')?.textContent).toContain('Work 12');
+    expect(element.querySelector('.entry-menu-items')).toBeNull();
+  });
+
   it('opens a skin you uploaded straight away when it is the only one', async () => {
     await listing([work('12')]);
     const library = TestBed.inject(Library);

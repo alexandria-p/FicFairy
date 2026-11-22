@@ -518,6 +518,13 @@ export class WorkList {
     }
   }
 
+  /** open the window that chooses between a work's two skins, from its ⋯ menu */
+  protected chooseSkinFromMenu(work: Bookmark): void {
+    this.menuFor.set(null);
+    this.skinChooser.set(work);
+    this.visit.note('Work skins window opened from the menu');
+  }
+
   /** which of a work's two skins it is read with */
   protected skinSource(work: Bookmark): WorkSkinSource {
     return work.id ? this.library.skinSourceFor(work.id) : 'mine';

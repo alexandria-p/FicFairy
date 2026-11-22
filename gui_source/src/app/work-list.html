@@ -793,6 +793,14 @@
                     </button>
                   </li>
                 }
+                <!-- with AO3's skin and yours: the window the rainbow brush opens -->
+                @if (hasBothSkins(work)) {
+                  <li role="none">
+                    <button type="button" role="menuitem" class="toggle-skin" (click)="chooseSkinFromMenu(work)">
+                      Toggle active work skin
+                    </button>
+                  </li>
+                }
                 <!-- a skin of your own, kept beside AO3's: never written over by a run -->
                 @if (canUploadSkin(work)) {
                   <li role="none">
