@@ -436,13 +436,15 @@ export class WorkList {
     return this.hasAo3Skin(work) || this.hasOwnSkin(work);
   }
 
+  // a skin is a work's: `skins/` is named by work number, and a series or an external work numbered
+  // the same as a work with a skin must not take that work's brush or its skin items
   private hasAo3Skin(work: Bookmark): boolean {
-    return !!work.id && this.library.skinnedWorks().has(work.id);
+    return this.worksToFetch(work).length > 0 && this.library.skinnedWorks().has(work.id!);
   }
 
   /** a work skin you uploaded for it (`skins/<n>_submittedbyuser.css`) */
   protected hasOwnSkin(work: Bookmark): boolean {
-    return !!work.id && this.library.userSkinnedWorks().has(work.id);
+    return this.worksToFetch(work).length > 0 && this.library.userSkinnedWorks().has(work.id!);
   }
 
   /** both AO3's skin and yours: the brush is a rainbow, and opens a window to choose between them */

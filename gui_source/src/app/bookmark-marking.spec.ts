@@ -372,10 +372,23 @@ describe('downloading or updating from the Works tab', () => {
     expect(menu.querySelector('button.remove-own-skin')).toBeTruthy();
   });
 
-  it('offers no work skin upload for a series or an external work', async () => {
+  it('offers no work skin upload, replace, remove or toggle on a series bookmark or an external work', async () => {
     await listing([series, external]);
-    expect((await menuOf('Work 500')).querySelector('button.upload-skin')).toBeNull();
-    expect((await menuOf('Work 600')).querySelector('button.upload-skin')).toBeNull();
+    // a work numbered the same as each, with both skins: none of it is theirs
+    const library = TestBed.inject(Library);
+    library.skinnedWorks.set(new Set(['500', '600']));
+    library.userSkinnedWorks.set(new Set(['500', '600']));
+    await settle();
+
+    expect(element.querySelector('.entry-actions .skin-open')).toBeNull();
+    for (const title of ['Work 500', 'Work 600']) {
+      const menu = await menuOf(title);
+      for (const item of ['upload-skin', 'remove-own-skin', 'toggle-skin']) {
+        expect(menu.querySelector(`button.${item}`)).toBeNull();
+      }
+      // shut it again before the next
+      await menuOf(title);
+    }
   });
 
   it('shows a rainbow brush for a work with two skins, which opens a window to choose and export them', async () => {

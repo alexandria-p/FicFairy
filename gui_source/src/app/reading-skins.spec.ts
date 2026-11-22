@@ -583,7 +583,8 @@ describe('ReadingSkinsSettings', () => {
     expect(element.querySelector('[data-skin="builtin:AO3"] .export-skin')).toBeNull();
   });
 
-  it('exports your own skin as its CSS in a tab of its own', async () => {
+  // the component takes a while to set up while the whole suite runs, as the previews' tests do
+  it('exports your own skin as its CSS in a tab of its own', { timeout: 30_000 }, async () => {
     localStorage.setItem(BROWSER_SKINS_KEY, JSON.stringify([{ name: 'Cosy', css: SKIN }]));
     const tab = { opener: {}, location: { href: '' } };
     const open = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
