@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { BUILT_IN_SKINS, ReadingSkin, ReadingSkins, skinId } from './reading-skins';
-import { SAMPLE_WORK_SKIN, skinSampleWork } from './skin-sample';
+import { SAMPLE_CHAT, SAMPLE_WORK_SKIN, skinSampleWork } from './skin-sample';
 import { shownWork, withReadingSkin, withSavedSkin } from './skin-html';
 
 /**
@@ -88,7 +88,7 @@ export class ReadingSkinsSettings {
     const tab = this.openTab();
     if (!tab) return;
     const site = this.skins.defaultSkin()?.css ?? BUILT_IN_SKINS[0].css;
-    this.show(tab, shownWork(withSavedSkin(await skinSampleWork(), SAMPLE_WORK_SKIN), site, layer));
+    this.show(tab, shownWork(withSavedSkin(await skinSampleWork(SAMPLE_CHAT), SAMPLE_WORK_SKIN), site, layer));
   }
 
   /** a tab opened at once - one opened after waiting is blocked as a pop-up - and filled after */

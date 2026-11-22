@@ -707,7 +707,9 @@ describe('ReadingSkinsSettings', () => {
         await vi.waitFor(() => expect(tab.location.href).not.toBe(''), { timeout: 20_000, interval: 20 });
         const html = await (made.mock.calls[0][0] as Blob).text();
         expect(html).toContain('id="workskin"');
-        expect(html).toContain('border-radius: 1.2em');
+        // the chat-app work skin, and the chat it styles
+        expect(html).toContain('#workskin .whatsapp .topbar');
+        expect(html).toContain('<div class="whatsapp light">');
         // no site skin is active, so AO3's stands in
         expect(html.includes('AO3 - comes with FicFairy')).toBe(layered);
       } finally {
