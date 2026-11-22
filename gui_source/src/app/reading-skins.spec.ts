@@ -446,16 +446,17 @@ describe('ReadingSkinsSettings', () => {
   const picks = (element: HTMLElement) =>
     [...element.querySelectorAll<HTMLInputElement>('input[name=defaultReadingSkin]')].map((x) => x.value);
 
-  it('says what a reading skin is, and what a work skin is, with nothing folded away', async () => {
+  it('says what a reading skin is, with the hint that AO3 downloads come unstyled', async () => {
     const { element } = await make();
     expect(element.querySelector('.intro')?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
-      'Operates like a site skin on AO3. Will be applied to downloaded HTML files that you open through FicFairy.');
+      'You can choose a default reading skin for FicFairy. It works like a "site skin" does on AO3. ' +
+      'Your default skin and any work skins are applied to downloaded HTML files if you open them through FicFairy.');
+    expect(element.querySelector('.no-styling')?.textContent?.trim()).toBe(
+      'Hint: HTML works are always downloaded from AO3 with no styling.');
     expect(element.querySelector('details.how-it-works')).toBeNull();
     const said = element.textContent?.replace(/\s+/g, ' ') ?? '';
     expect(said).toContain('paintbrush icon');
-    expect(said).toContain('Skins will only be applied to HTML files that you open through FicFairy.');
-    expect(said).not.toContain('without any site or work skins');
-    expect(said).not.toContain('To make them look nicer');
+    expect(said).not.toContain('Skins will only be applied');
   });
 
   it('lists None, AO3 and your skins as the choices of the active site skin, AO3 never removable', async () => {
@@ -544,7 +545,7 @@ describe('ReadingSkinsSettings', () => {
     expect(TestBed.inject(ReadingSkins).layer()).toBe(false);
   });
 
-  it('previews a skin on a made-up work in a tab of its own, saving nothing', async () => {
+  it('previews a skin on a made-up work in a tab of its own, saving nothing', { timeout: 30_000 }, async () => {
     const tab = { opener: {}, location: { href: '' } };
     const open = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
     const made = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:preview');
@@ -552,7 +553,8 @@ describe('ReadingSkinsSettings', () => {
       const { element } = await make();
       element.querySelector<HTMLButtonElement>('[data-skin="builtin:AO3"] .preview-skin')!.click();
       expect(open).toHaveBeenCalledWith('', '_blank');
-      for (let i = 0; i < 500 && !tab.location.href; i++) await new Promise((r) => setTimeout(r, 10));
+      // the sample library is read only now, which is slow while the whole suite runs
+      await vi.waitFor(() => expect(tab.location.href).not.toBe(''), { timeout: 20_000, interval: 20 });
       expect(tab.opener).toBeNull();
       expect(tab.location.href).toBe('blob:preview');
       const html = await (made.mock.calls[0][0] as Blob).text();
