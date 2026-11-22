@@ -1289,19 +1289,6 @@ export class Library {
     this.userSkinnedWorks.update((ids) => new Set(ids).add(id));
   }
 
-  /** take away the work skin you uploaded for a work; AO3's, if it has one, is read with again */
-  async removeUserSkin(id: string): Promise<void> {
-    const store = this.store();
-    if (!store) throw new Error('this library can only be read, so nothing can be removed from it');
-    await store.delete(skinPath(id, 'mine'));
-    this.userSkinnedWorks.update((ids) => {
-      const left = new Set(ids);
-      left.delete(id);
-      return left;
-    });
-    if (id in this.workSkinChoices()) await this.writeSkinChoices(store, without(this.workSkinChoices(), id));
-  }
-
   /** read a work with both skins with this one from now on, on every device */
   async chooseWorkSkin(id: string, source: WorkSkinSource): Promise<void> {
     const store = this.store();
@@ -1740,10 +1727,4 @@ function newestIndexed(works: Bookmark[]): string | undefined {
 /** where a work's skin is kept: AO3's under its number, yours with `USER_SKIN_SUFFIX` */
 function skinPath(id: string, source: WorkSkinSource): string {
   return `${SKINS_FOLDER}/${id}${source === 'mine' ? USER_SKIN_SUFFIX : ''}.css`;
-}
-
-function without<T>(record: Record<string, T>, key: string): Record<string, T> {
-  const copy = { ...record };
-  delete copy[key];
-  return copy;
 }

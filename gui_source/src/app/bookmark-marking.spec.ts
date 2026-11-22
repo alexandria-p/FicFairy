@@ -360,7 +360,7 @@ describe('downloading or updating from the Works tab', () => {
     made.mockRestore();
   });
 
-  it('offers to upload a work skin of your own from a work menu, and to replace or remove it after', async () => {
+  it('offers to upload a work skin of your own from a work menu, and to replace it after - never to remove it', async () => {
     await listing([work('11')]);
     let menu = await menuOf('Work 11');
     expect(menu.querySelector('button.upload-skin')?.textContent?.trim()).toBe('Upload my own work skin for this fic');
@@ -371,7 +371,7 @@ describe('downloading or updating from the Works tab', () => {
     await settle();
     menu = element.querySelector('.entry-menu-items') as HTMLElement;
     expect(menu.querySelector('button.upload-skin')?.textContent?.trim()).toBe('Replace my own work skin for this fic');
-    expect(menu.querySelector('button.remove-own-skin')).toBeTruthy();
+    expect(menu.querySelector('button.remove-own-skin')).toBeNull();
   });
 
   it('keeps every work skin item together at the foot of the menu, with only View index history below', async () => {
@@ -382,7 +382,7 @@ describe('downloading or updating from the Works tab', () => {
     await settle();
 
     const items = [...(await menuOf('Work 12')).querySelectorAll('button')].map((b) => b.className.split(' ')[0]);
-    expect(items.slice(-5)).toEqual(['skin-now', 'toggle-skin', 'upload-skin', 'remove-own-skin', 'view-index']);
+    expect(items.slice(-4)).toEqual(['skin-now', 'toggle-skin', 'upload-skin', 'view-index']);
   });
 
   it('offers no work skin upload, replace, remove or toggle on a series bookmark or an external work', async () => {
@@ -396,7 +396,7 @@ describe('downloading or updating from the Works tab', () => {
     expect(element.querySelector('.entry-actions .skin-open')).toBeNull();
     for (const title of ['Work 500', 'Work 600']) {
       const menu = await menuOf(title);
-      for (const item of ['upload-skin', 'remove-own-skin', 'toggle-skin']) {
+      for (const item of ['upload-skin', 'toggle-skin']) {
         expect(menu.querySelector(`button.${item}`)).toBeNull();
       }
       // shut it again before the next

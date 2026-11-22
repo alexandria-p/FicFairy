@@ -855,13 +855,6 @@
                       {{ hasOwnSkin(work) ? 'Replace my own work skin for this fic' : 'Upload my own work skin for this fic' }}
                     </button>
                   </li>
-                  @if (hasOwnSkin(work)) {
-                    <li role="none">
-                      <button type="button" role="menuitem" class="remove-own-skin" (click)="removeOwnSkin(work)">
-                        Remove my own work skin
-                      </button>
-                    </li>
-                  }
                 }
                 <!-- every entry with an index file: its readings, in a tab of their own -->
                 @if (canViewIndex(work)) {

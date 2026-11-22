@@ -471,7 +471,7 @@ export class WorkList {
 
   /** the work whose skins the chooser window is open on, or null */
   protected readonly skinChooser = signal<Bookmark | null>(null);
-  /** what the last upload, removal or choice of a work skin did, or why it could not */
+  /** what the last upload or choice of a work skin did, or why it could not */
   protected readonly skinNote = signal('');
   protected readonly skinProblem = signal('');
 
@@ -502,22 +502,6 @@ export class WorkList {
       const said = error instanceof Error ? error.message : String(error);
       this.skinProblem.set(said);
       this.visit.note(`Upload my own work skin: not saved (${said})`);
-    }
-  }
-
-  /** take away the work skin you uploaded for a work */
-  protected async removeOwnSkin(work: Bookmark): Promise<void> {
-    this.menuFor.set(null);
-    if (!work.id) return;
-    this.skinNote.set('');
-    this.skinProblem.set('');
-    try {
-      await this.library.removeUserSkin(work.id);
-      if (this.skinChooser() === work) this.skinChooser.set(null);
-      this.skinNote.set(`Removed the work skin you uploaded for ${work.title || work.id}.`);
-      this.visit.note('Remove my uploaded work skin: removed');
-    } catch (error) {
-      this.skinProblem.set(error instanceof Error ? error.message : String(error));
     }
   }
 
