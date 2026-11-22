@@ -3272,6 +3272,32 @@ describe('DownloadDialog', () => {
       expect(element.querySelector('input[name="username"]')).toBeNull();
     });
 
+    it('asks whether to overwrite on the work skins page, only when the import updates works', async () => {
+      await openImport();
+      const box = () => element.querySelector<HTMLInputElement>('input[name="overwrite"]');
+      expect(box()!.checked).toBe(false);
+      expect(box()!.closest('label')!.textContent?.trim()).toBe('Overwrite existing downloads');
+      expect(element.querySelector('.import-overwrite-hint')?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+        'Check this if you are concerned about file integrity issues and would like to re-download each file again.');
+      // on the same page as Fetch work skins, above it
+      const skins = element.querySelector('input[name="skins"]')!;
+      expect(box()!.compareDocumentPosition(skins) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      box()!.click();
+      await fixture.whenStable();
+      const lines = [...element.querySelectorAll('.import-summary li')].map((li) => li.textContent?.trim());
+      expect(lines).toContain('Will re-download and overwrite existing files to repair them');
+      await advanceTo('credentials');
+      checkbox('Skip AO3 login?')!.click();
+      await fixture.whenStable();
+      button('Start repair')!.click();
+      await fixture.whenStable();
+      expect(jobs.started[0].options.overwrite).toBe(true);
+
+      // only looking up indexes: nothing to overwrite, so nothing asked
+      await openImport({ ...IMPORT, scope: 'skip' });
+      expect(box()).toBeNull();
+    });
+
     it('asks to be left open, above what it will do, when the import makes more than 20 requests', async () => {
       // 2 lookups, 1 work updated in one other format, 3 files it may replace: about 6
       await openImport({ ...IMPORT, files: 3 });

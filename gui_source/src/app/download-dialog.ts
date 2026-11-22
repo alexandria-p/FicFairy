@@ -1,5 +1,5 @@
 import { savedRunLogLines, savedTrimOldRunLogs } from './run-logs';
-import { Component, DestroyRef, ElementRef, OnDestroy, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { Component, DestroyRef, ElementRef, OnDestroy, computed, effect, inject, input, linkedSignal, output, signal, untracked } from '@angular/core';
 import { WorkLink } from './work-link';
 import { Chime } from './chime';
 
@@ -220,8 +220,20 @@ export class DownloadDialog implements OnDestroy {
   /** roughly how many requests an import makes - over `LONG_IMPORT_REQUESTS` it says to leave the window open */
   protected readonly importRequestCount = computed(() => {
     const importing = this.importing();
-    return importing ? importRequests(importing) : 0;
+    return importing ? importRequests({ ...importing, overwrite: this.importOverwrite() }) : 0;
   });
+  /** how many works an import searches for updates - those not only looked up */
+  protected readonly importUpdated = computed(() => {
+    const importing = this.importing();
+    if (!importing || importing.scope === 'skip') return 0;
+    return Math.max(0, (importing.count ?? 0) - (importing.indexOnly?.length ?? 0));
+  });
+  /**
+   * *Overwrite existing downloads*, for an import that updates works: asked on the run window's
+   * work-skins page, beside Fetch work skins, at the owner's request - it was the import window's
+   * file types page. Starts from what the request says.
+   */
+  protected readonly importOverwrite = linkedSignal(() => !!this.importing()?.overwrite);
   protected readonly longImport = LONG_IMPORT_REQUESTS;
   /**
    * The newest scan a quick scan would measure back to, once read: undefined until then, null
@@ -822,9 +834,9 @@ export class DownloadDialog implements OnDestroy {
     const lookups = importing.lookups ?? 0;
     if (lookups) lines.push(`Look-up ${lookups.toLocaleString()} ${lookups === 1 ? 'work' : 'works'} with missing index`);
     // the works updated are those not only looked up; the formats are not said, at the owner's request
-    const updated = importing.scope === 'skip' ? 0 : Math.max(0, (importing.count ?? 0) - (importing.indexOnly?.length ?? 0));
+    const updated = this.importUpdated();
     if (updated) lines.push(`Search ${updated.toLocaleString()} ${updated === 1 ? 'work' : 'works'} for updates`);
-    if (updated && importing.overwrite) {
+    if (updated && this.importOverwrite()) {
       lines.push('Will re-download and overwrite existing files to repair them');
     }
     // every work the import reads gives its skin for nothing - saved as css, never into the html
@@ -2350,8 +2362,8 @@ export class DownloadDialog implements OnDestroy {
           : this.picksSkins() && this.skins() && !this.skinsHeld(),
         workdates: this.workdates(),
         // only offered on the runs that can be pointed at a known set of works
-        // an import's from its own window's *Overwrite existing downloads*
-        overwrite: this.action() === 'import' ? !!this.importing()?.overwrite
+        // an import's from the work-skins page's *Overwrite existing downloads*, when it updates works
+        overwrite: this.action() === 'import' ? this.importUpdated() > 0 && this.importOverwrite()
           : this.picksOverwrite() && this.overwrite(),
         // only the scans offer it, and not while skipping the indexing
         nonBookmarks: this.picksNonBookmarks() && this.nonBookmarks(),

@@ -1397,6 +1397,18 @@
             @for (line of importPlan(); track line) { <li>{{ line }}</li> }
           </ul>
         }
+        <!-- the update's own choice, here beside the skins at the owner's request -->
+        @if (importUpdated() > 0) {
+          <label class="check import-overwrite">
+            <input type="checkbox" name="overwrite" [checked]="importOverwrite()"
+                   (change)="importOverwrite.set($any($event.target).checked)" />
+            <span>Overwrite existing downloads</span>
+          </label>
+          <p class="hint import-overwrite-hint">
+            Check this if you are concerned about file integrity issues and would like to re-download
+            each file again.
+          </p>
+        }
         <label class="check skins-option">
           <input type="checkbox" name="skins" [checked]="importSkins()"
                  (change)="importSkins.set($any($event.target).checked)" />

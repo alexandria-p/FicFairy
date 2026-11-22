@@ -1962,7 +1962,8 @@ describe('ImportDialog', () => {
       'Ticking a format here will check if a work is missing a copy in these formats, and download it if so.',
       'Files you already have downloaded will still be checked for a newer version - regardless of whether you tick any boxes below.',
     ]);
-    expect(element.querySelector('input[name="overwrite"]')).not.toBeNull();
+    // overwriting is asked in the run window now, beside Fetch work skins
+    expect(element.querySelector('input[name="overwrite"]')).toBeNull();
     await click('Back');
     expect(step()).toBe('formats');
   });
@@ -2117,16 +2118,14 @@ describe('ImportDialog', () => {
     expect(request.filetypes).toEqual(['JSON', 'EPUB']);
   });
 
-  it('overwrites existing downloads only when told to', async () => {
+  it('leaves overwriting to the run window, asking nothing about it here', async () => {
     await open(ALL_DATED);
     await click('Continue');
     await click('Continue');
     await click('Continue');
-    expect(element.querySelector('label.overwrite')!.textContent).toContain(
-      'Check this if you are concerned about file integrity issues and would like to re-download each file again.');
-    await tick('overwrite');
+    expect(element.querySelector('input[name="overwrite"]')).toBeNull();
     await click('Continue');
-    expect(started[0].request.overwrite).toBe(true);
+    expect(started[0].request.overwrite).toBe(false);
   });
 
   it('hides the formats and replacing when the step is skipped, and does neither', async () => {
