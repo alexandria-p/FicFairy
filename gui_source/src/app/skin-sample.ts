@@ -101,3 +101,21 @@ export async function skinSampleWork(): Promise<string> {
   const readings = library.works[0].entry.indexes;
   return sampleWorkHtml(readings[readings.length - 1]);
 }
+
+/**
+ * A made-up work skin, for previewing how your site skin sits with a work's own: it styles only
+ * what an author typically would (a coloured heading, a message-bubble opening paragraph, a
+ * rule), and leaves the fonts and the tags box alone - so layering a site skin under it, or not,
+ * plainly shows.
+ */
+export const SAMPLE_WORK_SKIN = `
+#workskin h2.heading { color: #8e3b8e; letter-spacing: 0.04em; }
+#workskin .userstuff p:first-child {
+  max-width: 28em;
+  padding: 0.6em 1em;
+  border-radius: 1.2em 1.2em 1.2em 0.2em;
+  background: #e7f0fd;
+  color: #17324d;
+}
+#workskin .userstuff hr { border: 0; border-top: 2px dashed #c58bc5; }
+`;

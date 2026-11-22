@@ -104,14 +104,27 @@
   are called "work skins". Files with a work skin that you've downloaded will have a paintbrush icon
   next to them.
 </p>
-<label class="check layer-skin">
-  <input type="checkbox" name="layerReadingSkin" [checked]="skins.layer()"
-         (change)="setLayer($any($event.target).checked)" />
-  <span>
-    Layer my reading skin under a work's own skin
-    <span class="hint layer-hint">The author's work skin wins where they disagree.</span>
-  </span>
-</label>
+<fieldset class="layer-skin">
+  <legend>If a work skin is available:</legend>
+  <div class="layer-choice">
+    <label class="check">
+      <input type="radio" name="layerReadingSkin" value="only" [checked]="!skins.layer()" (change)="setLayer(false)" />
+      Only use the work skin
+    </label>
+    <button type="button" class="button subtle small preview-only" (click)="previewWorkSkin(false)">Preview</button>
+  </div>
+  <div class="layer-choice">
+    <label class="check">
+      <input type="radio" name="layerReadingSkin" value="layer" [checked]="skins.layer()" (change)="setLayer(true)" />
+      Layer my site skin under a work's own skin
+    </label>
+    <button type="button" class="button subtle small preview-layer" (click)="previewWorkSkin(true)">Preview</button>
+  </div>
+  <p class="hint layer-hint">
+    Layered, the author's work skin wins where the two disagree. The previews use a made-up work skin
+    and your active site skin{{ skins.defaultSkin() ? '' : ' (AO3, while none is active)' }}.
+  </p>
+</fieldset>
 
 @if (problem()) {
   <p class="error skin-problem">{{ problem() }}</p>

@@ -1,7 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { ReadingSkin, ReadingSkins, skinId } from './reading-skins';
-import { skinSampleWork } from './skin-sample';
-import { withReadingSkin } from './skin-html';
+import { BUILT_IN_SKINS, ReadingSkin, ReadingSkins, skinId } from './reading-skins';
+import { SAMPLE_WORK_SKIN, skinSampleWork } from './skin-sample';
+import { shownWork, withReadingSkin, withSavedSkin } from './skin-html';
 
 /**
  * User settings' *Reading skins* section (inside its `details`, which User settings draws): one
@@ -73,11 +73,33 @@ export class ReadingSkinsSettings {
    * without making it the active one. Nothing is saved.
    */
   protected async preview(css: string): Promise<void> {
-    const tab = window.open('', '_blank');
+    const tab = this.openTab();
     if (!tab) return;
-    tab.opener = null;
-    const sample = await skinSampleWork();
-    const url = URL.createObjectURL(new Blob([withReadingSkin(sample, css)], { type: 'text/html' }));
+    this.show(tab, withReadingSkin(await skinSampleWork(), css));
+  }
+
+  /**
+   * The sample work with a made-up work skin (`SAMPLE_WORK_SKIN`), shown as a work with its own
+   * skin is opened: with your active site skin layered under it, or with the work skin alone - so
+   * the two choices can be compared. With no active site skin, AO3's stands in, or the two would
+   * look the same. Nothing is saved.
+   */
+  protected async previewWorkSkin(layer: boolean): Promise<void> {
+    const tab = this.openTab();
+    if (!tab) return;
+    const site = this.skins.defaultSkin()?.css ?? BUILT_IN_SKINS[0].css;
+    this.show(tab, shownWork(withSavedSkin(await skinSampleWork(), SAMPLE_WORK_SKIN), site, layer));
+  }
+
+  /** a tab opened at once - one opened after waiting is blocked as a pop-up - and filled after */
+  private openTab(): Window | null {
+    const tab = window.open('', '_blank');
+    if (tab) tab.opener = null;
+    return tab;
+  }
+
+  private show(tab: Window, html: string): void {
+    const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
     tab.location.href = url;
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }
@@ -89,12 +111,11 @@ export class ReadingSkinsSettings {
     this.outcome.set('');
   }
 
+  /** the radio picked says it, so nothing more is said */
   protected setLayer(on: boolean): void {
     this.skins.setLayer(on);
     this.problem.set('');
-    this.outcome.set(on
-      ? 'Your reading skin now goes under a work\'s own skin.'
-      : 'A work with its own skin now shows that skin alone.');
+    this.outcome.set('');
   }
 
   /** a `.css` file chosen: its text goes in the box, and its name in the name box if that is empty */
