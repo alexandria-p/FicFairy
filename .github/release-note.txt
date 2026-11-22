@@ -1,1 +1,1 @@
-Work skins and reading skins are out of debug mode. Fetch a work's own skin from each run's options, upload your own for any fic, and read downloaded works with a reading skin of your own or the new built-in AO3 skin.
+Work skins and reading skins are out of beta 🎉. Fetch a creator's work skin with your downloads, upload your own for any fic, and set a site-wide reading skin of your own in User Settings.
