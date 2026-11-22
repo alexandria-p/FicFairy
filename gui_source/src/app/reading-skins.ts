@@ -1,7 +1,7 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
-import { DebugMode } from './debug-mode';
 import { Library } from './library';
 import { LibraryStore } from './library-store';
+import { AO3_READING_SKIN } from './ao3-reading-skin';
 import { breaksOutOfStyle } from './skin-html';
 import { safeGet, safeRemove, safeSet } from './storage';
 
@@ -10,12 +10,12 @@ import { safeGet, safeRemove, safeSet } from './storage';
  * the part a site skin plays on AO3, so on a work with its own work skin it goes underneath it
  * (`withAo3Shape`). Nothing is written into the work's file and AO3 is never asked for anything -
  * the skin is put in as the work is opened (`Library.openCopy`, through `shownWork`), so a new
- * default shows on every work at once. Debug mode only, for now.
+ * default shows on every work at once.
  */
 
 /** skins kept in this browser, as a list of {name, css} */
 export const BROWSER_SKINS_KEY = 'ao3.readingSkins';
-/** which skin to show by default, as `browser:<name>` or `library:<name>`; none when unset */
+/** which skin to show by default, as `builtin:<name>`, `browser:<name>` or `library:<name>`; none when unset */
 export const DEFAULT_SKIN_KEY = 'ao3.readingSkinDefault';
 /** 'off' when the reading skin is left off a work with its own skin; layered under it otherwise */
 export const LAYER_SKIN_KEY = 'ao3.readingSkinLayer';
@@ -25,13 +25,23 @@ export const LIBRARY_SKINS_FOLDER = 'skins/custom';
 export const SKIN_MAX_CHARS = 100_000;
 export const SKIN_NAME_MAX = 60;
 
-export type SkinPlace = 'browser' | 'library';
-
 export interface ReadingSkin {
   name: string;
   place: SkinPlace;
   css: string;
 }
+
+export type SkinPlace = 'builtin' | 'browser' | 'library';
+
+/**
+ * The skins that come with FicFairy, ahead of your own in every list: only *AO3* (at the owner's
+ * request - the earlier built-in skins were taken out), which lays a work out much as AO3's own
+ * page does. Never saved anywhere and never removed; choosing one as the default keeps its id.
+ */
+export const BUILT_IN_SKINS: readonly ReadingSkin[] = [
+  { name: 'AO3', place: 'builtin', css: AO3_READING_SKIN },
+];
+
 
 export function skinId(skin: Pick<ReadingSkin, 'name' | 'place'>): string {
   return `${skin.place}:${skin.name}`;
@@ -71,7 +81,6 @@ function libraryPath(name: string): string {
 @Injectable({ providedIn: 'root' })
 export class ReadingSkins {
   private readonly library = inject(Library);
-  private readonly debugMode = inject(DebugMode);
 
   readonly browserSkins = signal<ReadingSkin[]>(readBrowserSkins());
   readonly librarySkins = signal<ReadingSkin[]>([]);
@@ -79,7 +88,7 @@ export class ReadingSkins {
   readonly reading = signal(false);
   /** what went wrong reading the library's skins, if anything */
   readonly readProblem = signal('');
-  readonly skins = computed(() => [...this.browserSkins(), ...this.librarySkins()]);
+  readonly skins = computed(() => [...BUILT_IN_SKINS, ...this.browserSkins(), ...this.librarySkins()]);
   readonly defaultId = signal(safeGet(DEFAULT_SKIN_KEY));
   /** whether the reading skin goes under a work's own skin (the default), or is left off it */
   readonly layer = signal(safeGet(LAYER_SKIN_KEY) !== 'off');
@@ -95,9 +104,9 @@ export class ReadingSkins {
       const store = this.library.store();
       void this.readLibrarySkins(store);
     });
-    // what the library shows: the default skin while debug mode is on, nothing otherwise
+    // what the library shows: the default skin, or nothing with none chosen
     effect(() => {
-      this.library.readingSkin.set(this.debugMode.on() ? this.defaultSkin()?.css ?? '' : '');
+      this.library.readingSkin.set(this.defaultSkin()?.css ?? '');
       this.library.layerReadingSkin.set(this.layer());
     });
   }
@@ -130,7 +139,7 @@ export class ReadingSkins {
   }
 
   /** save a new skin; answers what was wrong, or null once it is saved */
-  async add(name: string, css: string, place: SkinPlace): Promise<string | null> {
+  async add(name: string, css: string, place: 'browser' | 'library'): Promise<string | null> {
     const problem = skinProblem(name, css);
     if (problem) return problem;
     const shown = name.trim();
@@ -162,6 +171,8 @@ export class ReadingSkins {
 
   /** remove a skin; answers what was wrong, or null once it is gone */
   async remove(skin: ReadingSkin): Promise<string | null> {
+    // a skin that comes with FicFairy is always there to choose
+    if (skin.place === 'builtin') return 'A skin that comes with FicFairy cannot be removed.';
     if (skin.place === 'browser') {
       const kept = this.browserSkins().filter((x) => x.name !== skin.name);
       if (kept.length) safeSet(BROWSER_SKINS_KEY, JSON.stringify(kept.map(({ name, css }) => ({ name, css }))));

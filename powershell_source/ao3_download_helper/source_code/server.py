@@ -5147,6 +5147,9 @@ def saved_skin_states(fileops: FileOps) -> dict[str, str]:
     states: dict[str, str] = {}
     for name in names:
         stem, extension = os.path.splitext(os.path.basename(str(name)))
+        # only a run's own files are named by the bare work number: a skin uploaded in the page
+        # (`<worknum>_submittedbyuser.css`) is the reader's, and never AO3's skin saved
+        if not stem.isdigit(): continue
         if extension.lower() in SKIN_NOTES:
             # a skin saved wins over a stray note that there was none
             if states.get(stem) != 'css': states[stem] = extension.lower()[1:]

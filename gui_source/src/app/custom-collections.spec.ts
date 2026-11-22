@@ -428,6 +428,8 @@ describe('ticking works in the listing', () => {
       'Download/update latest now from AO3',
       'Mark as bookmark',
       'Add to a collection...',
+      'Fetch work skin from AO3',
+      'Upload my own work skin for this fic',
       'View index history',
     ]);
   });

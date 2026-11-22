@@ -34,6 +34,36 @@ import { VisitLog } from './visit-log';
 /** where a run saves each work's skin, `<work number>.css` - the helper's `SKINS_FOLDER_NAME` */
 const SKINS_FOLDER = 'skins';
 
+/**
+ * A work skin you uploaded for a work, beside the one a run fetched from AO3:
+ * `skins/<work number>_submittedbyuser.css`. Its own name, so fetching AO3's never writes over it
+ * and the helper (which reads `skins/` by work number alone) never takes it for AO3's.
+ */
+export const USER_SKIN_SUFFIX = '_submittedbyuser';
+
+/**
+ * Which skin each work with both is read with (`{"<work number>": "ao3" | "mine"}`), kept in the
+ * library so every device reads a work the same way. A work not in it is read with yours.
+ */
+export const WORK_SKIN_CHOICES_FILE = `${SKINS_FOLDER}/work-skin-choices.json`;
+
+/** the longest work skin taken from you, as for a reading skin */
+const WORK_SKIN_MAX_CHARS = 100_000;
+
+/** a work's skins: the one fetched from AO3, and the one you uploaded */
+export type WorkSkinSource = 'ao3' | 'mine';
+
+/** why a work skin you uploaded cannot be saved, or null when it can */
+export function workSkinProblem(css: string): string | null {
+  if (!css.trim()) return 'The file has no CSS in it.';
+  if (css.length > WORK_SKIN_MAX_CHARS) {
+    return `The skin is too long - keep it under ${WORK_SKIN_MAX_CHARS.toLocaleString()} characters.`;
+  }
+  // it is put into a page inside a <style>, which this would close
+  if (/<\/style/i.test(css)) return 'A skin cannot contain </style.';
+  return null;
+}
+
 /** how the visit log names where a Dropbox check took something from, when not Dropbox */
 const CACHE = "this browser's cache";
 export type LocalCopy = File | DropboxCopy;
@@ -220,6 +250,10 @@ export class Library {
    * `skins/` after any other read and after a run that wrote there.
    */
   readonly skinnedWorks = signal<Set<string>>(new Set());
+  /** the works with a work skin you uploaded (`skins/<worknum>_submittedbyuser.css`), by number */
+  readonly userSkinnedWorks = signal<Set<string>>(new Set());
+  /** which skin each work with both is read with (`WORK_SKIN_CHOICES_FILE`) */
+  readonly workSkinChoices = signal<Record<string, WorkSkinSource>>({});
   private readonly skinsAfterRead = effect(() => {
     const read = this.lastRead();
     if (!read) return;
@@ -268,7 +302,7 @@ export class Library {
   readonly store = signal<LibraryStore | null>(null);
   /**
    * The reading skin to show on a work with no skin of its own as it is opened - set by
-   * `ReadingSkins` (the default chosen in User settings, while debug mode is on), '' for none.
+   * `ReadingSkins` (the default chosen in User settings), '' for none.
    * Never written into the file.
    */
   readonly readingSkin = signal('');
@@ -661,10 +695,28 @@ export class Library {
     const id = name ? workIdFromFilename(name) : null;
     if (!store || !id) return '';
     try {
-      return (await store.read(`${SKINS_FOLDER}/${id}.css`)) ?? '';
+      return (await this.chosenSkin(id)) ?? '';
     } catch {
       return '';
     }
+  }
+
+  /** the skin a work is read with: the one chosen when it has both, else whichever it has */
+  async chosenSkin(id: string): Promise<string | null> {
+    const store = this.store();
+    if (!store) return null;
+    const order: WorkSkinSource[] = this.skinSourceFor(id) === 'ao3' ? ['ao3', 'mine'] : ['mine', 'ao3'];
+    for (const source of order) {
+      const css = await store.read(skinPath(id, source)).catch(() => null);
+      // an empty .css would be a run's own note, never written by one; treat it as none
+      if (css?.trim()) return css;
+    }
+    return null;
+  }
+
+  /** which skin a work with both is read with - yours unless AO3's was chosen */
+  skinSourceFor(id: string): WorkSkinSource {
+    return this.workSkinChoices()[id] === 'ao3' ? 'ao3' : 'mine';
   }
 
   /**
@@ -823,6 +875,8 @@ export class Library {
     this.copySource = null;
     this.worksFiles.set([]);
     this.skinnedWorks.set(new Set());
+    this.userSkinnedWorks.set(new Set());
+    this.workSkinChoices.set({});
     this.worksListing = null;
     this.fromCache.set(null);
     this.hidden.set(new Map());
@@ -1212,11 +1266,81 @@ export class Library {
     return path ? store.read(path) : null;
   }
 
-  /** a work's saved work skin (`skins/<work number>.css`) as it is, or null when it has none */
-  async skinText(id: string): Promise<string | null> {
+  /**
+   * A work's saved work skin as it is - the one fetched from AO3 (`skins/<work number>.css`) or the
+   * one you uploaded - or null when it has none.
+   */
+  async skinText(id: string, source: WorkSkinSource = 'ao3'): Promise<string | null> {
     const store = this.store();
     if (!store || !id) return null;
-    return store.read(`${SKINS_FOLDER}/${id}.css`);
+    return store.read(skinPath(id, source));
+  }
+
+  /**
+   * Save a work skin you uploaded for a work, over one you uploaded before; AO3's is kept. Refuses
+   * one `workSkinProblem` finds wrong.
+   */
+  async saveUserSkin(id: string, css: string): Promise<void> {
+    const store = this.store();
+    if (!store) throw new Error('this library can only be read, so nothing can be saved in it');
+    const problem = workSkinProblem(css);
+    if (problem) throw new Error(problem);
+    await store.write(skinPath(id, 'mine'), new Response(css));
+    this.userSkinnedWorks.update((ids) => new Set(ids).add(id));
+  }
+
+  /**
+   * Delete the work skin you uploaded for a work - never AO3's, which a run fetched and only a run
+   * replaces. AO3's, if it has one, is read with again, and the work's choice is forgotten.
+   */
+  async removeUserSkin(id: string): Promise<void> {
+    const store = this.store();
+    if (!store) throw new Error('this library can only be read, so nothing can be removed from it');
+    await store.delete(skinPath(id, 'mine'));
+    this.userSkinnedWorks.update((ids) => {
+      const left = new Set(ids);
+      left.delete(id);
+      return left;
+    });
+    if (id in this.workSkinChoices()) {
+      const { [id]: _gone, ...rest } = this.workSkinChoices();
+      await this.writeSkinChoices(store, rest);
+    }
+  }
+
+  /** read a work with both skins with this one from now on, on every device */
+  async chooseWorkSkin(id: string, source: WorkSkinSource): Promise<void> {
+    const store = this.store();
+    if (!store) throw new Error('this library can only be read, so nothing can be saved in it');
+    if (this.skinSourceFor(id) === source) return;
+    await this.writeSkinChoices(store, { ...this.workSkinChoices(), [id]: source });
+  }
+
+  private async writeSkinChoices(store: LibraryStore, choices: Record<string, WorkSkinSource>): Promise<void> {
+    const before = this.workSkinChoices();
+    // shown at once, put back if the write fails
+    this.workSkinChoices.set(choices);
+    try {
+      await store.write(WORK_SKIN_CHOICES_FILE, new Response(JSON.stringify(choices, null, 2) + '\n'));
+    } catch (error) {
+      if (store === this.store()) this.workSkinChoices.set(before);
+      throw error;
+    }
+  }
+
+  private async readSkinChoices(store: LibraryStore): Promise<void> {
+    let choices: Record<string, WorkSkinSource> = {};
+    try {
+      const parsed = JSON.parse((await store.read(WORK_SKIN_CHOICES_FILE)) ?? '{}');
+      if (parsed && typeof parsed === 'object') {
+        for (const [id, source] of Object.entries(parsed)) {
+          if (/^\d+$/.test(id) && (source === 'ao3' || source === 'mine')) choices[id] = source;
+        }
+      }
+    } catch {
+      choices = {};
+    }
+    if (store === this.store()) this.workSkinChoices.set(choices);
   }
 
   async setBookmarked(given: Bookmark | Bookmark[], bookmarked: boolean): Promise<number> {
@@ -1400,8 +1524,13 @@ export class Library {
   /** each work's newest copy in every format, from the files in works/ */
   /** the works a list of names in `skins/` says have a skin */
   private noteSkinNames(names: string[]): void {
-    const ids = names.map((n) => /^(\d+)\.css$/i.exec(n)?.[1]).filter((x): x is string => !!x);
-    this.skinnedWorks.set(new Set(ids));
+    const ids = (pattern: RegExp) => new Set(names.map((n) => pattern.exec(n)?.[1]).filter((x): x is string => !!x));
+    this.skinnedWorks.set(ids(/^(\d+)\.css$/i));
+    this.userSkinnedWorks.set(ids(new RegExp(`^(\\d+)${USER_SKIN_SUFFIX}\\.css$`, 'i')));
+    const store = this.store();
+    const choicesName = WORK_SKIN_CHOICES_FILE.split('/').pop()!;
+    if (store && names.some((n) => n.toLowerCase() === choicesName)) void this.readSkinChoices(store);
+    else this.workSkinChoices.set({});
   }
 
   private async readSkins(store: LibraryStore): Promise<void> {
@@ -1409,7 +1538,10 @@ export class Library {
       const paths = await store.list(SKINS_FOLDER, false);
       if (store === this.store()) this.noteSkinNames(paths.map((p) => p.split('/').pop() ?? p));
     } catch {
-      if (store === this.store()) this.skinnedWorks.set(new Set());
+      if (store === this.store()) {
+        this.skinnedWorks.set(new Set());
+        this.userSkinnedWorks.set(new Set());
+      }
     }
   }
 
@@ -1609,4 +1741,9 @@ function newestIndexed(works: Bookmark[]): string | undefined {
     }
   }
   return newest;
+}
+
+/** where a work's skin is kept: AO3's under its number, yours with `USER_SKIN_SUFFIX` */
+function skinPath(id: string, source: WorkSkinSource): string {
+  return `${SKINS_FOLDER}/${id}${source === 'mine' ? USER_SKIN_SUFFIX : ''}.css`;
 }

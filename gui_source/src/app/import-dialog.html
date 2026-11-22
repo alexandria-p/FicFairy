@@ -1070,7 +1070,7 @@
     </footer>
   }
 
-  <!-- 6: the file types to fetch for the works updated, and whether to overwrite what is there -->
+  <!-- 6: the file types to fetch for the works updated; whether to overwrite is the run window's -->
   @if (step() === 'filetypes') {
     <section class="body">
       <fieldset class="formats">
@@ -1093,13 +1093,6 @@
           </label>
         }
       </fieldset>
-      <label class="check overwrite">
-        <input type="checkbox" name="overwrite" [checked]="overwrite()" (change)="overwrite.set($any($event.target).checked)" />
-        <span>
-          Overwrite existing downloads
-          <span class="hint">Check this if you are concerned about file integrity issues and would like to re-download each file again.</span>
-        </span>
-      </label>
       @if (busy()) {
         <p class="warning busy-note" role="note">A run is in progress. It has to finish before an import can start.</p>
       }

@@ -1134,8 +1134,6 @@ export class ImportDialog implements OnInit {
   protected fetchLatest(): void {
     this.updateScope.set(this.lastScope());
   }
-  /** *Overwrite existing downloads*: fetch every dated copy again, current or not */
-  protected readonly overwrite = signal(false);
   /** the formats to fetch for works without them - none ticked to begin with */
   protected readonly picked = signal<string[]>([]);
   /** every downloadable format the helper offers, JSON aside (always written: it is the index) */
@@ -1575,7 +1573,8 @@ export class ImportDialog implements OnInit {
         count: works.length,
         filetypes: ['JSON', ...(updates ? this.picked() : [])],
         replaceOutdated: updates,
-        overwrite: updates && this.overwrite(),
+        // asked in the run window now, beside Fetch work skins
+        overwrite: false,
         // every work not updated is only looked up - one with a file to repair gets that alone
         indexOnly: [...taken].filter((id) => !updating.has(id)),
         lookups: this.lookups().filter((id) => taken.has(id)).length,

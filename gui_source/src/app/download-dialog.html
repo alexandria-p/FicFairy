@@ -213,30 +213,6 @@
           }
         </fieldset>
 
-        <!-- debug mode only: each work's skin, which AO3's download leaves out, saved as css beside
-             the works - never put into the html. ticked or not decides whether any is saved -->
-        @if (picksSkins()) {
-          <label class="check skins-option" [class.locked]="skinsHeld()">
-            <input type="checkbox" name="skins" [checked]="skins()" [disabled]="skinsHeld()"
-                   (change)="skins.set($any($event.target).checked)" />
-            <span>[DEBUG] Fetch work skin for HTML downloads</span>
-          </label>
-          <!-- said only once ticked (or while it is held, to say why) -->
-          @if (skinsHeld()) {
-            <p class="hint skins-hint">Tick HTML to use this - work skins go with HTML files.</p>
-          } @else if (skins() && freeSkins()) {
-            <p class="hint skins-hint">
-              No extra requests to AO3 in this run - it opens each work's page anyway. Work skins
-              are only fetched from AO3.
-            </p>
-          } @else if (skins()) {
-            <p class="hint skins-hint">
-              At most one extra request to AO3 per fic the run picks up. Work skins are only
-              fetched from AO3.
-            </p>
-          }
-        }
-
         <!-- JSON is only listed in debug mode, so only then is there anything to say about it -->
         @if (!debugMode.on()) {
         } @else if (picksReindex()) {
@@ -370,12 +346,12 @@
               </label>
             }
 
-            <!-- debug only: nothing but each work's skin - no index, no download -->
-            @if (action() === 'custom' && (debugTools() || skinWorks().length)) {
+            <!-- nothing but each work's skin - no index, no download -->
+            @if (action() === 'custom') {
               <label class="check">
                 <input type="radio" name="coverage" [checked]="coverage() === 'skins'"
                        (change)="coverage.set('skins')" />
-                <span>[DEBUG] Just fetch work skins</span>
+                <span>Just fetch work skins</span>
               </label>
               @if (coverage() === 'skins') {
                 <div class="skins-only-options">
@@ -755,7 +731,7 @@
           </p>
         }
 
-        <!-- after series and non-bookmarks: the last choice on a full scan; a custom run's images follow it -->
+        <!-- after series and non-bookmarks; work skins follow it, and a custom run's images come last -->
         @if (picksOverwrite()) {
           <label class="check">
             <input
@@ -773,6 +749,29 @@
           <!-- the non-bookmarks it re-reads are downloaded with the rest, so they are overwritten too -->
           @if (overwrite() && picksNonBookmarks() && nonBookmarks()) {
             <p class="hint overwrite-non-bookmarks">This will include any non-bookmarks in this scan too.</p>
+          }
+        }
+
+        <!-- each work's skin, which AO3's download leaves out, saved as css beside the works -
+             never put into the html. it can be ticked whatever file types come next, but a skin
+             is only fetched with HTML -->
+        @if (picksSkins()) {
+          <label class="check skins-option">
+            <input type="checkbox" name="skins" [checked]="skins()"
+                   (change)="skins.set($any($event.target).checked)" />
+            <span>Fetch work skin for HTML downloads</span>
+          </label>
+          <!-- said only once ticked -->
+          @if (skins() && freeSkins()) {
+            <p class="hint skins-hint">
+              Work skins are only fetched from AO3, and only with HTML downloads. Bundled with
+              indexing, so it doesn't cost any extra calls.
+            </p>
+          } @else if (skins()) {
+            <p class="hint skins-hint">
+              Work skins are only fetched from AO3, and only with HTML downloads. Will cost one
+              additional call for each fic the run picks up.
+            </p>
           }
         }
 
@@ -1384,7 +1383,7 @@
       </footer>
     }
 
-    <!-- Resolve issues: whether to save each work's skin as its page is read - debug mode only -->
+    <!-- Resolve issues: whether to save each work's skin as its page is read -->
     @if (step() === 'work-skins') {
       <section class="body">
         @if (firstStep() === 'work-skins') {
@@ -1398,15 +1397,26 @@
             @for (line of importPlan(); track line) { <li>{{ line }}</li> }
           </ul>
         }
+        <!-- the update's own choice, here beside the skins at the owner's request -->
+        @if (importUpdated() > 0) {
+          <label class="check import-overwrite">
+            <input type="checkbox" name="overwrite" [checked]="importOverwrite()"
+                   (change)="importOverwrite.set($any($event.target).checked)" />
+            <span>Overwrite existing downloads</span>
+          </label>
+          <p class="hint import-overwrite-hint">
+            Check this if you are concerned about file integrity issues and would like to re-download
+            each file again.
+          </p>
+        }
         <label class="check skins-option">
           <input type="checkbox" name="skins" [checked]="importSkins()"
                  (change)="importSkins.set($any($event.target).checked)" />
-          <span>[DEBUG] Fetch work skins</span>
+          <span>Fetch work skins</span>
         </label>
         @if (importSkins()) {
           <p class="hint skins-hint">
-            No extra requests to AO3 in this run - it opens each work's page anyway. Work skins
-            are only fetched from AO3.
+            Work skins are only fetched for AO3.
           </p>
         }
       </section>

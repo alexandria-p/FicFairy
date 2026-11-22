@@ -1,5 +1,5 @@
 import { savedRunLogLines, savedTrimOldRunLogs } from './run-logs';
-import { Component, DestroyRef, ElementRef, OnDestroy, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { Component, DestroyRef, ElementRef, OnDestroy, computed, effect, inject, input, linkedSignal, output, signal, untracked } from '@angular/core';
 import { WorkLink } from './work-link';
 import { Chime } from './chime';
 
@@ -89,7 +89,7 @@ type Step =
   | 'retry-how'
   /** whether to run it in the background, and its answers up front - a hosted copy only */
   | 'background'
-  /** Resolve issues: whether to save each work's skin as it is read - debug mode only */
+  /** Resolve issues: whether to save each work's skin as it is read */
   | 'work-skins'
   | 'acknowledge'
   | 'credentials'
@@ -220,8 +220,20 @@ export class DownloadDialog implements OnDestroy {
   /** roughly how many requests an import makes - over `LONG_IMPORT_REQUESTS` it says to leave the window open */
   protected readonly importRequestCount = computed(() => {
     const importing = this.importing();
-    return importing ? importRequests(importing) : 0;
+    return importing ? importRequests({ ...importing, overwrite: this.importOverwrite() }) : 0;
   });
+  /** how many works an import searches for updates - those not only looked up */
+  protected readonly importUpdated = computed(() => {
+    const importing = this.importing();
+    if (!importing || importing.scope === 'skip') return 0;
+    return Math.max(0, (importing.count ?? 0) - (importing.indexOnly?.length ?? 0));
+  });
+  /**
+   * *Overwrite existing downloads*, for an import that updates works: asked on the run window's
+   * work-skins page, beside Fetch work skins, at the owner's request - it was the import window's
+   * file types page. Starts from what the request says.
+   */
+  protected readonly importOverwrite = linkedSignal(() => !!this.importing()?.overwrite);
   protected readonly longImport = LONG_IMPORT_REQUESTS;
   /**
    * The newest scan a quick scan would measure back to, once read: undefined until then, null
@@ -272,7 +284,7 @@ export class DownloadDialog implements OnDestroy {
   protected readonly pages = signal(0);
   protected readonly series = signal(false);
   protected readonly images = signal(false);
-  /** put each work's skin into the html this run downloads - a debug option for now */
+  /** save each work's skin as css beside the html this run downloads */
   protected readonly skins = signal(false);
   protected readonly workdates = signal(false);
   /** fetch every requested format again, whether or not the copy held is behind */
@@ -326,7 +338,7 @@ export class DownloadDialog implements OnDestroy {
    */
   protected readonly coverage = signal<'all' | 'pages' | 'dates' | 'run' | 'resume' | 'existing' | 'skins'>('all');
   /**
-   * A custom run that only fetches work skins (`coverage` 'skins', debug mode): each work's page
+   * A custom run that only fetches work skins (`coverage` 'skins'): each work's page
    * read for its author's skin and saved beside the works - nothing indexed, nothing downloaded,
    * so it has no file types and no other options (the helper's `run_skins_only`)
    */
@@ -822,14 +834,14 @@ export class DownloadDialog implements OnDestroy {
     const lookups = importing.lookups ?? 0;
     if (lookups) lines.push(`Look-up ${lookups.toLocaleString()} ${lookups === 1 ? 'work' : 'works'} with missing index`);
     // the works updated are those not only looked up; the formats are not said, at the owner's request
-    const updated = importing.scope === 'skip' ? 0 : Math.max(0, (importing.count ?? 0) - (importing.indexOnly?.length ?? 0));
+    const updated = this.importUpdated();
     if (updated) lines.push(`Search ${updated.toLocaleString()} ${updated === 1 ? 'work' : 'works'} for updates`);
-    if (updated && importing.overwrite) {
+    if (updated && this.importOverwrite()) {
       lines.push('Will re-download and overwrite existing files to repair them');
     }
     // every work the import reads gives its skin for nothing - saved as css, never into the html
     if (this.picksImportSkins() && this.importSkins()) {
-      lines.push('Save the work skin of each work it reads from AO3, as css - no extra requests');
+      lines.push('Fetch and save work skins from AO3, where possible');
     }
     const repairs = importing.repair?.length ?? 0;
     if (repairs) {
@@ -921,13 +933,16 @@ export class DownloadDialog implements OnDestroy {
 
   /**
    * Work skins - the CSS an author gives a work, which AO3's own download leaves out - saved as
-   * css beside the works (`skins/<work number>.css`), **never put into the html** - debug mode
-   * only, at the owner's request - on every run that has file types to pick (`SKIN_ACTIONS`).
-   * Ticked: a work page the run reads anyway gives its skin for nothing (`freeSkins`); otherwise
-   * each work whose HTML is downloaded has its page read once. Unticked, no skin is saved at all.
+   * css beside the works (`skins/<work number>.css`), **never put into the html** - offered among
+   * the run's options on every run that can download works (`SKIN_ACTIONS`; a collection run only
+   * while it takes the works in it). It can be ticked whatever file types are picked next, but a
+   * skin is only fetched alongside HTML (`skinsHeld`): a work page the run reads anyway gives its
+   * skin for nothing (`freeSkins`); otherwise each work whose HTML is downloaded has its page read
+   * once. Unticked, no skin is saved at all.
    */
   protected readonly picksSkins = computed(() =>
-    this.debugTools() && !this.resuming() && !this.skinsOnly() && SKIN_ACTIONS.includes(this.action()));
+    !this.resuming() && !this.skinsOnly() && SKIN_ACTIONS.includes(this.action()) &&
+    (!this.picksCollectionWorks() || this.collectionWorks()));
 
   /** whether HTML is among the file types - the downloads a scan reads skins for */
   protected readonly htmlTicked = computed(() =>
@@ -940,17 +955,20 @@ export class DownloadDialog implements OnDestroy {
   protected readonly freeSkins = computed(() =>
     ['work', 'works', 'update'].includes(this.action()) ||
     (this.action() === 'custom' && this.coverage() === 'existing' && this.existingCheck() === 'ao3'));
-  /** the box held while HTML is unticked - on every run, at the owner's request */
+  /**
+   * HTML left unticked: the box can still be ticked, but no skin is fetched - the helper clears
+   * `skins` for a run with no HTML, and the file types page says so
+   */
   protected readonly skinsHeld = computed(() => !this.htmlTicked());
 
   /**
-   * Resolve issues' own *[DEBUG] Fetch work skins*, on a page of its own just before the login
+   * Resolve issues' own *Fetch work skins*, on a page of its own just before the login
    * (`work-skins`). Every work a repair takes in is read on AO3 to index it - looked up, updated
    * or repaired - so its skin is free, and saved as css, **never into the html**. Unlike every
    * other run it needs no HTML ticked, at the owner's request: the skin is free either way.
    */
   protected readonly picksImportSkins = computed(() =>
-    this.debugTools() && this.action() === 'import' && !this.resuming() && (this.importing()?.count ?? 0) > 0);
+    this.action() === 'import' && !this.resuming() && (this.importing()?.count ?? 0) > 0);
   protected readonly importSkins = signal(false);
 
   /**
@@ -1077,6 +1095,7 @@ export class DownloadDialog implements OnDestroy {
       this.picksOverwrite() ||
       this.picksNonBookmarks() ||
       this.picksCollectionWorks() ||
+      this.picksSkins() ||
       // it can always be pointed at an earlier scan, so it always has a choice to offer
       this.action() === 'quick'),
   );
@@ -1097,7 +1116,8 @@ export class DownloadDialog implements OnDestroy {
       this.splitOptions() &&
       !this.resuming() &&
       !this.skinsOnly() &&
-      (this.picksSeries() || this.picksNonBookmarks() || this.picksOverwrite() || this.picksImages()),
+      (this.picksSeries() || this.picksNonBookmarks() || this.picksOverwrite() || this.picksImages() ||
+        this.picksSkins()),
   );
 
   protected readonly firstStep = computed<Step>(() => {
@@ -2342,8 +2362,8 @@ export class DownloadDialog implements OnDestroy {
           : this.picksSkins() && this.skins() && !this.skinsHeld(),
         workdates: this.workdates(),
         // only offered on the runs that can be pointed at a known set of works
-        // an import's from its own window's *Overwrite existing downloads*
-        overwrite: this.action() === 'import' ? !!this.importing()?.overwrite
+        // an import's from the work-skins page's *Overwrite existing downloads*, when it updates works
+        overwrite: this.action() === 'import' ? this.importUpdated() > 0 && this.importOverwrite()
           : this.picksOverwrite() && this.overwrite(),
         // only the scans offer it, and not while skipping the indexing
         nonBookmarks: this.picksNonBookmarks() && this.nonBookmarks(),

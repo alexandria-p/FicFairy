@@ -288,6 +288,47 @@
   </div>
 }
 
+@if (skinNote()) {
+  <p class="hint skin-note" role="status">{{ skinNote() }}</p>
+}
+@if (skinProblem()) {
+  <p class="error skin-problem" role="alert">Not saved: {{ skinProblem() }}</p>
+}
+
+<!-- a work with AO3's skin and one you uploaded: which it is read with, and each to look at -->
+@if (skinChooser(); as work) {
+  <div class="hide-modal">
+    <div class="backdrop" (click)="closeSkinChooser()"></div>
+    <div class="dialog skin-chooser" role="dialog" aria-modal="true" aria-labelledby="skin-chooser-title">
+      <header><h2 id="skin-chooser-title">Work skins for {{ work.title || work.id }}</h2></header>
+      <section class="body">
+        <p>Choose which work skin to apply when reading this HTML through FicFairy.</p>
+        <fieldset class="skin-sources" aria-label="Work skin to apply">
+          @for (source of skinSources; track source.value) {
+            <div class="skin-source" [class.active]="skinSource(work) === source.value">
+              <label>
+                <input type="radio" name="workSkinSource" [value]="source.value"
+                       [checked]="skinSource(work) === source.value" (change)="chooseSkin(work, source.value)" />
+                {{ source.label }}
+              </label>
+              <button type="button" class="button small export-work-skin" (click)="openSkin(work, source.value)">Export</button>
+              <!-- only yours can be deleted: AO3's is the work's own, and a run keeps it -->
+              @if (source.value === 'mine') {
+                <button type="button" class="button small delete-work-skin" (click)="deleteOwnSkin(work)">
+                  {{ confirmingSkinDelete() === work.id ? 'Click again to delete' : 'Delete' }}
+                </button>
+              }
+            </div>
+          }
+        </fieldset>
+      </section>
+      <footer>
+        <button type="button" class="button primary" (click)="closeSkinChooser()">Done</button>
+      </footer>
+    </div>
+  </div>
+}
+
 @if (markProblem()) {
   <p class="error" role="alert">Not saved: {{ markProblem() }}</p>
 }
@@ -672,11 +713,38 @@
       -->
       @if ((canHide() || canSelect()) && work.id && !isLoose(work)) {
         <div class="entry-actions">
-          <!-- a work skin saved for it (shown when its html is opened from FicFairy): opens the css -->
+          <!-- a work skin saved for it (shown when its html is opened from FicFairy), always the
+               rainbow brush: one skin opens its css, AO3's and yours both open a window to choose -->
           @if (hasSkin(work)) {
-            <button type="button" class="skin-open" aria-label="Open downloaded workskin"
-              title="Open downloaded workskin" (click)="openSkin(work)">
-              <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 2.5l-6 6"/><path d="M7.5 8.5c-1.6-.4-3 .6-3.2 2.1-.2 1.3-.9 2-2.3 2.4 2.3 1 5.6.6 6.4-1.6.4-1.1 0-2.3-.9-2.9z"/></svg>
+            <button type="button" class="skin-open rainbow"
+              [attr.aria-label]="skinTitle(work)" [title]="skinTitle(work)"
+              (click)="openSkin(work)">
+                <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <defs>
+                    <linearGradient [attr.id]="'skin-rainbow-' + work.id" x1="0" y1="1" x2="1" y2="0">
+                      <stop offset="0" stop-color="#e5484d" /><stop offset="0.25" stop-color="#f5a524" />
+                      <stop offset="0.5" stop-color="#30a46c" /><stop offset="0.75" stop-color="#3e63dd" />
+                      <stop offset="1" stop-color="#8e4ec6" />
+                    </linearGradient>
+                  </defs>
+                  <path d="M13.5 2.5l-6 6" fill="none" [attr.stroke]="'url(#skin-rainbow-' + work.id + ')'" />
+                  <path d="M7.5 8.5c-1.6-.4-3 .6-3.2 2.1-.2 1.3-.9 2-2.3 2.4 2.3 1 5.6.6 6.4-1.6.4-1.1 0-2.3-.9-2.9z" [attr.fill]="'url(#skin-rainbow-' + work.id + ')'" [attr.stroke]="'url(#skin-rainbow-' + work.id + ')'" />
+                </svg>
+                <!-- paint running off the border, in the border's own colours -->
+                <svg class="drips" viewBox="0 0 32 9" preserveAspectRatio="none" aria-hidden="true">
+                  <defs>
+                    <linearGradient [attr.id]="'skin-drips-' + work.id" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0" stop-color="#e5484d" /><stop offset="0.25" stop-color="#f5a524" />
+                      <stop offset="0.5" stop-color="#30a46c" /><stop offset="0.75" stop-color="#3e63dd" />
+                      <stop offset="1" stop-color="#8e4ec6" />
+                    </linearGradient>
+                  </defs>
+                  <path [attr.fill]="'url(#skin-drips-' + work.id + ')'"
+                    d="M5 0h3.2c0 1.6-.5 2.2-.5 3.3a1.6 1.6 0 1 1-2.2 0C5.5 2.2 5 1.6 5 0z
+                       M13.6 0h2.6c0 2.6-.3 3.6-.3 5.2a1.5 1.5 0 1 1-2 0c0-1.6-.3-2.6-.3-5.2z
+                       M21.5 0h2.6c0 1-.3 1.4-.3 2a1.2 1.2 0 1 1-2 0c0-.6-.3-1-.3-2z
+                       M26.6 0h2c0 1.8-.2 2.6-.2 3.7a1.1 1.1 0 1 1-1.6 0c0-1.1-.2-1.9-.2-3.7z" />
+                </svg>
             </button>
           }
           <!-- hiding takes it out of this listing only: its files and index entry stay -->
@@ -731,18 +799,6 @@
                     </button>
                   </li>
                 }
-                <!-- debug: a custom run that fetches this work's skin and nothing else -->
-                @if (offersSkins() && !work.error && worksToFetch(work).length) {
-                  <li role="none">
-                    <button type="button" role="menuitem" class="skin-now"
-                      [class.unavailable]="runGoing()"
-                      [attr.aria-disabled]="runGoing()"
-                      [title]="runGoing() ? 'Unavailable while a run is already in progress' : ''"
-                      (click)="!runGoing() && downloadSkin(work)">
-                      [DEBUG] Download work skin
-                    </button>
-                  </li>
-                }
                 <!-- works only: a series or an external work has no such item at all -->
                 @if (!work.error && worksToFetch(work).length) {
                   <li role="none">
@@ -774,6 +830,35 @@
                       [title]="canCollect(work) ? '' : 'A series cannot be added to a collection - only works can'"
                       (click)="menuAdd(work)">
                       Add to a collection...
+                    </button>
+                  </li>
+                }
+                <!-- the work skin items together at the foot, only View index history below them -->
+                <!-- a custom run that fetches this work's skin and nothing else -->
+                @if (!work.error && worksToFetch(work).length) {
+                  <li role="none">
+                    <button type="button" role="menuitem" class="skin-now"
+                      [class.unavailable]="runGoing()"
+                      [attr.aria-disabled]="runGoing()"
+                      [title]="runGoing() ? 'Unavailable while a run is already in progress' : ''"
+                      (click)="!runGoing() && downloadSkin(work)">
+                      Fetch work skin from AO3
+                    </button>
+                  </li>
+                }
+                <!-- with AO3's skin and yours: the window the rainbow brush opens -->
+                @if (hasBothSkins(work)) {
+                  <li role="none">
+                    <button type="button" role="menuitem" class="toggle-skin" (click)="chooseSkinFromMenu(work)">
+                      Toggle active work skin
+                    </button>
+                  </li>
+                }
+                <!-- a skin of your own, kept beside AO3's: never written over by a run -->
+                @if (canUploadSkin(work)) {
+                  <li role="none">
+                    <button type="button" role="menuitem" class="upload-skin" (click)="uploadSkin(work)">
+                      {{ hasOwnSkin(work) ? 'Replace my own work skin for this fic' : 'Upload my own work skin for this fic' }}
                     </button>
                   </li>
                 }
@@ -971,8 +1056,8 @@
             : !tickedToFetch().length ? 'Nothing ticked can be downloaded - only works can, not series or external works'
             : fetchTickedNote()"
           (click)="downloadTicked()">{{ fetchTickedLabel() }}</button>
-        @if (offersSkins() && tickedForSkins().length) {
-          <button type="button" class="button debug skins-ticked" [disabled]="busy() || runGoing()"
+        @if (tickedForSkins().length) {
+          <button type="button" class="button skins-ticked" [disabled]="busy() || runGoing()"
             [title]="runGoing() ? 'Unavailable while a run is already in progress' : fetchTickedNote()"
             (click)="downloadTickedSkins()">{{ skinsTickedLabel() }}</button>
         }
