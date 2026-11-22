@@ -3,7 +3,7 @@
   default skin and any work skins are applied to downloaded HTML files if you open them through
   FicFairy.
 </p>
-<p class="hint no-styling">Hint: HTML works are always downloaded from AO3 with no styling.</p>
+<p class="hint no-styling">HTML works are always downloaded from AO3 with no styling.</p>
 
 @if (skins.reading()) {
   <p class="hint reading">Reading the skins saved in your library...</p>
@@ -106,24 +106,20 @@
 </p>
 <fieldset class="layer-skin">
   <legend>If a work skin is available:</legend>
-  <div class="layer-choice">
+  <div class="layer-choice" [class.active]="!skins.layer()">
     <label class="check">
       <input type="radio" name="layerReadingSkin" value="only" [checked]="!skins.layer()" (change)="setLayer(false)" />
       Only use the work skin
     </label>
     <button type="button" class="button subtle small preview-only" (click)="previewWorkSkin(false)">Preview</button>
   </div>
-  <div class="layer-choice">
+  <div class="layer-choice" [class.active]="skins.layer()">
     <label class="check">
       <input type="radio" name="layerReadingSkin" value="layer" [checked]="skins.layer()" (change)="setLayer(true)" />
       Layer my site skin under a work's own skin
     </label>
     <button type="button" class="button subtle small preview-layer" (click)="previewWorkSkin(true)">Preview</button>
   </div>
-  <p class="hint layer-hint">
-    Layered, the author's work skin wins where the two disagree. The previews use a made-up work skin
-    and your active site skin{{ skins.defaultSkin() ? '' : ' (AO3, while none is active)' }}.
-  </p>
 </fieldset>
 
 @if (problem()) {

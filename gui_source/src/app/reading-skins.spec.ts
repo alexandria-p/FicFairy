@@ -452,7 +452,7 @@ describe('ReadingSkinsSettings', () => {
       'You can choose a default reading skin for FicFairy. It works like a "site skin" does on AO3. ' +
       'Your default skin and any work skins are applied to downloaded HTML files if you open them through FicFairy.');
     expect(element.querySelector('.no-styling')?.textContent?.trim()).toBe(
-      'Hint: HTML works are always downloaded from AO3 with no styling.');
+      'HTML works are always downloaded from AO3 with no styling.');
     expect(element.querySelector('details.how-it-works')).toBeNull();
     const said = element.textContent?.replace(/\s+/g, ' ') ?? '';
     expect(said).toContain('paintbrush icon');
@@ -519,9 +519,11 @@ describe('ReadingSkinsSettings', () => {
       element.querySelector<HTMLButtonElement>('[data-skin="browser:Cosy"] .export-skin')!.click();
       expect(tab.opener).toBeNull();
       expect(tab.location.href).toBe('blob:css');
-      const blob = made.mock.calls[0][0] as Blob;
-      expect(blob.type).toContain('text/plain');
-      expect(await blob.text()).toBe(SKIN);
+      // an earlier test's preview can finish late and make a blob of its own here, so take
+      // the plain-text one this export made
+      const blob = made.mock.calls.map(([b]) => b as Blob).find((b) => b.type.includes('text/plain'));
+      expect(blob).toBeTruthy();
+      expect(await blob!.text()).toBe(SKIN);
     } finally {
       open.mockRestore();
       made.mockRestore();
