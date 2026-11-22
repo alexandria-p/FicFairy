@@ -1,1 +1,1 @@
-Work skins and reading skins are out of beta 🎉. Fetch a creator's work skin with your downloads, upload your own for any fic, and set a site-wide reading skin of your own in User Settings.
+Guests on the hosted copy can now try reading skins in User settings, saved to their own browser.

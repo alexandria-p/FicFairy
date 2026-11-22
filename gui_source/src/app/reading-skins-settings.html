@@ -79,7 +79,7 @@
         This browser
       </label>
       <label class="check" [class.locked]="!skins.libraryWritable()"
-             [title]="skins.libraryWritable() ? 'Saved as skins/custom/<name>.css, wherever the library is opened' : 'Open a library to save a skin there'">
+             [title]="skins.libraryWritable() ? 'Saved as skins/custom/<name>.css, wherever the library is opened' : skins.guest() ? 'Not in guest mode - save it to this browser' : 'Open a library to save a skin there'">
         <input type="radio" name="skinPlace" value="library" [checked]="place() === 'library'"
                [disabled]="!skins.libraryWritable()" (change)="place.set('library')" />
         My library

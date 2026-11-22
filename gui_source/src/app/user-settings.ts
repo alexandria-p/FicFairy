@@ -190,7 +190,7 @@ export class UserSettings implements OnDestroy {
   /** what a font choice looks like, for its preview line */
   protected readonly fontPreview = computed(() => fontStack(this.appearance.font(), this.appearance.customFont()));
 
-  /** a guest changes only the time zone and the appearance, which are theirs (`guest.ts`) */
+  /** a guest changes only the time zone, the appearance and reading skins, which are theirs (`guest.ts`) */
   protected readonly guest = inject(HelperConnection).guest;
   /** the owner's login, from the Advanced section a guest sees last */
   protected readonly guestMode = inject(GuestMode);
@@ -202,7 +202,7 @@ export class UserSettings implements OnDestroy {
    */
   private guestRefused(): boolean {
     if (!this.guest()) return false;
-    this.say('Not available in guest mode - only your time zone and appearance can be changed', 'problem');
+    this.say('Not available in guest mode - only your time zone, appearance and reading skins can be changed', 'problem');
     return true;
   }
 

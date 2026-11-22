@@ -225,11 +225,15 @@
     </div>
   </details>
 
-  <!-- skins of your own, shown on works as they open - not a guest's: one could be saved in the library -->
-  <details class="group reading-skins" [class.guest-locked]="guest()" [attr.inert]="guest() ? '' : null" [attr.aria-disabled]="guest() ? 'true' : null">
+  <!-- skins of your own, shown on works as they open - a guest's too, saved to their browser only (ReadingSkins.libraryWritable) -->
+  <details class="group reading-skins">
     <summary class="group-head">
       <h3>Reading skins</h3>
-      <span class="saved-to" title="Each skin where you chose to save it: this browser, or your library. Which is the default is kept in this browser">Saved to this browser or your library</span>
+      @if (guest()) {
+        <span class="saved-to" title="In guest mode skins are kept in this browser alone">Saved to this browser</span>
+      } @else {
+        <span class="saved-to" title="Each skin where you chose to save it: this browser, or your library. Which is the default is kept in this browser">Saved to this browser or your library</span>
+      }
     </summary>
     <app-reading-skins-settings />
   </details>
