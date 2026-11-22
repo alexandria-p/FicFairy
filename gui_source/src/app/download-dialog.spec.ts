@@ -3405,7 +3405,7 @@ describe('DownloadDialog', () => {
       expect(element.querySelector('.skins-hint')!.textContent!.replace(/\s+/g, ' ').trim()).toBe(
         "Work skins are only fetched for AO3.");
       expect([...element.querySelectorAll('.import-summary li')].map((li) => li.textContent?.trim())).toContain(
-        'Save the work skin of each work it reads from AO3, as css - no extra requests');
+        'Fetch and save work skins from AO3, where possible');
 
       button('Continue')!.click();
       await fixture.whenStable();

@@ -841,7 +841,7 @@ export class DownloadDialog implements OnDestroy {
     }
     // every work the import reads gives its skin for nothing - saved as css, never into the html
     if (this.picksImportSkins() && this.importSkins()) {
-      lines.push('Save the work skin of each work it reads from AO3, as css - no extra requests');
+      lines.push('Fetch and save work skins from AO3, where possible');
     }
     const repairs = importing.repair?.length ?? 0;
     if (repairs) {
