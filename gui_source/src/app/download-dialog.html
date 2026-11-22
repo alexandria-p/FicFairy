@@ -764,13 +764,13 @@
           <!-- said only once ticked -->
           @if (skins() && freeSkins()) {
             <p class="hint skins-hint">
-              No extra requests to AO3 in this run - it opens each work's page anyway. Work skins
-              are only fetched from AO3, and only with HTML downloads.
+              Work skins are only fetched from AO3, and only with HTML downloads. Bundled with
+              indexing, so it doesn't cost any extra calls.
             </p>
           } @else if (skins()) {
             <p class="hint skins-hint">
-              At most one extra request to AO3 per fic the run picks up. Work skins are only
-              fetched from AO3, and only with HTML downloads.
+              Work skins are only fetched from AO3, and only with HTML downloads. Will cost one
+              additional call for each fic the run picks up.
             </p>
           }
         }
@@ -1416,8 +1416,7 @@
         </label>
         @if (importSkins()) {
           <p class="hint skins-hint">
-            No extra requests to AO3 in this run - it opens each work's page anyway. Work skins
-            are only fetched from AO3.
+            Work skins are only fetched for AO3.
           </p>
         }
       </section>

@@ -565,7 +565,7 @@ describe('DownloadDialog', () => {
     await fixture.whenStable();
 
     const said = element.querySelector('.skins-hint')?.textContent?.replace(/\s+/g, ' ').trim();
-    expect(said).toBe('At most one extra request to AO3 per fic the run picks up. Work skins are only fetched from AO3, and only with HTML downloads.');
+    expect(said).toBe("Work skins are only fetched from AO3, and only with HTML downloads. Will cost one additional call for each fic the run picks up.");
   });
 
   for (const action of ['work', 'works', 'update'] as const) {
@@ -576,7 +576,7 @@ describe('DownloadDialog', () => {
       await fixture.whenStable();
 
       const said = element.querySelector('.skins-hint')?.textContent?.replace(/\s+/g, ' ').trim();
-      expect(said).toBe('No extra requests to AO3 in this run - it opens each work\'s page anyway. Work skins are only fetched from AO3, and only with HTML downloads.');
+      expect(said).toBe("Work skins are only fetched from AO3, and only with HTML downloads. Bundled with indexing, so it doesn't cost any extra calls.");
       await advanceTo('running');
       expect(jobs.started[0].options).toMatchObject({ skins: true });
     });
@@ -2533,7 +2533,7 @@ describe('DownloadDialog', () => {
       box.click();
       await fixture.whenStable();
       // collection listings carry no skin: each costs a request, after the downloads
-      expect(element.querySelector('.skins-hint')?.textContent).toContain('At most one extra request');
+      expect(element.querySelector('.skins-hint')?.textContent).toContain('Will cost one additional call');
       await advanceTo('running');
 
       expect(jobs.started[0].options).toMatchObject({ collectionWorks: true, skins: true });
@@ -3403,7 +3403,7 @@ describe('DownloadDialog', () => {
       box.click();
       await fixture.whenStable();
       expect(element.querySelector('.skins-hint')!.textContent!.replace(/\s+/g, ' ').trim()).toBe(
-        "No extra requests to AO3 in this run - it opens each work's page anyway. Work skins are only fetched from AO3.");
+        "Work skins are only fetched for AO3.");
       expect([...element.querySelectorAll('.import-summary li')].map((li) => li.textContent?.trim())).toContain(
         'Save the work skin of each work it reads from AO3, as css - no extra requests');
 

@@ -591,14 +591,21 @@ describe('ReadingSkinsSettings', () => {
     const made = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:css');
     try {
       const { element } = await make();
+      // an earlier test's preview can finish late, while this one waits, and open a tab or make
+      // a blob of its own on these spies - so only what the click itself does is looked at, read
+      // at once: the export is synchronous, and nothing late can run between the click and here
+      open.mockClear();
+      made.mockClear();
+      const exported = { ...tab, location: { href: '' }, opener: {} as unknown };
+      open.mockReturnValue(exported as unknown as Window);
       element.querySelector<HTMLButtonElement>('[data-skin="browser:Cosy"] .export-skin')!.click();
-      expect(tab.opener).toBeNull();
-      expect(tab.location.href).toBe('blob:css');
-      // an earlier test's preview can finish late and make a blob of its own here, so take
-      // the plain-text one this export made
-      const blob = made.mock.calls.map(([b]) => b as Blob).find((b) => b.type.includes('text/plain'));
-      expect(blob).toBeTruthy();
-      expect(await blob!.text()).toBe(SKIN);
+      const blobs = made.mock.calls.map(([b]) => b as Blob);
+      expect(open).toHaveBeenCalledTimes(1);
+      expect(exported.opener).toBeNull();
+      expect(exported.location.href).toBe('blob:css');
+      expect(blobs).toHaveLength(1);
+      expect(blobs[0].type).toContain('text/plain');
+      expect(await blobs[0].text()).toBe(SKIN);
     } finally {
       open.mockRestore();
       made.mockRestore();
