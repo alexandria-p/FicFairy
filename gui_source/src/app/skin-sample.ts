@@ -741,7 +741,7 @@ export const SAMPLE_WORK_SKIN = `
 }
 `;
 
-/** a short made-up chat in the markup the sample work skin styles, put in the first chapter */
+/** a made-up group chat of lorem ipsum, back and forth, in the markup the sample work skin styles - put in the first chapter */
 export const SAMPLE_CHAT = `
 <div class="whatsapp light">
   <table class="topbar"><tbody><tr>
@@ -754,10 +754,18 @@ export const SAMPLE_CHAT = `
   </tr></tbody></table>
   <div class="messages">
     <div class="info"><p>Today</p></div>
-    <div class="in"><div class="text"><p class="from blue1">Wren</p><p>did anyone else see the lights over the meadow last night??</p><p class="time">21:04</p></div></div>
-    <div class="in"><div class="text"><p class="from orange">Bramble</p><p>Lorem ipsum dolor sit amet. Also yes.</p><p class="time">21:05</p></div></div>
-    <div class="out"><div class="text"><p>it's a fairy ring. do NOT step in it</p><p class="time">21:06</p></div></div>
-    <div class="out"><div class="text"><p>I mean it</p><p class="time unread">21:06</p></div></div>
+    <div class="in"><div class="text"><p class="from blue1">Wren</p><p>Lorem ipsum dolor sit amet?</p><p class="time">21:04</p></div></div>
+    <div class="out"><div class="text"><p>Consectetur adipiscing elit, sed do eiusmod tempor.</p><p class="time">21:04</p></div></div>
+    <div class="in"><div class="text"><p class="from orange">Bramble</p><p>Incididunt ut labore et dolore magna aliqua.</p><p class="time">21:05</p></div></div>
+    <div class="in"><div class="text"><p class="from orange">Bramble</p><p>Ut enim ad minim veniam!!</p><p class="time">21:05</p></div></div>
+    <div class="out"><div class="text"><p>Quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p><p class="time">21:06</p></div></div>
+    <div class="in"><div class="text"><p class="from blue1">Wren</p><p>Duis aute irure dolor?</p><p class="time">21:06</p></div></div>
+    <div class="out"><div class="text"><p>In reprehenderit in voluptate velit esse.</p><p class="time">21:07</p></div></div>
+    <div class="in"><div class="text"><p class="from orange">Bramble</p><p>Cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat.</p><p class="time">21:08</p></div></div>
+    <div class="out"><div class="text"><p>Cupidatat non proident</p><p class="time">21:08</p></div></div>
+    <div class="out"><div class="text"><p>sunt in culpa qui officia deserunt mollit anim id est laborum</p><p class="time">21:09</p></div></div>
+    <div class="in"><div class="text"><p class="from blue1">Wren</p><p>Sed ut perspiciatis 👀</p><p class="time">21:10</p></div></div>
+    <div class="out"><div class="text"><p>Nemo enim ipsam voluptatem.</p><p class="time unread">21:10</p></div></div>
   </div>
   <div class="bottombar"><p class="typearea">Message</p></div>
 </div>
