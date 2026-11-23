@@ -15,12 +15,15 @@ describe('the FAQ', () => {
     const { element } = await faq();
     const legal = element.querySelector('.legal')!;
 
-    expect(element.querySelector('section.faq')?.lastElementChild).toBe(legal);
+    const credit = element.querySelector('.legal-credit')!;
+    // the privacy policy and licence, then the credit to the project this was forked from, on a line of its own
+    expect(element.querySelector('section.faq')?.lastElementChild).toBe(credit);
+    expect(legal.nextElementSibling).toBe(credit);
     expect(legal.querySelector('.privacy-link')?.getAttribute('href')).toBe(
       'https://github.com/alexandria-p/FicFairy/blob/main/docs/privacy/FicFairy_Privacy-Policy.md',
     );
-    expect(legal.querySelector('.upstream-link')?.getAttribute('href')).toBe('https://github.com/nianeyna/ao3downloader');
-    expect(legal.textContent?.replace(/\s+/g, ' ')).toContain(
+    expect(credit.querySelector('.upstream-link')?.getAttribute('href')).toBe('https://github.com/nianeyna/ao3downloader');
+    expect(credit.textContent?.replace(/\s+/g, ' ')).toContain(
       "FicFairy is a fork of nianeyna's ao3downloader - show them some love and check out their work ❤️",
     );
     expect(legal.querySelector('.licence-link')?.getAttribute('href')).toBe(
