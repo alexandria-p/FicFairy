@@ -35,7 +35,7 @@ Pick a colour palette and a font in **User settings**.
 
 Works with a CSS skin get a rainbow paintbrush 🖌️; open the work using FicFairy to read it with its original styling preserved (HTML downloads only). You can also create your own site skin in **User settings**, to style any fic you read in FicFairy.
 
-![A work with the rainbow paintbrush, the Reading skins section of User settings, and the work opened in its group chat skin](docs/screenshots/work-skins.png)
+![The Reading skins section of User settings, with the rainbow paintbrush, and a work opened in its group chat skin](docs/screenshots/work-skins.png)
 
 ## Download
 

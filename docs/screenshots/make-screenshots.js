@@ -157,13 +157,12 @@ async function open(browser, o = {}) {
 
 const tab = (page, name) => page.locator('nav.views button', { hasText: name }).first().click();
 
-/** the work skins picture: the work and the reading skins settings stacked on the left, the work opened on the right */
-async function skinGrid(browser, entry, settings, work, name) {
+/** the work skins picture: the reading skins settings on the left, the work opened on the right */
+async function skinGrid(browser, settings, work, name) {
   const page = await browser.newPage({ viewport: { width: 2200, height: 400 }, deviceScaleFactor: 1 });
   const img = (f, style) => `<img src="data:image/png;base64,${fs.readFileSync(f).toString('base64')}" style="display:block;border-radius:10px;box-shadow:0 2px 10px #0002;${style}">`;
   await page.setContent(`<body style="margin:0;background:#fbeef2"><div id="grid" style="display:inline-flex;gap:28px;padding:28px;align-items:flex-start">
-    <div style="display:flex;flex-direction:column;gap:28px;align-items:center">${img(entry, 'width:1400px')}${img(settings, 'width:1000px')}</div>
-    ${img(work, 'width:700px')}</div></body>`);
+    ${img(settings, 'width:1100px')}${img(work, 'width:600px')}</div></body>`);
   const box = await page.locator('#grid').boundingBox();
   await page.setViewportSize({ width: Math.ceil(box.width), height: Math.ceil(box.height) });
   await page.screenshot({ path: path.join(OUT, name) });
@@ -228,14 +227,10 @@ async function stack(browser, files, name) {
     }
     await stack(browser, looks, 'customisation.png');
 
-    // work skins: the rainbow brush on the work, the reading skins settings, and the work opened in its skin
+    // work skins: the reading skins settings (the rainbow brush in its sentence), and the work opened in its skin
     page = await open(browser, { viewport: { width: 1100, height: 1400 } });
     const tmp = (file) => path.join(require('os').tmpdir(), file);
     const entry = page.locator('li.blurb', { hasText: 'Spooky Scary Skeletons' }).first();
-    const brush = entry.locator('.skin-open');
-    await brush.hover();
-    await page.waitForTimeout(900);
-    await entry.screenshot({ path: tmp('skin-entry.png') });
     const [opened] = await Promise.all([
       page.context().waitForEvent('page'),
       entry.locator('.blurb-titles a').first().click(),
@@ -254,7 +249,7 @@ async function stack(browser, files, name) {
     await page.waitForTimeout(600);
     await skinSettings.screenshot({ path: tmp('skin-settings.png') });
     await page.close();
-    await skinGrid(browser, tmp('skin-entry.png'), tmp('skin-settings.png'), tmp('skin-work.png'), 'work-skins.png');
+    await skinGrid(browser, tmp('skin-settings.png'), tmp('skin-work.png'), 'work-skins.png');
 
     page = await open(browser, { viewport: { width: 420, height: 860 } });
     await page.waitForTimeout(800);
