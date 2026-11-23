@@ -8,11 +8,11 @@
  */
 
 /** what the sample says of itself, under its title */
-const SAMPLE_NOTE = 'A sample work, shown to preview your reading skin. It was not downloaded from anywhere.';
+const SAMPLE_NOTE = 'A sample work, shown to preview your reading skin.';
 
 /** the note on the work-skin Preview, saying what kind of work skin it shows */
 export const SAMPLE_CHAT_NOTE =
-  'A sample work, shown with an example creator work skin - a social media / group chat style, as some fics use for text messages. It was not downloaded from anywhere.';
+  'A sample work, shown with an example creator work skin - a social media / group chat style, as some fics use for text messages.';
 
 export interface SampleReading {
   title: string;
