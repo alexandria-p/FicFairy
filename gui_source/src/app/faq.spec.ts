@@ -26,6 +26,8 @@ describe('the FAQ', () => {
     expect(credit.textContent?.replace(/\s+/g, ' ')).toContain(
       "FicFairy is a fork of nianeyna's ao3downloader - show them some love and check out their work ❤️",
     );
+    // the heart stands outside the italics
+    expect(credit.querySelector('em')?.textContent).not.toContain('❤️');
     expect(legal.querySelector('.licence-link')?.getAttribute('href')).toBe(
       'https://github.com/alexandria-p/FicFairy/blob/main/LICENSE',
     );

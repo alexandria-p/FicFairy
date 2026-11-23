@@ -20,6 +20,7 @@ _Font: Lexend, Colour Palette: Light - Strawberry Milk_
   into your library.
 - **Browse and search your library in the browser**, and open downloaded works in a new tab.
 - **Logging in is optional.** Skip it to fetch only what anyone can see, or log in to access your private bookmarks and fics restricted to AO3 users. Your ao3 login is never saved, and is passed straight to ao3.
+- **View fics as their creator intended.** Download work skins (CSS) alongside HTML, when works are fetched from AO3.
 - **Keep your fics in your Dropbox** so you can access your downloads from any device - sync up your bookmarks on your computer, and read fic on the go from your phone using Dropbox.
 
 . ݁₊ ⊹ . ݁ ⟡ ݁ . ⊹ ₊ ݁.
@@ -29,6 +30,12 @@ _Font: Lexend, Colour Palette: Light - Strawberry Milk_
 Pick a colour palette and a font in **User settings**.
 
 ![Strawberry milk, Charcoal with the Typewriter font, and Lavender with Gaegu](docs/screenshots/customisation.png)
+
+### Work skins
+
+Works with a CSS skin get a rainbow paintbrush 🖌️; open the work using FicFairy to read it with its original styling preserved (HTML downloads only). You can also create your own site skin in **User settings**, to style any fic you read in FicFairy.
+
+![A work with the rainbow paintbrush, the window choosing its work skin, and the work opened in its group chat skin](docs/screenshots/work-skins.png)
 
 ## Download
 
