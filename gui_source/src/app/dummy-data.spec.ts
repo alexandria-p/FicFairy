@@ -2,7 +2,7 @@ import { BUILT_IN_CONFIG, Jobs, ServerConfig } from './jobs';
 import { TestBed } from '@angular/core/testing';
 import { DebugMode } from './debug-mode';
 import { DUMMY_DATA_KEY, DummyData, SKINNED_WORK, dummyLibrary } from './dummy-data';
-import { SAMPLE_WORK_SKIN } from './skin-sample';
+import { SAMPLE_CHAT, SAMPLE_CHAT_NOTE, SAMPLE_WORK_SKIN, skinSampleWork } from './skin-sample';
 import { readRunHistory } from './library-store';
 import { workIdFromFilename } from './bookmarks';
 import library from './dummy-library.json';
@@ -48,7 +48,9 @@ describe('dummyLibrary', () => {
     expect(page).toContain('<div class="whatsapp light">');
     expect(page).toContain('Halloween Town');
     expect(page).toContain('has a work skin');
-    expect(page).toContain('A made-up work');
+    expect(page).not.toContain('not downloaded from anywhere');
+    // a guest opening it sees exactly the page the reading skins Preview shows
+    expect(page).toBe(await skinSampleWork(SAMPLE_CHAT, SAMPLE_CHAT_NOTE));
   });
 
   it('gives every work file an index entry, so nothing offers to repair it', async () => {

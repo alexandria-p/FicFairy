@@ -74,7 +74,7 @@ interface LibraryFile {
 export async function dummyLibrary(kind: DummyKind): Promise<MemoryStore> {
   const LIBRARY = (await import('./dummy-library.json')).default as unknown as LibraryFile;
   // the sample work and its skin are read with the library, so neither is in the page's first download
-  const { SAMPLE_CHAT, SAMPLE_WORK_SKIN, sampleWorkHtml } = await import('./skin-sample');
+  const { SAMPLE_CHAT, SAMPLE_CHAT_NOTE, SAMPLE_WORK_SKIN, sampleWorkHtml } = await import('./skin-sample');
   const store = new MemoryStore([], {}, kind === 'local' ? 'dummy library - this computer' : 'dummy library - Dropbox');
   const put = (path: string, value: unknown, changed: number) => {
     store.files.set(path, typeof value === 'string' ? value : JSON.stringify(value, null, 2));
@@ -92,7 +92,9 @@ export async function dummyLibrary(kind: DummyKind): Promise<MemoryStore> {
       put(
         `works/${file}`,
         format !== 'html' ? `A made-up ${format} of ${reading.title}`
-          : id === SKINNED_WORK ? sampleWorkHtml(reading as unknown as SampleReading, SAMPLE_CHAT, MADE_UP_NOTE)
+          // exactly the page the reading skins Preview shows: its newest reading, the chat and its note
+          : id === SKINNED_WORK
+            ? sampleWorkHtml(work.entry.indexes[work.entry.indexes.length - 1] as unknown as SampleReading, SAMPLE_CHAT, SAMPLE_CHAT_NOTE)
           : workHtml({ title: reading.title, n }),
         updated,
       );
@@ -110,7 +112,6 @@ export async function dummyLibrary(kind: DummyKind): Promise<MemoryStore> {
  * a run saves one (`skins/<n>.css`).
  */
 export const SKINNED_WORK = '90000001';
-const MADE_UP_NOTE = 'A made-up work. It was not downloaded from anywhere.';
 
 /** the text of every dummy work: lorem ipsum, and nothing that reads as anybody's story */
 const LOREM = [
