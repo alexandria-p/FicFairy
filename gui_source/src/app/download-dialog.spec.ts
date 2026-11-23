@@ -3786,6 +3786,13 @@ describe('DownloadDialog', () => {
     expect(jobs.started[0].filetypes).not.toContain('JSON');
   });
 
+  it("puts no hint under a quick scan's choices of what it covers", async () => {
+    await open('quick');
+    await advanceTo('options');
+    expect(element.textContent).toContain('Anything that has changed since my last run');
+    expect(element.querySelectorAll('.coverage-hint').length).toBe(0);
+  });
+
   it("says whether a work with no index entry is picked up only under the custom run's outdated-check choices", async () => {
     await open('custom');
     await advanceTo('options');
