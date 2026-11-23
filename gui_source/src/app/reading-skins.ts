@@ -1,5 +1,6 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { Library } from './library';
+import { HelperConnection } from './helper-connection';
 import { LibraryStore } from './library-store';
 import { AO3_READING_SKIN } from './ao3-reading-skin';
 import { breaksOutOfStyle } from './skin-html';
@@ -93,8 +94,10 @@ export class ReadingSkins {
   /** whether the reading skin goes under a work's own skin (the default), or is left off it */
   readonly layer = signal(safeGet(LAYER_SKIN_KEY) !== 'off');
   readonly defaultSkin = computed(() => this.skins().find((x) => skinId(x) === this.defaultId()) ?? null);
-  /** whether the open library can take a skin */
-  readonly libraryWritable = computed(() => !!this.library.store());
+  /** a guest saves skins to this browser alone - their library is the made-up one, gone on a reload */
+  readonly guest = inject(HelperConnection).guest;
+  /** whether the open library can take a skin - never a guest's */
+  readonly libraryWritable = computed(() => !!this.library.store() && !this.guest());
 
   private readGeneration = 0;
 
@@ -159,6 +162,7 @@ export class ReadingSkins {
       return null;
     }
     const store = this.library.store();
+    if (this.guest()) return 'In guest mode a skin can only be saved to this browser.';
     if (!store) return 'Open a library first, to save a skin there.';
     try {
       await store.write(libraryPath(shown), new Response(css));

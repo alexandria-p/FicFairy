@@ -17,6 +17,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { DebugMode } from './debug-mode';
 import { HelperConnection } from './helper-connection';
 import { MemoryStore } from './memory-store';
+import type { SampleReading } from './skin-sample';
 import { safeGet, safeRemove, safeSet } from './storage';
 
 export const DUMMY_DATA_KEY = 'ao3.dummyData';
@@ -72,6 +73,8 @@ interface LibraryFile {
  */
 export async function dummyLibrary(kind: DummyKind): Promise<MemoryStore> {
   const LIBRARY = (await import('./dummy-library.json')).default as unknown as LibraryFile;
+  // the sample work and its skin are read with the library, so neither is in the page's first download
+  const { SAMPLE_CHAT, SAMPLE_CHAT_NOTE, SAMPLE_WORK_SKIN, sampleWorkHtml } = await import('./skin-sample');
   const store = new MemoryStore([], {}, kind === 'local' ? 'dummy library - this computer' : 'dummy library - Dropbox');
   const put = (path: string, value: unknown, changed: number) => {
     store.files.set(path, typeof value === 'string' ? value : JSON.stringify(value, null, 2));
@@ -80,12 +83,19 @@ export async function dummyLibrary(kind: DummyKind): Promise<MemoryStore> {
   LIBRARY.works.forEach((work, n) => {
     put(`indexing/${work.indexFile}`, work.entry, NOW);
     const reading = work.entry.indexes[0];
+    const id = work.indexFile.split(' ')[0];
+    // one work - and only one - has a work skin, so a guest sees the rainbow brush and what it does
+    if (id === SKINNED_WORK) put(`skins/${id}.css`, SAMPLE_WORK_SKIN, NOW);
     const updated = Date.parse(reading.date_updated) || NOW - n * DAY;
     for (const file of work.files) {
       const format = file.slice(file.lastIndexOf('.') + 1);
       put(
         `works/${file}`,
-        format === 'html' ? workHtml({ title: reading.title, n }) : `A made-up ${format} of ${reading.title}`,
+        format !== 'html' ? `A made-up ${format} of ${reading.title}`
+          // exactly the page the reading skins Preview shows: its newest reading, the chat and its note
+          : id === SKINNED_WORK
+            ? sampleWorkHtml(work.entry.indexes[work.entry.indexes.length - 1] as unknown as SampleReading, SAMPLE_CHAT, SAMPLE_CHAT_NOTE)
+          : workHtml({ title: reading.title, n }),
         updated,
       );
     }
@@ -95,6 +105,13 @@ export async function dummyLibrary(kind: DummyKind): Promise<MemoryStore> {
   for (const { file, run } of LIBRARY.runs) put(`runs/${file}`, run, Date.parse(run.started ?? '') || NOW);
   return store;
 }
+
+/**
+ * The one dummy work with a work skin: Spooky Scary Skeletons, its html the reading skins Preview's
+ * sample (the group chat in its first chapter) and its skin that Preview's chat-app skin, saved as
+ * a run saves one (`skins/<n>.css`).
+ */
+export const SKINNED_WORK = '90000001';
 
 /** the text of every dummy work: lorem ipsum, and nothing that reads as anybody's story */
 const LOREM = [

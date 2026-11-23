@@ -29,6 +29,17 @@ const LOOK = { palette: 'strawberry-milk', font: 'lexend' };
 // the made-up library, shared with debug mode's dummy data and guest mode - change it there
 const LIBRARY = require(path.join(ROOT, 'gui_source', 'src', 'app', 'dummy-library.json'));
 
+// the one work with a creator work skin, as dummy data shows it: its html is the work-skin
+// Preview's page, and its skin the sample chat-app one - read from the page's own skin-sample.ts
+const SKINNED_WORK = '90000001';
+const SAMPLE = (() => {
+  const { transformSync } = require(path.join(ROOT, 'gui_source', 'node_modules', 'esbuild'));
+  const source = fs.readFileSync(path.join(ROOT, 'gui_source', 'src', 'app', 'skin-sample.ts'), 'utf8');
+  const mod = { exports: {} };
+  new Function('module', 'exports', 'require', transformSync(source, { loader: 'ts', format: 'cjs' }).code)(mod, mod.exports, require);
+  return mod.exports;
+})();
+
 // endregion
 
 // region the page
@@ -48,7 +59,7 @@ function serve() {
 }
 
 async function setUp(page, { issues }) {
-  await page.evaluate(async ({ name, works, collections, customs, runs, issues }) => {
+  await page.evaluate(async ({ skinned, name, works, collections, customs, runs, issues }) => {
     const top = await navigator.storage.getDirectory();
     for await (const old of top.keys()) await top.removeEntry(old, { recursive: true });
     const root = await top.getDirectoryHandle(name, { create: true });
@@ -60,8 +71,13 @@ async function setUp(page, { issues }) {
     const worksDir = await root.getDirectoryHandle('works', { create: true });
     for (const w of works) {
       await write(indexing, w.indexFile, JSON.stringify(w.entry));
-      for (const file of w.files) await write(worksDir, file, '<p>A made-up work.</p>');
+      for (const file of w.files) {
+        await write(worksDir, file, w.entry.id === skinned.id && file.endsWith('.html') ? skinned.html : '<p>A made-up work.</p>');
+      }
     }
+    const skins = await root.getDirectoryHandle('skins', { create: true });
+    await write(skins, `${skinned.id}.css`, skinned.css);
+
     if (issues) {
       // files you already had: two works with no index entry, and one with no date in the name
       await write(worksDir, '80000101 Moonlit Market - Paper_Moth.html', '<p>x</p>');
@@ -76,9 +92,18 @@ async function setUp(page, { issues }) {
     for (const { file, run } of runs) await write(runsDir, file, JSON.stringify(run));
     await root.getDirectoryHandle('images', { create: true });
   }, {
+    skinned: skinnedWork(),
     name: LIBRARY_NAME, works: LIBRARY.works, collections: LIBRARY.collections, customs: LIBRARY.customCollections,
     runs: LIBRARY.runs, issues,
   });
+}
+
+/** the skinned work's html and its AO3 skin, as setUp writes them */
+function skinnedWork() {
+  const work = LIBRARY.works.find((w) => w.entry.id === SKINNED_WORK);
+  const reading = work.entry.indexes[work.entry.indexes.length - 1];
+  return { id: SKINNED_WORK, html: SAMPLE.sampleWorkHtml(reading, SAMPLE.SAMPLE_CHAT, SAMPLE.SAMPLE_CHAT_NOTE),
+    css: SAMPLE.SAMPLE_WORK_SKIN };
 }
 
 async function open(browser, o = {}) {
@@ -96,6 +121,8 @@ async function open(browser, o = {}) {
     localStorage.setItem('ao3.browserNoticeSeen', 'true');
     localStorage.setItem('ao3.folderWarningDismissed', 'true');
     localStorage.setItem('ao3.ao3TimeZone', 'UTC');
+    // AO3's look as the site skin, layered under a work's own skin as the work opens
+    localStorage.setItem('ao3.readingSkinDefault', 'builtin:AO3');
     const grant = async () => 'granted';
     FileSystemHandle.prototype.queryPermission = grant;
     FileSystemHandle.prototype.requestPermission = grant;
@@ -129,6 +156,21 @@ async function open(browser, o = {}) {
 }
 
 const tab = (page, name) => page.locator('nav.views button', { hasText: name }).first().click();
+
+/** the work skins picture: the reading skins settings on the left, the work opened on the right */
+async function skinGrid(browser, settings, work, name) {
+  const page = await browser.newPage({ viewport: { width: 2200, height: 400 }, deviceScaleFactor: 1 });
+  const img = (f, style) => `<img src="data:image/png;base64,${fs.readFileSync(f).toString('base64')}" style="display:block;border-radius:10px;box-shadow:0 2px 10px #0002;${style}">`;
+  await page.setContent(`<body style="margin:0;background:#fbeef2"><div id="grid" style="display:inline-flex;gap:28px;padding:28px;align-items:flex-start">
+    ${img(settings, 'width:1100px')}${img(work, 'width:auto')}</div></body>`);
+  // the chat as tall as the settings beside it
+  await page.evaluate(() => Promise.all([...document.images].map((i) => i.decode())));
+  await page.evaluate(() => { const [left, right] = document.images; right.style.height = `${left.offsetHeight}px`; });
+  const box = await page.locator('#grid').boundingBox();
+  await page.setViewportSize({ width: Math.ceil(box.width), height: Math.ceil(box.height) });
+  await page.screenshot({ path: path.join(OUT, name) });
+  await page.close();
+}
 
 /** the three looks, cut into strips and stacked into one picture */
 async function stack(browser, files, name) {
@@ -187,6 +229,30 @@ async function stack(browser, files, name) {
       await page.close();
     }
     await stack(browser, looks, 'customisation.png');
+
+    // work skins: the reading skins settings (the rainbow brush in its sentence), and the work opened in its skin
+    page = await open(browser, { viewport: { width: 1100, height: 1400 } });
+    const tmp = (file) => path.join(require('os').tmpdir(), file);
+    const entry = page.locator('li.blurb', { hasText: 'Spooky Scary Skeletons' }).first();
+    const [opened] = await Promise.all([
+      page.context().waitForEvent('page'),
+      entry.locator('.blurb-titles a').first().click(),
+    ]);
+    await opened.setViewportSize({ width: 560, height: 1100 });
+    await opened.waitForLoadState('load');
+    await opened.waitForTimeout(1500);
+    // the chat the creator's skin draws, cut close round it
+    const chat = await opened.locator('.whatsapp').first().boundingBox();
+    await opened.screenshot({ path: tmp('skin-work.png'), fullPage: true,
+      clip: { x: Math.max(0, chat.x - 12), y: Math.max(0, chat.y - 12), width: chat.width + 24, height: chat.height + 24 } });
+    await opened.close();
+    await tab(page, 'User settings'); await page.waitForTimeout(600);
+    const skinSettings = page.locator('details.reading-skins');
+    await skinSettings.locator('summary').first().click();
+    await page.waitForTimeout(600);
+    await skinSettings.screenshot({ path: tmp('skin-settings.png') });
+    await page.close();
+    await skinGrid(browser, tmp('skin-settings.png'), tmp('skin-work.png'), 'work-skins.png');
 
     page = await open(browser, { viewport: { width: 420, height: 860 } });
     await page.waitForTimeout(800);

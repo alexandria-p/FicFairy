@@ -3,7 +3,7 @@
  *
  * The hosted copy is its owner's. Everyone else who opens it gets a tour instead of a passcode
  * window: the dummy library, pretend runs that go through every step and touch nothing, and
- * the settings they can change for themselves (time zone and appearance) - and nothing that
+ * the settings they can change for themselves (time zone, appearance and reading skins) - and nothing that
  * reaches the owner's helper, AO3, FicHub or anyone's Dropbox.
  *
  * - **Only a hosted copy that needs a passcode** opens as a guest (`HelperConnection.guest`,

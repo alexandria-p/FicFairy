@@ -200,6 +200,10 @@
       <input type="checkbox" name="missingIndex" [checked]="missingIndex()" (change)="missingIndex.set($any($event.target).checked)" />
       Missing a FicFairy index
     </label>
+    <label title="A work skin fetched from AO3, or one you uploaded">
+      <input type="checkbox" name="withSkin" [checked]="withSkin()" (change)="withSkin.set($any($event.target).checked)" />
+      Works with a work skin
+    </label>
   </p>
 
   <p class="filter-hidden">

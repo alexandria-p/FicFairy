@@ -555,7 +555,13 @@ export class GuestRun {
       }
       case 'skins': {
         this.mark(id, 'running');
-        for (const work of this.picked(works).slice(0, 2)) {
+        // works picked from the Works tab are named as the helper names them; nothing is written
+        const asked = this.request.options['skinWorks'];
+        const ids = Array.isArray(asked) ? asked.map(String) : [];
+        const named = ids.length
+          ? ids.map((n) => works.find((w) => w.id === n) ?? { id: n, title: `work ${n}`, author: '', updated: '' })
+          : this.picked(works).slice(0, 2);
+        for (const work of named) {
           await this.wait(pace.work);
           this.say(`work skin saved for ${work.title}`);
         }

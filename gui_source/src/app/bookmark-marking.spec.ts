@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Bookmark, flattenRecord, isBookmarkEntry } from './bookmarks';
+import { HelperConnection } from './helper-connection';
 import { Library, emptyCopies, markedBookmarked } from './library';
 import { LibraryStore } from './library-store';
 import { Jobs } from './jobs';
@@ -383,6 +384,15 @@ describe('downloading or updating from the Works tab', () => {
 
     const items = [...(await menuOf('Work 12')).querySelectorAll('button')].map((b) => b.className.split(' ')[0]);
     expect(items.slice(-4)).toEqual(['skin-now', 'toggle-skin', 'upload-skin', 'view-index']);
+  });
+
+  it('offers a guest no work skin upload - their library is the made-up one', async () => {
+    TestBed.inject(HelperConnection).guest.set(true);
+    await listing([work('11')]);
+    const menu = await menuOf('Work 11');
+    expect(menu.querySelector('button.upload-skin')).toBeNull();
+    expect(menu.querySelector('button.skin-now')).not.toBeNull();
+    TestBed.inject(HelperConnection).guest.set(false);
   });
 
   it('offers no work skin upload, replace, remove or toggle on a series bookmark or an external work', async () => {

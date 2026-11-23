@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { DebugMode } from './debug-mode';
+import { HelperConnection } from './helper-connection';
 import { Library } from './library';
 import { MemoryStore } from './memory-store';
 import { BROWSER_SKINS_KEY, BUILT_IN_SKINS, DEFAULT_SKIN_KEY, LAYER_SKIN_KEY, ReadingSkins, skinProblem } from './reading-skins';
@@ -245,6 +246,18 @@ describe('ReadingSkins', () => {
 
     expect(skins.libraryWritable()).toBe(false);
     expect(await skins.add('Cosy', SKIN, 'library')).toContain('Open a library');
+  });
+
+  it('lets a guest save skins to this browser, never to the made-up library', async () => {
+    const store = new MemoryStore();
+    const { skins } = setUp(store);
+    TestBed.inject(HelperConnection).guest.set(true);
+
+    expect(skins.libraryWritable()).toBe(false);
+    expect(await skins.add('Cosy', SKIN, 'library')).toContain('only be saved to this browser');
+    expect(await store.list('', true)).toEqual([]);
+    expect(await skins.add('Cosy', SKIN, 'browser')).toBeNull();
+    expect(skins.browserSkins().map((x) => x.name)).toEqual(['Cosy']);
   });
 
   it('hands the default skin to the library while debug mode is on, and nothing otherwise', async () => {
@@ -526,7 +539,7 @@ describe('ReadingSkinsSettings', () => {
       'You can choose a default reading skin for FicFairy. It works like a "site skin" does on AO3. ' +
       'Your default skin and any work skins are applied to downloaded HTML files if you open them through FicFairy.');
     expect(element.querySelector('.no-styling')?.textContent?.trim()).toBe(
-      'HTML works are always downloaded from AO3 with no styling. Works downloaded from FicHub may look different to AO3.');
+      'HTML works are always downloaded with no styling - so skins (CSS) are only applied if you open the file through FicFairy. Skins may look a little different on works downloaded from FicHub compared to how they look on works downloaded from AO3.');
     expect(element.querySelector('details.how-it-works')).toBeNull();
     const said = element.textContent?.replace(/\s+/g, ' ') ?? '';
     expect(said).toContain('paintbrush icon');
@@ -694,7 +707,10 @@ describe('ReadingSkinsSettings', () => {
         await vi.waitFor(() => expect(tab.location.href).not.toBe(''), { timeout: 20_000, interval: 20 });
         const html = await (made.mock.calls[0][0] as Blob).text();
         expect(html).toContain('id="workskin"');
-        expect(html).toContain('border-radius: 1.2em');
+        // the chat-app work skin, and the chat it styles
+        expect(html).toContain('#workskin .whatsapp .topbar');
+        expect(html).toContain('<div class="whatsapp light">');
+        expect(html).toContain('social media / group chat style');
         // no site skin is active, so AO3's stands in
         expect(html.includes('AO3 - comes with FicFairy')).toBe(layered);
       } finally {

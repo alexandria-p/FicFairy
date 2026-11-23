@@ -28,4 +28,4 @@ The words this project uses.
 | **Bundle** | The page and helper built into `build/`, run with PowerShell and uv. |
 | **Windows / Mac / Linux app** | The bundle with Python packed in, as a zip. |
 | **Hosted copy** | The page on GitHub Pages and the helper on a hosting service, for one person. |
-| **Guest mode** | The hosted copy opened without its passcode: a made-up library and pretend runs that fetch and save nothing. Only the time zone and appearance can be changed. The owner leaves it from *enter passcode here*, under *Advanced* at the bottom of User settings. |
+| **Guest mode** | The hosted copy opened without its passcode: a made-up library and pretend runs that fetch and save nothing. Only the time zone, appearance and reading skins can be changed, and are kept in the browser. The owner leaves it from *enter passcode here*, under *Advanced* at the bottom of User settings. |

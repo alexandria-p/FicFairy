@@ -281,10 +281,6 @@
               <span>
                 @if (action() === 'quick') {
                   (Recommended) Anything that has changed since my last run
-                  <span class="hint coverage-hint">
-                    A work with no index entry yet is picked up and checked only if it is one of your
-                    AO3 bookmarks, bookmarked or updated on AO3 since your last scan.
-                  </span>
                 } @else {
                   All bookmarks
                 }
@@ -322,10 +318,6 @@
                        (change)="coverage.set('run')" />
                 <span>
                   Choose which earlier scan to measure back to
-                  <span class="hint coverage-hint">
-                    A work with no index entry yet is picked up and checked only if it is one of your
-                    AO3 bookmarks, bookmarked or updated on AO3 since the scan you choose.
-                  </span>
                 </span>
               </label>
             }
@@ -338,10 +330,6 @@
                        (change)="coverage.set('dates')" />
                 <span>
                   [DEBUG] Choose my own date range
-                  <span class="hint coverage-hint">
-                    A work with no index entry yet is picked up and checked only if it is one of
-                    your AO3 bookmarks, bookmarked or updated on AO3 within the range.
-                  </span>
                 </span>
               </label>
             }

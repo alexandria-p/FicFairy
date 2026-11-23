@@ -25,6 +25,7 @@ export function ficLists(run: Pick<RunHistory, 'reindexed' | 'newlyIndexed' | 'd
 import { StorageChoice } from './storage-choice';
 import { VisitLog } from './visit-log';
 import { DummyData } from './dummy-data';
+import { DebugMode } from './debug-mode';
 import { ProgressBar } from './progress-bar';
 import { HISTORY_LIMIT } from './library-store';
 
@@ -73,6 +74,8 @@ export class History {
   protected readonly device = inject(DeviceSupport);
   /** a guest's history is the dummy library's: nothing in it can be retried (`guest.ts`) */
   protected readonly guest = inject(HelperConnection).guest;
+  /** FicHub's odd reply is offered only in debug mode - it is for troubleshooting */
+  protected readonly debugMode = inject(DebugMode);
   private readonly storage = inject(StorageChoice);
   /**
    * ' from Dropbox' while the library is there: History is always read straight from it - every
@@ -301,6 +304,44 @@ export class History {
       saveText([...head, '', ...lines].join('\n') + '\n', `run-log-${this.stampOf(run)}`);
     } catch {
       // the file is gone or unreadable; the button stays, and the list says what there was
+    } finally {
+      this.readingLog.set('');
+    }
+  }
+
+  /**
+   * Save the first reply FicHub gave this run that was not its usual one (`fichubOddReply`,
+   * kept by the helper for troubleshooting), with what it was asked and when, then the body
+   * as FicHub sent it. Read from the run's file when asked for, as the log is.
+   */
+  protected async downloadOddReply(run: RunHistory): Promise<void> {
+    const store = this.library.store();
+    if (!store || this.readingLog()) return;
+    this.readingLog.set(run.id);
+    try {
+      const live = this.activeRuns().some((active) => active.id === run.id)
+        ? await this.jobs.liveRecord(run.id)
+        : null;
+      const record = (live ?? JSON.parse((await store.read(`runs/${run.file}`)) ?? '{}')) as {
+        fichubOddReply?: { id?: string; link?: string; at?: string; url?: string; status?: number;
+          contentType?: string; length?: number; body?: string };
+      };
+      const reply = record.fichubOddReply;
+      if (!reply) return;
+      const body = reply.body ?? '';
+      const head = [
+        `# FicHub's odd reply, from ${run.actionName} started ${this.when(run.started)}`,
+        `# work: ${reply.id ?? ''} ${reply.link ?? ''}`.trimEnd(),
+        `# asked: ${reply.url ?? ''}`,
+        `# when: ${reply.at ? this.when(reply.at) : ''}`,
+        `# status: ${reply.status ?? ''}`,
+        `# content type: ${reply.contentType ?? ''}`,
+        `# length: ${reply.length ?? body.length} characters${(reply.length ?? 0) > body.length ? ` (the first ${body.length} kept)` : ''}`,
+        '#',
+      ];
+      saveText([...head, body].join('\n') + '\n', `fichub-reply-${this.stampOf(run)}`);
+    } catch {
+      // the file is gone or unreadable; nothing to save
     } finally {
       this.readingLog.set('');
     }

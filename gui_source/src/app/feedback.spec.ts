@@ -824,6 +824,22 @@ describe('runSummary', () => {
   });
 });
 
+describe("runSummary and FicHub's odd reply", () => {
+  it('always puts the start of the odd reply in the overview, which is never cut', () => {
+    const lines = runSummary({
+      fichubOddReply: { id: '75354806', status: 200, contentType: 'text/html', length: 5000, body: 'x'.repeat(5000) },
+    });
+    expect(lines).toContain("FicHub's odd reply: work 75354806, status 200, text/html, 5,000 characters (the first 3,000 below)");
+    const start = lines.indexOf('--- FicHub reply starts ---');
+    expect(lines[start + 1]).toBe('x'.repeat(3000));
+    expect(lines[start + 2]).toBe('--- FicHub reply ends ---');
+  });
+
+  it('says nothing of FicHub for a run that kept no odd reply', () => {
+    expect(runSummary({}).join('\n')).not.toContain('FicHub');
+  });
+});
+
 describe('failureReason', () => {
   it('names a timeout, an unreachable service, and passes the service\'s own words on', () => {
     expect(failureReason(new DOMException('t', 'TimeoutError'))).toContain('took too long');

@@ -90,6 +90,8 @@ export function issueLength(message: string, log: string, visit: string): number
 
 /** at most this much of a run's log goes with feedback - its newest part - the Worker's `LIMITS.log` */
 export const LOG_ATTACH_LIMIT = 60000;
+/** how much of FicHub's odd reply goes in an attached run's overview - its start says what it was */
+export const ODD_REPLY_ATTACH_CHARS = 3000;
 
 /** at most this much of the visit's log goes with feedback - its newest part, where a bug is */
 export const VISIT_ATTACH_LIMIT = 30000;
@@ -237,6 +239,19 @@ export function runSummary(record: Record<string, unknown>): string[] {
   ];
   const said = kinds.filter(([n]) => n).map(([n, what]) => `${n} ${what}`);
   lines.push(`Issues: ${said.length ? said.join('; ') : 'none'}`);
+  // the first reply FicHub gave that was not its usual one, kept with the run for this: always
+  // in the overview, so it is never the part of a long log left out
+  const odd = record['fichubOddReply'];
+  if (odd && typeof odd === 'object') {
+    const reply = odd as Record<string, unknown>;
+    const body = text(reply['body']);
+    const length = Number(reply['length']) || body.length;
+    const shown = body.slice(0, ODD_REPLY_ATTACH_CHARS);
+    lines.push(`FicHub's odd reply: work ${text(reply['id']) || 'unknown'}, status ${String(reply['status'] ?? 'unknown')}, ` +
+      `${text(reply['contentType']) || 'no content type'}, ${length.toLocaleString('en')} characters` +
+      `${length > shown.length ? ` (the first ${shown.length.toLocaleString('en')} below)` : ''}`);
+    lines.push('--- FicHub reply starts ---', shown, '--- FicHub reply ends ---');
+  }
   const trimmed = Number(record['logTrimmed']) || 0;
   lines.push(`Log: ${count(record['log']).toLocaleString('en')} lines${trimmed ? ` (${trimmed.toLocaleString('en')} earlier lines dropped by the run itself)` : ''}`);
   return lines;

@@ -112,6 +112,27 @@ def test_anything_but_an_answer_about_this_work_is_a_failure(repo):
         fichub.lookup(repo, LINK)
 
 
+def test_an_odd_reply_is_kept_on_the_failure_to_look_at_afterwards():
+    repo = answering(body=ValueError('not json'), content_type='text/html')
+    repo.my_request.return_value.text = '<html>Checking your browser...</html>'
+    with pytest.raises(exceptions.FicHubException) as raised:
+        fichub.lookup(repo, LINK)
+    assert str(raised.value) == strings.ERROR_FICHUB_NOT_JSON
+    reply = raised.value.reply
+    assert reply['status'] == 200 and reply['contentType'] == 'text/html'
+    assert reply['body'] == '<html>Checking your browser...</html>'
+    assert reply['url'].startswith('https://fichub.net/api/v0/epub?q=')
+
+
+def test_an_odd_reply_keeps_only_the_start_of_a_long_body():
+    repo = answering(body={'no': 'meta'})
+    repo.my_request.return_value.text = 'x' * (fichub.ODD_REPLY_KEPT_CHARS + 10)
+    with pytest.raises(exceptions.FicHubException) as raised:
+        fichub.lookup(repo, LINK)
+    assert raised.value.reply['length'] == fichub.ODD_REPLY_KEPT_CHARS + 10
+    assert len(raised.value.reply['body']) == fichub.ODD_REPLY_KEPT_CHARS
+
+
 def test_a_format_is_fetched_from_fichub_itself():
     repo = answering(content=b'epub bytes', content_type='application/epub+zip')
     assert fichub.download(repo, wolfbird(), 'EPUB') == b'epub bytes'
@@ -230,6 +251,36 @@ def test_a_work_ao3_would_not_give_us_is_indexed_and_downloaded_from_fichub(libr
     assert ao3.rescued == [{'id': '75354806', 'link': LINK, 'title': 'Wolfbird',
                             'downloaded': ['EPUB', 'HTML']}]
     assert '75354806' in ao3.downloaded
+
+
+@pytest.mark.fichub
+def test_only_the_first_odd_reply_of_a_run_is_kept_with_it(library, monkeypatch):
+    replies = iter(['<p>first</p>', '<p>second</p>'])
+
+    def lookup(repo, link):
+        raise exceptions.FicHubException(strings.ERROR_FICHUB_NOT_JSON, reply={
+            'url': 'u', 'status': 200, 'contentType': 'text/html', 'length': 12, 'body': next(replies)})
+
+    monkeypatch.setattr(server.fichub, 'lookup', lookup)
+    failed = ao3_failed() + [{'id': '2', 'link': 'https://archiveofourown.org/works/2', 'error': 'x'}]
+    job, ao3, asked = a_run(library, ['JSON', 'HTML'], failed)
+
+    server.rescue_with_fichub(job, library, ao3, MagicMock())
+
+    assert ao3.fichub_odd_reply['body'] == '<p>first</p>'
+    assert ao3.fichub_odd_reply['id'] == '75354806'
+    assert len(ao3.failures) == 2
+
+    # kept with the run, and never replaced by a later collect
+    from source_code import runs
+    fileops = MagicMock()
+    fileops.runsfolder = str(library.downloadfolder)
+    record = runs.RunRecord(fileops, 'abcdef123456', 'bookmarks', 'Full scan', ['JSON'], {})
+    record.collect(ao3)
+    assert record.data['fichubOddReply']['body'] == '<p>first</p>'
+    ao3.fichub_odd_reply = {**ao3.fichub_odd_reply, 'body': '<p>later</p>'}
+    record.collect(ao3)
+    assert record.data['fichubOddReply']['body'] == '<p>first</p>'
 
 
 @pytest.mark.fichub

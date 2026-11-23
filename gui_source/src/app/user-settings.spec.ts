@@ -109,7 +109,7 @@ describe('UserSettings', () => {
 
   // region guest mode
 
-  it("lets a guest change only the time zone and appearance, and saves nothing else even if forced", async () => {
+  it("lets a guest change only the time zone, appearance and reading skins, and saves nothing else even if forced", async () => {
     TestBed.inject(HelperConnection).guest.set(true);
     await open();
 
@@ -117,6 +117,11 @@ describe('UserSettings', () => {
     expect(element.querySelector('.formats')?.classList).toContain('guest-locked');
     expect(element.querySelector('.formats')?.hasAttribute('inert')).toBe(true);
     expect(element.querySelector('.appearance')?.classList).not.toContain('guest-locked');
+    const skins = element.querySelector('details.reading-skins')!;
+    expect(skins.classList).not.toContain('guest-locked');
+    expect(skins.hasAttribute('inert')).toBe(false);
+    expect(skins.querySelector('.saved-to')?.textContent).toContain('Saved to this browser');
+    expect(skins.querySelector('.saved-to')?.textContent).not.toContain('library');
 
     expect(element.querySelector('.ao3-zone')?.classList).not.toContain('guest-locked');
     expect(element.querySelector<HTMLButtonElement>('button.reset-all')!.disabled).toBe(true);

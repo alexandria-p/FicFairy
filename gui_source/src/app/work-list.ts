@@ -6,6 +6,7 @@ import { WorkLink } from './work-link';
 import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { Library, LocalCopy, OPENABLE_FORMATS, OpenableFormat, WorkSkinSource, copyName, hiddenKey, viewableInBrowser } from './library';
 import { safeGet, safeSet } from './storage';
+import { HelperConnection } from './helper-connection';
 import { Jobs } from './jobs';
 import { Collection, isCustomCollection } from './collections';
 import { CollectionItems, CustomCollections, canCollect, canTick, itemsOf } from './custom-collections';
@@ -121,6 +122,8 @@ export class WorkList {
   protected readonly recommended = signal(false);
   /** only what has no index entry: a file the index does not match, or a work a collection lists */
   protected readonly missingIndex = signal(false);
+  /** works with a work skin saved - AO3's, or one you uploaded */
+  protected readonly withSkin = signal(false);
   /** hidden works are left out unless this is ticked - and then shown, marked as hidden */
   protected readonly showHidden = signal(false);
   /** tags a work must carry, every one of them, and tags it must not carry - as on ao3 */
@@ -167,6 +170,7 @@ export class WorkList {
         this.withNotes() ||
         this.recommended() ||
         this.missingIndex() ||
+        this.withSkin() ||
         this.includeTags().length ||
         this.excludeTags().length
       ),
@@ -202,6 +206,7 @@ export class WorkList {
     const withNotes = this.withNotes();
     const recommended = this.recommended();
     const missingIndex = this.missingIndex();
+    const withSkin = this.withSkin();
 
     return this.visibleWorks().filter((work) => {
       if (missingIndex && !work.unindexed && !work.placeholder) return false;
@@ -215,6 +220,7 @@ export class WorkList {
       }
       if (withNotes && !(work.bookmark_notes ?? '').trim()) return false;
       if (recommended && !work.bookmark_rec) return false;
+      if (withSkin && !this.hasSkin(work)) return false;
       if (!matchesTags(work, include, exclude)) return false;
       if (title && !(work.title ?? '').toLowerCase().includes(title)) return false;
       if (author && !(work.authors ?? []).some((name) =>
@@ -430,6 +436,8 @@ export class WorkList {
   // region marking entries as bookmarks by hand
 
   private readonly jobs = inject(Jobs);
+  /** a guest's library is the made-up one: nothing of theirs is uploaded to it */
+  private readonly guest = inject(HelperConnection).guest;
 
   /** whether a work skin is saved for this entry's work - shown as an icon in its corner */
   protected hasSkin(work: Bookmark): boolean {
@@ -460,8 +468,9 @@ export class WorkList {
   }
 
   /** a work you can upload a skin of your own for: a work, in a library the page can write */
+  // never a guest's: their library is the made-up one, and nothing of theirs is uploaded to it
   protected canUploadSkin(work: Bookmark): boolean {
-    return this.canSelect() && !work.error && this.worksToFetch(work).length > 0;
+    return !this.guest() && this.canSelect() && !work.error && this.worksToFetch(work).length > 0;
   }
 
   protected readonly skinSources: { value: WorkSkinSource; label: string }[] = [
@@ -1024,6 +1033,7 @@ export class WorkList {
     this.formatFilter.set('');
     this.withNotes.set(false);
     this.missingIndex.set(false);
+    this.withSkin.set(false);
     this.recommended.set(false);
     this.includeTags.set([]);
     this.excludeTags.set([]);

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { History, LINKS_SHOWN } from './history';
 import { ActiveRun, Jobs, RunHistory } from './jobs';
 import { Library } from './library';
+import { DebugMode } from './debug-mode';
 import { StorageChoice } from './storage-choice';
 
 function aRun(over: Partial<RunHistory> = {}): RunHistory {
@@ -822,6 +823,47 @@ describe('History', () => {
     expect(text.trim().split('\n').slice(-2)).toEqual(['logging in as Someone', 'new download: 1 A.html']);
     expect(name).toBe('run-log-2026-09-13-abcdef12.txt');
     click.mockRestore();
+  });
+
+  it("offers FicHub's odd reply only in debug mode", async () => {
+    TestBed.inject(DebugMode).set(false);
+    await show([aRun({ id: 'abcdef123', file: 'r.json', hasFichubOddReply: true })]);
+    expect(element.querySelector('button.fichub-odd-reply')).toBeNull();
+  });
+
+  it("offers FicHub's odd reply only where the run kept one, and saves it as FicHub sent it", async () => {
+    TestBed.inject(DebugMode).set(true);
+    let saved: Blob | null = null;
+    let name = '';
+    Object.assign(URL, { createObjectURL: vi.fn((blob: Blob) => ((saved = blob), 'blob:x')),
+                         revokeObjectURL: vi.fn() });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      name = this.download;
+    });
+    const read = vi.fn(async () => JSON.stringify({
+      fichubOddReply: { id: '75354806', link: 'https://archiveofourown.org/works/75354806', url: 'https://fichub.net/api/v0/epub?q=x',
+        status: 200, contentType: 'text/html', length: 26, body: '<html>Just a moment</html>' },
+    }));
+    TestBed.inject(Library).store.set({ read } as never);
+    await show([aRun({ id: 'abcdef123', file: 'r.json', hasFichubOddReply: true }),
+                aRun({ file: 'b.json', id: 'b' })]);
+
+    const buttons = Array.from(element.querySelectorAll<HTMLButtonElement>('button.fichub-odd-reply'));
+    expect(buttons).toHaveLength(1);
+    buttons[0].click();
+    await fixture.whenStable();
+
+    expect(read).toHaveBeenCalledWith('runs/r.json');
+    const text = await saved!.text();
+    expect(text).toContain('# status: 200');
+    expect(text).toContain('# content type: text/html');
+    expect(text).toContain('# work: 75354806');
+    expect(text.trim().split('\n').at(-1)).toBe('<html>Just a moment</html>');
+    expect(name).toBe('fichub-reply-2026-09-13-abcdef12.txt');
+    click.mockRestore();
+    TestBed.inject(DebugMode).set(false);
   });
 
   it('puts what the run was asked to do, and the settings it ran under, above its log', async () => {

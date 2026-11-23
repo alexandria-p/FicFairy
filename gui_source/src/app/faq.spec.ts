@@ -15,13 +15,39 @@ describe('the FAQ', () => {
     const { element } = await faq();
     const legal = element.querySelector('.legal')!;
 
-    expect(element.querySelector('section.faq')?.lastElementChild).toBe(legal);
+    const credit = element.querySelector('.legal-credit')!;
+    // the privacy policy and licence, then the credit to the project this was forked from, under a divider
+    expect(element.querySelector('section.faq')?.lastElementChild).toBe(credit);
+    expect(legal.nextElementSibling).toBe(credit);
     expect(legal.querySelector('.privacy-link')?.getAttribute('href')).toBe(
       'https://github.com/alexandria-p/FicFairy/blob/main/docs/privacy/FicFairy_Privacy-Policy.md',
     );
+    expect(credit.querySelector('.upstream-link')?.getAttribute('href')).toBe('https://github.com/nianeyna/ao3downloader');
+    expect(credit.textContent?.replace(/\s+/g, ' ')).toContain(
+      "FicFairy is a fork of nianeyna's ao3downloader - show them some love and check out their work ❤️",
+    );
+    // the heart stands outside the italics
+    expect(credit.querySelector('em')?.textContent).not.toContain('❤️');
     expect(legal.querySelector('.licence-link')?.getAttribute('href')).toBe(
       'https://github.com/alexandria-p/FicFairy/blob/main/LICENSE',
     );
+  });
+});
+
+describe('the FAQ on work skins', () => {
+  it('says a skin is fetched as css and shown only when the html is opened through FicFairy', async () => {
+    const { element } = await faq();
+    const heading = element.querySelector('h3.reading-skins')!;
+    expect(heading.textContent).toBe('Reading skins');
+    const text = element.textContent!.replace(/\s+/g, ' ');
+    expect(text).toContain('However, we\'ve built a workaround for this - FicFairy can optionally fetch work skins for HTML downloads, and save them as CSS files.');
+    // the workaround closes the paragraph saying styling does not survive a download
+    expect(element.querySelector('em')?.closest('p')?.textContent).toContain('will read as ordinary paragraphs');
+    expect(element.querySelector('.site-skins')?.textContent).toContain('User settings tab');
+    expect(text).toContain('Fetch work skin for HTML downloads');
+    expect(text).toContain('Skins are only applied when you open the work through FicFairy, and only for HTML files.');
+    // the rainbow brush the Works tab marks a skinned work with
+    expect(heading.nextElementSibling?.querySelector('.brush-icon svg')).not.toBeNull();
   });
 });
 

@@ -359,6 +359,10 @@ class RunRecord:
         self.data['keptCopies'] = list(kept) if isinstance(kept, list) else []
         older = getattr(ao3, 'fichub_older', None)
         self.data['fichubOlder'] = list(older) if isinstance(older, list) else []
+        # the first odd reply is kept once had: a later attempt's collect never clears it
+        odd = getattr(ao3, 'fichub_odd_reply', None)
+        if isinstance(odd, dict) and not self.data.get('fichubOddReply'):
+            self.data['fichubOddReply'] = dict(odd)
         clashes = getattr(ao3, 'repair_clashes', None)
         self.data['repairClashes'] = list(clashes) if isinstance(clashes, list) else []
         skins = getattr(ao3, 'skin_failures', None)

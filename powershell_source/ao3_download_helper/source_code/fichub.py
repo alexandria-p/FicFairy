@@ -35,9 +35,11 @@ def lookup(repo, link: str) -> dict:
     try:
         answer = response.json()
     except ValueError as e:
-        raise exceptions.FicHubException(strings.ERROR_FICHUB_NOT_JSON) from e
+        raise exceptions.FicHubException(strings.ERROR_FICHUB_NOT_JSON,
+                                         reply=odd_reply(response, url)) from e
     if not isinstance(answer, dict) or not isinstance(answer.get('meta'), dict):
-        raise exceptions.FicHubException(strings.ERROR_FICHUB_NOT_JSON)
+        raise exceptions.FicHubException(strings.ERROR_FICHUB_NOT_JSON,
+                                         reply=odd_reply(response, url))
     if answer.get('err'):
         raise exceptions.FicHubException(strings.ERROR_FICHUB_LOOKUP.format(
             answer.get('msg') or answer.get('err')))
@@ -47,6 +49,28 @@ def lookup(repo, link: str) -> dict:
     if asked and source and source != asked:
         raise exceptions.FicHubException(strings.ERROR_FICHUB_WRONG_WORK.format(source))
     return answer
+
+
+# how much of an odd reply's body is kept with the run - enough to see what it was
+ODD_REPLY_KEPT_CHARS = 50_000
+
+
+def odd_reply(response, url: str) -> dict:
+    """What FicHub sent when it was not its usual reply, to keep with the run for looking at
+    afterwards (`Ao3.fichub_odd_reply`, the record's `fichubOddReply`): the address asked, the
+    status, the content type and the body's start. Never a header beyond the content type."""
+
+    try:
+        body = response.text or ''
+    except Exception:
+        body = ''
+    return {
+        'url': url,
+        'status': getattr(response, 'status_code', None),
+        'contentType': (getattr(response, 'headers', None) or {}).get('Content-Type', ''),
+        'length': len(body),
+        'body': body[:ODD_REPLY_KEPT_CHARS],
+    }
 
 
 def count(value) -> int | None:
