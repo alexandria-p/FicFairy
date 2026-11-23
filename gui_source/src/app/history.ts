@@ -25,6 +25,7 @@ export function ficLists(run: Pick<RunHistory, 'reindexed' | 'newlyIndexed' | 'd
 import { StorageChoice } from './storage-choice';
 import { VisitLog } from './visit-log';
 import { DummyData } from './dummy-data';
+import { DebugMode } from './debug-mode';
 import { ProgressBar } from './progress-bar';
 import { HISTORY_LIMIT } from './library-store';
 
@@ -73,6 +74,8 @@ export class History {
   protected readonly device = inject(DeviceSupport);
   /** a guest's history is the dummy library's: nothing in it can be retried (`guest.ts`) */
   protected readonly guest = inject(HelperConnection).guest;
+  /** FicHub's odd reply is offered only in debug mode - it is for troubleshooting */
+  protected readonly debugMode = inject(DebugMode);
   private readonly storage = inject(StorageChoice);
   /**
    * ' from Dropbox' while the library is there: History is always read straight from it - every

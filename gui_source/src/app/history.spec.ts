@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { History, LINKS_SHOWN } from './history';
 import { ActiveRun, Jobs, RunHistory } from './jobs';
 import { Library } from './library';
+import { DebugMode } from './debug-mode';
 import { StorageChoice } from './storage-choice';
 
 function aRun(over: Partial<RunHistory> = {}): RunHistory {
@@ -824,7 +825,14 @@ describe('History', () => {
     click.mockRestore();
   });
 
+  it("offers FicHub's odd reply only in debug mode", async () => {
+    TestBed.inject(DebugMode).set(false);
+    await show([aRun({ id: 'abcdef123', file: 'r.json', hasFichubOddReply: true })]);
+    expect(element.querySelector('button.fichub-odd-reply')).toBeNull();
+  });
+
   it("offers FicHub's odd reply only where the run kept one, and saves it as FicHub sent it", async () => {
+    TestBed.inject(DebugMode).set(true);
     let saved: Blob | null = null;
     let name = '';
     Object.assign(URL, { createObjectURL: vi.fn((blob: Blob) => ((saved = blob), 'blob:x')),
@@ -855,6 +863,7 @@ describe('History', () => {
     expect(text.trim().split('\n').at(-1)).toBe('<html>Just a moment</html>');
     expect(name).toBe('fichub-reply-2026-09-13-abcdef12.txt');
     click.mockRestore();
+    TestBed.inject(DebugMode).set(false);
   });
 
   it('puts what the run was asked to do, and the settings it ran under, above its log', async () => {
