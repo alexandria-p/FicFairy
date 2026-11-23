@@ -8,8 +8,8 @@ If it happens a lot, raise `ExtraWaitTime` in [[Settings]] (default 15 seconds).
 
 - **Windows:** "Windows protected your PC" → **More info** → **Run anyway**.
 - **Mac:** **System Settings > Privacy & Security > Open Anyway**. From Terminal, `xattr -dr com.apple.quarantine <the folder>` does the same.
-- **Linux:** run `./"Start ao3downloader.sh"` from a terminal to see why. It needs a glibc at least as new as Ubuntu 22.04's.
-- **"Seems to be running already":** close every ao3downloader window and start it again.
+- **Linux:** run `./"Start FicFairy.sh"` from a terminal to see why. It needs a glibc at least as new as Ubuntu 22.04's.
+- **"Seems to be running already":** close every FicFairy window and start it again.
 
 ## I can't choose a folder
 

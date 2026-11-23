@@ -19,6 +19,8 @@ describe('the FAQ', () => {
     expect(legal.querySelector('.privacy-link')?.getAttribute('href')).toBe(
       'https://github.com/alexandria-p/FicFairy/blob/main/docs/privacy/FicFairy_Privacy-Policy.md',
     );
+    expect(legal.querySelector('.upstream-link')?.getAttribute('href')).toBe('https://github.com/nianeyna/ao3downloader');
+    expect(legal.textContent).toContain("FicFairy is a fork of nianeyna's ao3downloader");
     expect(legal.querySelector('.licence-link')?.getAttribute('href')).toBe(
       'https://github.com/alexandria-p/FicFairy/blob/main/LICENSE',
     );
