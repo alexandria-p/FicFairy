@@ -710,6 +710,7 @@ describe('ReadingSkinsSettings', () => {
         // the chat-app work skin, and the chat it styles
         expect(html).toContain('#workskin .whatsapp .topbar');
         expect(html).toContain('<div class="whatsapp light">');
+        expect(html).toContain('social media / group chat style');
         // no site skin is active, so AO3's stands in
         expect(html.includes('AO3 - comes with FicFairy')).toBe(layered);
       } finally {

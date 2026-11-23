@@ -10,6 +10,10 @@
 /** what the sample says of itself, under its title */
 const SAMPLE_NOTE = 'A sample work, shown to preview your reading skin. It was not downloaded from anywhere.';
 
+/** the note on the work-skin Preview, saying what kind of work skin it shows */
+export const SAMPLE_CHAT_NOTE =
+  'A sample work, shown with an example creator work skin - a social media / group chat style, as some fics use for text messages. It was not downloaded from anywhere.';
+
 export interface SampleReading {
   title: string;
   authors: string[];
@@ -101,12 +105,12 @@ ${line('Rating', work.tags.rating ? [work.tags.rating] : [])}${line('Archive War
  * The first made-up work of the dummy library, as the sample - read when a preview is asked for -
  * with `chat` (the work skin Preview's `SAMPLE_CHAT`) in its first chapter.
  */
-export async function skinSampleWork(chat = ''): Promise<string> {
+export async function skinSampleWork(chat = '', note = SAMPLE_NOTE): Promise<string> {
   const library = (await import('./dummy-library.json')).default as unknown as {
     works: { entry: { indexes: SampleReading[] } }[];
   };
   const readings = library.works[0].entry.indexes;
-  return sampleWorkHtml(readings[readings.length - 1], chat);
+  return sampleWorkHtml(readings[readings.length - 1], chat, note);
 }
 
 /**

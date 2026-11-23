@@ -47,7 +47,7 @@ describe('dummyLibrary', () => {
     expect(page).toContain('Spooky Scary Skeletons');
     expect(page).toContain('<div class="whatsapp light">');
     expect(page).toContain('Halloween Town');
-    expect(page).toContain('turn on creator skin');
+    expect(page).toContain('has a work skin');
     expect(page).toContain('A made-up work');
   });
 
