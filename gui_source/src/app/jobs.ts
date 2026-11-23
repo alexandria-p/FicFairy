@@ -424,6 +424,11 @@ export interface RunHistory {
   helper?: string;
   /** how many lines of the run window's account its history file holds, and how many it dropped */
   logLines?: number;
+  /**
+   * the run kept the first reply FicHub gave that was not its usual one (`fichubOddReply` in the
+   * file, left out of the listing for its size) - History offers it to download
+   */
+  hasFichubOddReply?: boolean;
   logTrimmed?: number;
   /** its log was taken out, being older than the most recent runs - how many lines it had */
   logPruned?: number;

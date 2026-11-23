@@ -205,11 +205,13 @@ export async function* runHistoryBatches(store: LibraryStore): AsyncGenerator<Ru
 
 async function readRunRecord(store: LibraryStore, path: string): Promise<RunHistory | null> {
   try {
-    const record = JSON.parse((await store.read(path)) ?? '') as RunHistory & { log?: string[] };
+    const record = JSON.parse((await store.read(path)) ?? '') as RunHistory & { log?: string[]; fichubOddReply?: unknown };
     if (!record || typeof record !== 'object') return null;
     // the console log is not shown here, and can run to thousands of lines - only how many,
     // so the history can offer it to download. it is read again, on its own, if asked for
-    const { log, ...rest } = record;
+    // nor is FicHub's odd reply, which can be tens of thousands of characters: only that there
+    // is one, read again on its own when downloaded
+    const { log, fichubOddReply, ...rest } = record;
     const file = path.split('/').pop() ?? path;
     // every read, from History, floors or retries alike, tells the interrupted-run check
     // which records it need not download again
@@ -217,6 +219,7 @@ async function readRunRecord(store: LibraryStore, path: string): Promise<RunHist
     return {
       ...rest,
       logLines: Array.isArray(log) ? log.length : 0,
+      hasFichubOddReply: !!fichubOddReply && typeof fichubOddReply === 'object',
       file,
     };
   } catch {

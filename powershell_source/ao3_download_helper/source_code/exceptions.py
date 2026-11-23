@@ -103,5 +103,11 @@ class PausedException(Ao3DownloaderException):
 
 class FicHubException(Ao3DownloaderException):
     """Raised when FicHub cannot give us a work ao3 would not: not there, not in that format,
-    or an answer that is not the one its api gives."""
-    pass
+    or an answer that is not the one its api gives.
+
+    `reply` is what FicHub actually sent, for an answer that was not its usual reply
+    (`fichub.odd_reply`): kept with the run so it can be looked at afterwards."""
+
+    def __init__(self, *args, reply: dict | None = None):
+        super().__init__(*args)
+        self.reply = reply

@@ -256,6 +256,9 @@ class Ao3:
         # for the work: {id, link, title, formats, fichub, latest, latestFrom}. taken anyway (an
         # older version beats none), and warned about, since it may be an older cached copy
         self.fichub_older: list[dict] = []
+        # the first reply this run that was not FicHub's usual one ({id, link, at, url, status,
+        # contentType, length, body}), kept with the run to look at - `note_fichub_odd_reply`
+        self.fichub_odd_reply: dict | None = None
         # Resolve issues' repairs not done: the name the file would get is another file's
         # ({id, link, file, wanted, site}) - reported at the end (`report_failures`)
         self.repair_clashes: list[dict] = []

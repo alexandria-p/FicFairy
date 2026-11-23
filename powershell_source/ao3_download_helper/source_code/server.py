@@ -4970,6 +4970,7 @@ def rescue_one(ao3, failure: dict, entry: dict | None, existing: dict, filetypes
     except Exception as e:
         failure['error'] = strings.ERROR_AO3_AND_FICHUB.format(failure.get('error') or '', e)
         failure['fichub'] = str(e)
+        note_fichub_odd_reply(ao3, failure, e)
         print(strings.AO3_INFO_FICHUB_FAILED_TOO.format(e))
         ao3.log_error(log, e)
         return
@@ -4977,6 +4978,18 @@ def rescue_one(ao3, failure: dict, entry: dict | None, existing: dict, filetypes
     ao3.failures[:] = [x for x in ao3.failures if x is not failure]
     ao3.rescued.append({'id': failure['id'], 'link': link, 'title': title,
                         'downloaded': arrived})
+
+
+def note_fichub_odd_reply(ao3, failure: dict, error: Exception) -> None:
+    """The first reply of a run that was not FicHub's usual one, kept whole enough to look at
+    (`ao3.fichub_odd_reply`, the record's `fichubOddReply`, History's *Download FicHub's odd
+    reply*) - to find out what it was. Only the first: later ones are passed over."""
+
+    reply = getattr(error, 'reply', None)
+    if not isinstance(reply, dict) or getattr(ao3, 'fichub_odd_reply', None):
+        return
+    ao3.fichub_odd_reply = {'id': str(failure.get('id') or ''), 'link': failure.get('link') or '',
+                            'at': runs.now(), **reply}
 
 
 def note_fichub_older(ao3, failure: dict, record: dict, entry: dict | None, held: dict,

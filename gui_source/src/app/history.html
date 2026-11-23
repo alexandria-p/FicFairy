@@ -260,7 +260,7 @@
             (User settings, under Advanced).
           </p>
         }
-        @if (issuesIn(run) || run.logLines) {
+        @if (issuesIn(run) || run.logLines || run.hasFichubOddReply) {
           <div class="run-issues">
             @if (issuesIn(run)) {
               <button type="button" class="button" (click)="downloadIssues(run)"
@@ -273,6 +273,13 @@
                       (click)="downloadLog(run)"
                       title="Everything the run said in its window, line by line">
                 {{ readingLog() === run.id ? 'Reading the log...' : 'Download log' }}
+              </button>
+            }
+            @if (run.hasFichubOddReply) {
+              <button type="button" class="button fichub-odd-reply" [disabled]="readingLog() === run.id"
+                      (click)="downloadOddReply(run)"
+                      title="The first reply FicHub gave this run that was not its usual one, as FicHub sent it - for troubleshooting">
+                Download FicHub's odd reply
               </button>
             }
           </div>
