@@ -31,12 +31,6 @@ Pick a colour palette and a font in **User settings**.
 
 ![Strawberry milk, Charcoal with the Typewriter font, and Lavender with Gaegu](docs/screenshots/customisation.png)
 
-### Work skins
-
-Works with a CSS skin get a rainbow paintbrush 🖌️; open the work using FicFairy to read it with its original styling preserved (HTML downloads only). You can also create your own site skin in **User settings**, to style any fic you read in FicFairy.
-
-![The Reading skins section of User settings, with the rainbow paintbrush, and a work opened in its group chat skin](docs/screenshots/work-skins.png)
-
 ## Download
 
 | Windows | Mac (Apple silicon) | Mac (Intel) | Linux |
@@ -137,6 +131,12 @@ The logo was hand-drawn by me using Procreate on my iPad. I hand-wrote the fake 
 ![Your AO3 collections](docs/screenshots/collections.png)
 
 ![Importing files you already have](docs/screenshots/import.png)
+
+## Work skins
+
+Works with a CSS skin get a rainbow paintbrush 🖌️; open the work using FicFairy to read it with its original styling preserved (HTML downloads only). You can also create your own site skin in **User settings**, to style any fic you read in FicFairy.
+
+![The Reading skins section of User settings, with the rainbow paintbrush, and a work opened in its group chat skin](docs/screenshots/work-skins.png)
 
 ## More
 
