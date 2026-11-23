@@ -16,9 +16,9 @@ describe('the FAQ', () => {
     const legal = element.querySelector('.legal')!;
 
     const credit = element.querySelector('.legal-credit')!;
-    // the credit to the project this was forked from, on a line of its own, then the privacy policy and licence
-    expect(element.querySelector('section.faq')?.lastElementChild).toBe(legal);
-    expect(credit.nextElementSibling).toBe(legal);
+    // the privacy policy and licence, then the credit to the project this was forked from, under a divider
+    expect(element.querySelector('section.faq')?.lastElementChild).toBe(credit);
+    expect(legal.nextElementSibling).toBe(credit);
     expect(legal.querySelector('.privacy-link')?.getAttribute('href')).toBe(
       'https://github.com/alexandria-p/FicFairy/blob/main/docs/privacy/FicFairy_Privacy-Policy.md',
     );

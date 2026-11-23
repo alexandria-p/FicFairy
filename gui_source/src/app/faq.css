@@ -102,3 +102,10 @@
   margin-top: 6px;
   font-size: 0.86rem;
 }
+
+/* the credit to the project this was forked from, last, under a divider like a section's own */
+.faq .legal-credit {
+  margin-top: 26px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
