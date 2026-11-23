@@ -6,6 +6,7 @@ import { WorkLink } from './work-link';
 import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { Library, LocalCopy, OPENABLE_FORMATS, OpenableFormat, WorkSkinSource, copyName, hiddenKey, viewableInBrowser } from './library';
 import { safeGet, safeSet } from './storage';
+import { HelperConnection } from './helper-connection';
 import { Jobs } from './jobs';
 import { Collection, isCustomCollection } from './collections';
 import { CollectionItems, CustomCollections, canCollect, canTick, itemsOf } from './custom-collections';
@@ -435,6 +436,8 @@ export class WorkList {
   // region marking entries as bookmarks by hand
 
   private readonly jobs = inject(Jobs);
+  /** a guest's library is the made-up one: nothing of theirs is uploaded to it */
+  private readonly guest = inject(HelperConnection).guest;
 
   /** whether a work skin is saved for this entry's work - shown as an icon in its corner */
   protected hasSkin(work: Bookmark): boolean {
@@ -465,8 +468,9 @@ export class WorkList {
   }
 
   /** a work you can upload a skin of your own for: a work, in a library the page can write */
+  // never a guest's: their library is the made-up one, and nothing of theirs is uploaded to it
   protected canUploadSkin(work: Bookmark): boolean {
-    return this.canSelect() && !work.error && this.worksToFetch(work).length > 0;
+    return !this.guest() && this.canSelect() && !work.error && this.worksToFetch(work).length > 0;
   }
 
   protected readonly skinSources: { value: WorkSkinSource; label: string }[] = [

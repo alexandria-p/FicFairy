@@ -129,6 +129,14 @@ describe("guest mode's pretend runs", () => {
     expect(events.filter((e) => e.type === 'failures').at(-1)?.failures).toEqual([]);
   });
 
+  it('fetch work skins for exactly the works picked from the Works tab, and write nothing', async () => {
+    const run = new GuestRun('r', request('custom', { filetypes: [], options: { skinsOnly: true, skinWorks: ['9100003'] } }), NO_WAITING);
+    const events = await played(run);
+    const said = events.filter((e) => e.type === 'message').map((e) => e.text ?? '');
+    expect(said.filter((t) => t.startsWith('work skin saved for'))).toEqual(['work skin saved for Work 3']);
+    expect(events.some((e) => (e.type as string) === 'storage')).toBe(false);
+  });
+
   it("look up exactly the works a fic run's box names - a chapter's number is never a work", async () => {
     const lookedUp = (events: JobEvent[]) =>
       events.filter((e) => e.type === 'message').map((e) => /looking up work (\d+)/.exec(e.text ?? '')?.[1]).filter(Boolean);

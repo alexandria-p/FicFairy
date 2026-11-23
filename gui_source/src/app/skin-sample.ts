@@ -7,7 +7,10 @@
  * asked for, so it stays out of the page's first download, as dummy data's does.
  */
 
-interface SampleReading {
+/** what the sample says of itself, under its title */
+const SAMPLE_NOTE = 'A sample work, shown to preview your reading skin. It was not downloaded from anywhere.';
+
+export interface SampleReading {
   title: string;
   authors: string[];
   fandoms: string[];
@@ -38,7 +41,7 @@ function line(label: string, tags: string[] | undefined): string {
 }
 
 /** the sample work's html, built from a made-up blurb */
-export function sampleWorkHtml(work: SampleReading, chat = ''): string {
+export function sampleWorkHtml(work: SampleReading, chat = '', note = SAMPLE_NOTE): string {
   const chapters = Math.min(2, Math.max(1, work.chapters_published || 1));
   const body = Array.from({ length: chapters }, (_, i) => `
   <div class="meta group">
@@ -72,7 +75,7 @@ export function sampleWorkHtml(work: SampleReading, chat = ''): string {
   <h2 class="toc-heading">Preface</h2>
   <p class="message">
     <b>${escape(work.title)}</b><br />
-    A sample work, shown to preview your reading skin. It was not downloaded from anywhere.
+    ${note}
   </p>
   <div class="meta">
     <dl class="tags">

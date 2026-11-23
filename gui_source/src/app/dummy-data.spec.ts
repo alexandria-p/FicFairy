@@ -1,7 +1,8 @@
 import { BUILT_IN_CONFIG, Jobs, ServerConfig } from './jobs';
 import { TestBed } from '@angular/core/testing';
 import { DebugMode } from './debug-mode';
-import { DUMMY_DATA_KEY, DummyData, dummyLibrary } from './dummy-data';
+import { DUMMY_DATA_KEY, DummyData, SKINNED_WORK, dummyLibrary } from './dummy-data';
+import { SAMPLE_WORK_SKIN } from './skin-sample';
 import { readRunHistory } from './library-store';
 import { workIdFromFilename } from './bookmarks';
 import library from './dummy-library.json';
@@ -29,12 +30,25 @@ describe('dummyLibrary', () => {
 
   it('gives each html copy its title over lorem ipsum', async () => {
     const store = await dummyLibrary('local');
-    const html = (await store.list('works')).filter((p) => p.endsWith('.html'));
+    const html = (await store.list('works')).filter((p) => p.endsWith('.html') && !p.startsWith(`works/${SKINNED_WORK} `));
     expect(html.length).toBeGreaterThan(0);
     const page = (await store.read(html[0])) ?? '';
     expect(page).toContain('<h1>');
     expect(page).toContain('Lorem ipsum');
     expect(page).not.toContain('Chapter');
+  });
+
+  it('gives Spooky Scary Skeletons - and no other work - the chat-app work skin, and the chat it styles', async () => {
+    const store = await dummyLibrary('local');
+    expect(await store.list('skins')).toEqual([`skins/${SKINNED_WORK}.css`]);
+    expect(await store.read(`skins/${SKINNED_WORK}.css`)).toBe(SAMPLE_WORK_SKIN);
+    const html = (await store.list('works')).find((p) => p.startsWith(`works/${SKINNED_WORK} `) && p.endsWith('.html'))!;
+    const page = (await store.read(html)) ?? '';
+    expect(page).toContain('Spooky Scary Skeletons');
+    expect(page).toContain('<div class="whatsapp light">');
+    expect(page).toContain('Halloween Town');
+    expect(page).toContain('turn on creator skin');
+    expect(page).toContain('A made-up work');
   });
 
   it('gives every work file an index entry, so nothing offers to repair it', async () => {
