@@ -162,7 +162,10 @@ async function skinGrid(browser, settings, work, name) {
   const page = await browser.newPage({ viewport: { width: 2200, height: 400 }, deviceScaleFactor: 1 });
   const img = (f, style) => `<img src="data:image/png;base64,${fs.readFileSync(f).toString('base64')}" style="display:block;border-radius:10px;box-shadow:0 2px 10px #0002;${style}">`;
   await page.setContent(`<body style="margin:0;background:#fbeef2"><div id="grid" style="display:inline-flex;gap:28px;padding:28px;align-items:flex-start">
-    ${img(settings, 'width:1100px')}${img(work, 'width:600px')}</div></body>`);
+    ${img(settings, 'width:1100px')}${img(work, 'width:auto')}</div></body>`);
+  // the chat as tall as the settings beside it
+  await page.evaluate(() => Promise.all([...document.images].map((i) => i.decode())));
+  await page.evaluate(() => { const [left, right] = document.images; right.style.height = `${left.offsetHeight}px`; });
   const box = await page.locator('#grid').boundingBox();
   await page.setViewportSize({ width: Math.ceil(box.width), height: Math.ceil(box.height) });
   await page.screenshot({ path: path.join(OUT, name) });
@@ -238,10 +241,10 @@ async function stack(browser, files, name) {
     await opened.setViewportSize({ width: 560, height: 1100 });
     await opened.waitForLoadState('load');
     await opened.waitForTimeout(1500);
-    // the chat the creator's skin draws, with a little of the page around it
+    // the chat the creator's skin draws, cut close round it
     const chat = await opened.locator('.whatsapp').first().boundingBox();
     await opened.screenshot({ path: tmp('skin-work.png'), fullPage: true,
-      clip: { x: 0, y: Math.max(0, chat.y - 24), width: 560, height: chat.height + 48 } });
+      clip: { x: Math.max(0, chat.x - 12), y: Math.max(0, chat.y - 12), width: chat.width + 24, height: chat.height + 24 } });
     await opened.close();
     await tab(page, 'User settings'); await page.waitForTimeout(600);
     const skinSettings = page.locator('details.reading-skins');
