@@ -34,6 +34,20 @@ describe('the FAQ', () => {
   });
 });
 
+describe('the FAQ on work skins', () => {
+  it('says a skin is fetched as css and shown only when the html is opened through FicFairy', async () => {
+    const { element } = await faq();
+    const heading = element.querySelector('h3.reading-skins')!;
+    expect(heading.textContent).toBe('Reading skins');
+    const text = element.textContent!.replace(/\s+/g, ' ');
+    expect(text).toContain('fetch work skins and save them as separate CSS files, for HTML downloads.');
+    expect(text).toContain('Fetch work skin for HTML downloads');
+    expect(text).toContain('Skins are only applied when you open the work through FicFairy, and only for HTML files.');
+    // the rainbow brush the Works tab marks a skinned work with
+    expect(heading.nextElementSibling?.querySelector('.brush-icon svg')).not.toBeNull();
+  });
+});
+
 describe('the FAQ on file names', () => {
   afterEach(() => useNamePattern(DEFAULT_NAME_PATTERN));
 

@@ -113,9 +113,14 @@
 
   <p>
     This app only downloads what AO3 provides. This means that any custom styling an author
-    applied to their work is not carried into a downloaded copy - so text laid out as chat
-    logs, handwriting, redactions or newspaper clippings will read as ordinary paragraphs.
-    Sorry!
+    applied to their work is not carried into a downloaded copy of the work - so text laid out
+    as chat logs, handwriting, redactions or newspaper clippings will read as ordinary
+    paragraphs.
+  </p>
+
+  <p>
+    However, we've built a workaround for this - FicFairy can optionally
+    <em>fetch work skins and save them as separate CSS files, for HTML downloads.</em>
   </p>
 
   <p>
@@ -129,6 +134,27 @@
     not repair a work whose images are already inaccessible, and it makes the run considerably
     longer, because every fic needs its own page fetched on top of its files. Very large images
     sometimes fail.
+  </p>
+
+  <h3 class="reading-skins">Reading skins</h3>
+
+  <p>
+    Tick <code>Fetch work skin for HTML downloads</code> on a run, and FicFairy will attempt to
+    fetch &amp; save each work's skin as a CSS file beside your downloads. You can see which of
+    your downloaded works have skins, as they will be marked with a rainbow paintbrush
+    <span
+  class="brush-icon" aria-hidden="true"><svg viewBox="0 0 16 16" width="14" height="14" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><defs><linearGradient id="faq-skin-rainbow" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#e5484d" /><stop offset="0.25" stop-color="#f5a524" /><stop offset="0.5" stop-color="#30a46c" /><stop offset="0.75" stop-color="#3e63dd" /><stop offset="1" stop-color="#8e4ec6" /></linearGradient></defs><path d="M13.5 2.5l-6 6" fill="none" stroke="url(#faq-skin-rainbow)" /><path d="M7.5 8.5c-1.6-.4-3 .6-3.2 2.1-.2 1.3-.9 2-2.3 2.4 2.3 1 5.6.6 6.4-1.6.4-1.1 0-2.3-.9-2.9z" fill="url(#faq-skin-rainbow)" stroke="url(#faq-skin-rainbow)" /></svg><svg class="drips" viewBox="0 0 32 9" preserveAspectRatio="none"><defs><linearGradient id="faq-skin-drips" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e5484d" /><stop offset="0.25" stop-color="#f5a524" /><stop offset="0.5" stop-color="#30a46c" /><stop offset="0.75" stop-color="#3e63dd" /><stop offset="1" stop-color="#8e4ec6" /></linearGradient></defs><path fill="url(#faq-skin-drips)" d="M5 0h3.2c0 1.6-.5 2.2-.5 3.3a1.6 1.6 0 1 1-2.2 0C5.5 2.2 5 1.6 5 0z M13.6 0h2.6c0 2.6-.3 3.6-.3 5.2a1.5 1.5 0 1 1-2 0c0-1.6-.3-2.6-.3-5.2z M21.5 0h2.6c0 1-.3 1.4-.3 2a1.2 1.2 0 1 1-2 0c0-.6-.3-1-.3-2z M26.6 0h2c0 1.8-.2 2.6-.2 3.7a1.1 1.1 0 1 1-1.6 0c0-1.1-.2-1.9-.2-3.7z" /></svg></span>.
+  </p>
+
+  <p>
+    Skins are only applied when you open the work through FicFairy, and only for HTML files.
+    Opening a HTML file anywhere else, or in any other format, will display the work unstyled
+    as ordinary paragraphs.
+  </p>
+
+  <p>
+    Skins may look a little different on works downloaded from FicHub compared to how they look
+    on works downloaded from AO3.
   </p>
 
   <h3>How indexing works</h3>
