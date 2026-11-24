@@ -825,6 +825,64 @@ describe('UserSettings', () => {
     expect(JSON.parse(localStorage.getItem('ao3.alwaysAnswers')!)).toEqual({ 'fichub-unknown': 'no' });
   });
 
+  it('moves the six cases\' timed-out answers under their always-answers, shown only while asked every time', async () => {
+    TestBed.inject(HelperConnection).settings.set({ ...DEFAULT_PAGE_CONFIG, helperUrl: 'https://helper.example.com' });
+    localStorage.setItem('ao3.alwaysAnswers', JSON.stringify({ 'ao3-newer': 'no' }));
+    await open();
+    const questions = element.querySelector('details.questions')!;
+    const always = element.querySelector('details.always-answers')!;
+    for (const name of ['ao3-older', 'ao3-newer', 'ao3-unknown', 'fichub-older', 'fichub-newer', 'fichub-unknown']) {
+      // no longer in the timed-out answers' own list
+      expect(questions.querySelector(`[data-question-setting="${name}"]`), name).toBeNull();
+    }
+    expect(questions.querySelector('[data-question-setting="fichub"]')).not.toBeNull();
+
+    // asked every time: what it takes if not answered in time, under it
+    const older = always.querySelector('[data-always="ao3-older"]')!;
+    expect(older.querySelector('.when-unanswered[data-question-setting="ao3-older"]')).not.toBeNull();
+    expect([...older.querySelectorAll('.when-unanswered option')].map((x) => x.textContent?.trim()))
+      .toEqual(['Keep mine (default)', 'Replace it', 'Keep both']);
+    choose('[data-always="ao3-older"] .when-unanswered select', 'yes');
+    await settle();
+    expect(JSON.parse(localStorage.getItem('ao3.answerDefaults')!)).toEqual({ 'ao3-older': 'yes' });
+
+    // an answer always used asks nothing, so nothing can time out
+    expect(always.querySelector('[data-always="ao3-newer"] .when-unanswered')).toBeNull();
+    choose('[data-always="ao3-older"] > .row select', 'no');
+    await settle();
+    expect(always.querySelector('[data-always="ao3-older"] .when-unanswered')).toBeNull();
+    choose('[data-always="ao3-older"] > .row select', '');
+    await settle();
+    expect(always.querySelector('[data-always="ao3-older"] .when-unanswered')).not.toBeNull();
+  });
+
+  it('on this computer, puts each case\'s settings.ini answer under its always-answer, not in the settings.ini list', async () => {
+    iniAnswer = { editable: true, file: 'settings.ini', settings: [
+      ...INI,
+      { key: 'FicHubUnknownDateAnswer', value: 'no', default: 'no', kind: 'choice', choices: ['no', 'yes', 'both'], about: 'no date' },
+    ] };
+    await open();
+    expect(element.querySelector('details.questions')).toBeNull();
+    const row = element.querySelector('[data-always="fichub-unknown"] .when-unanswered[data-setting="FicHubUnknownDateAnswer"]')!;
+    expect(row).not.toBeNull();
+    expect(row.textContent).toContain('settings.ini');
+    expect(element.querySelectorAll('[data-setting="FicHubUnknownDateAnswer"]').length).toBe(1);
+    expect(element.querySelector('.ini [data-setting="FicHubUnknownDateAnswer"]')).toBeNull();
+    choose('[data-setting="FicHubUnknownDateAnswer"] select', 'both');
+    await settle();
+    expect(posted).toEqual([{ FicHubUnknownDateAnswer: 'both' }]);
+  });
+
+  it('asks what a retry takes when not answered in time only while it is asked every time', async () => {
+    TestBed.inject(HelperConnection).settings.set({ ...DEFAULT_PAGE_CONFIG, helperUrl: 'https://helper.example.com' });
+    localStorage.setItem('ao3.alwaysAnswers', JSON.stringify({ 'retry-reread': 'yes' }));
+    await open();
+    expect(element.querySelector('.advanced-part.retry-reread [data-question-setting="retry-reread"]')).toBeNull();
+    choose('[data-always="retry-reread"] select', '');
+    await settle();
+    expect(element.querySelector('.advanced-part.retry-reread [data-question-setting="retry-reread"]')).not.toBeNull();
+  });
+
   it('starts the AO3 time zone at this browser\'s own, keeps another when chosen, and Reset puts it back', async () => {
     const own = Intl.DateTimeFormat().resolvedOptions().timeZone;
     await open();

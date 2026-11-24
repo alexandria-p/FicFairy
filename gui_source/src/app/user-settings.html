@@ -380,25 +380,66 @@
       A file whose name has no date written the way this app writes one is never replaced
       without asking, and a retry asks whether to read its works again. When a run asks, you can
       tick <em>Always choose this</em> - and that case is never asked about again, the answer you
-      gave taken instead. Change one here, or choose <em>Ask every time</em> to be asked again.
+      gave taken instead. Change one here, or choose <em>Ask every time</em> to be asked again -
+      and then choose what happens if you don't answer in time.
     </p>
     <ul class="rows">
       @for (scenario of scenarios; track scenario.name) {
-        <li class="row" [attr.data-always]="scenario.name">
-          <div class="about">
-            <span class="name">{{ scenario.label }}</span>
+        <li class="row-group" [attr.data-always]="scenario.name">
+          <div class="row">
+            <div class="about">
+              <span class="name">{{ scenario.label }}</span>
+            </div>
+            <select
+              [attr.aria-label]="scenario.label"
+              (change)="setAlways(scenario.name, scenario.label, $any($event.target).value)"
+            >
+              <option value="" [selected]="!alwaysAnswers()[scenario.name]">Ask every time (default)</option>
+              <option value="yes" [selected]="alwaysAnswers()[scenario.name] === 'yes'">Always: {{ scenario.yes }}</option>
+              <option value="no" [selected]="alwaysAnswers()[scenario.name] === 'no'">Always: {{ scenario.no }}</option>
+              @if (scenario.both) {
+                <option value="both" [selected]="alwaysAnswers()[scenario.name] === 'both'">Always: {{ scenario.both }}</option>
+              }
+            </select>
           </div>
-          <select
-            [attr.aria-label]="scenario.label"
-            (change)="setAlways(scenario.name, scenario.label, $any($event.target).value)"
-          >
-            <option value="" [selected]="!alwaysAnswers()[scenario.name]">Ask every time (default)</option>
-            <option value="yes" [selected]="alwaysAnswers()[scenario.name] === 'yes'">Always: {{ scenario.yes }}</option>
-            <option value="no" [selected]="alwaysAnswers()[scenario.name] === 'no'">Always: {{ scenario.no }}</option>
-            @if (scenario.both) {
-              <option value="both" [selected]="alwaysAnswers()[scenario.name] === 'both'">Always: {{ scenario.both }}</option>
+          <!-- asked every time: what a question nobody answers in time takes -->
+          @if (!alwaysAnswers()[scenario.name]) {
+            @if (!local) {
+              @let question = scenarioQuestion(scenario.name);
+              <div class="row when-unanswered" [attr.data-question-setting]="question.name">
+                <div class="about">
+                  <span class="name">If you don't answer in time</span>
+                </div>
+                <select
+                  [attr.aria-label]="scenario.label + ' - if you don\'t answer in time'"
+                  (change)="setAnswer(question, $any($event.target).value)"
+                >
+                  @for (choice of question.choices; track choice.value) {
+                    <option [value]="choice.value" [selected]="answer(question.name) === choice.value">
+                      {{ choice.label }}{{ choice.value === helperAnswer(question.name) ? ' (default)' : '' }}
+                    </option>
+                  }
+                </select>
+              </div>
+            } @else if (scenarioIni(scenario.name); as setting) {
+              <!-- on this computer the same default is settings.ini's -->
+              <div class="row when-unanswered" [attr.data-setting]="setting.key">
+                <div class="about">
+                  <span class="name">If you don't answer in time</span>
+                  <span class="description">Saved to <code>settings.ini</code> as <code>{{ setting.key }}</code>.</span>
+                </div>
+                <select
+                  [attr.aria-label]="setting.key"
+                  [value]="setting.value"
+                  (change)="editIni(setting, $any($event.target).value, $any($event.target))"
+                >
+                  @for (choice of setting.choices ?? []; track choice) {
+                    <option [value]="choice" [selected]="setting.value === choice">{{ iniWords(setting.key, choice) }}{{ choice === setting.default ? ' (default)' : '' }}</option>
+                  }
+                </select>
+              </div>
             }
-          </select>
+          }
         </li>
       }
     </ul>
@@ -504,7 +545,7 @@
         <ul class="rows">
           <!-- FileNamePattern is changed from the DEBUG tab alone, which offers the renames it needs -->
           @for (setting of file.settings; track setting.key) {
-            @if (setting.key !== 'FileNamePattern' && !ADVANCED_KEYS.includes(setting.key)) {
+            @if (setting.key !== 'FileNamePattern' && !SHOWN_ELSEWHERE.includes(setting.key)) {
             <li class="row" [attr.data-setting]="setting.key">
               <div class="about">
                 <span class="name">
@@ -710,10 +751,12 @@
               <option value="no" [selected]="alwaysAnswers()[retryAlways.name] === 'no'">Always: {{ retryAlways.no }}</option>
             </select>
           </li>
-          @if (!local) {
+          @if (alwaysAnswers()[retryAlways.name]) {
+            <!-- an answer always used: no question is asked, so nothing can time out -->
+          } @else if (!local) {
             <li class="row" [attr.data-question-setting]="retryQuestion.name">
               <div class="about">
-                <span class="name">When nobody answers it in time</span>
+                <span class="name">If you don't answer in time</span>
               </div>
               <select
                 [attr.aria-label]="retryQuestion.label + ' - when nobody answers'"
@@ -730,7 +773,7 @@
             <!-- on this computer the same default is settings.ini's -->
             <li class="row" [attr.data-setting]="setting.key">
               <div class="about">
-                <span class="name">When nobody answers it in time</span>
+                <span class="name">If you don't answer in time</span>
                 <span class="description">Saved to <code>settings.ini</code> as <code>{{ setting.key }}</code>.</span>
               </div>
               <select

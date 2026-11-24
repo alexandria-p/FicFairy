@@ -243,6 +243,41 @@ details.group[open] > summary {
   border-top: none;
 }
 
+/* a case and, while it is asked every time, what it takes when not answered in time - one entry */
+.row-group {
+  border-top: 1px solid var(--border);
+}
+
+.row-group:first-child {
+  border-top: none;
+}
+
+.row-group > .row {
+  border-top: none;
+}
+
+.row.when-unanswered {
+  padding-top: 0;
+  padding-left: 20px;
+}
+
+.when-unanswered .name {
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+/* the two dropdowns of one case the same width, one under the other */
+.row-group .row > select {
+  width: 240px;
+  min-width: 0;
+}
+
+@media (max-width: 620px) {
+  .row-group .row > select {
+    width: 100%;
+  }
+}
+
 .about {
   display: flex;
   flex-direction: column;

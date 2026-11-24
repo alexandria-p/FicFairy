@@ -142,10 +142,12 @@ const ANSWER_SETTINGS: Record<string, DefaultName> = {
   OverwriteNewerCopyAnswer: 'overwrite-older', RetryRereadAnswer: 'retry-reread',
 };
 
-const KEEP_OR_REPLACE_SETTINGS = new Set([
-  'AO3GuessedOlderAnswer', 'AO3GuessedNewerAnswer', 'AO3UnknownDateAnswer',
-  'FicHubGuessedOlderAnswer', 'FicHubGuessedNewerAnswer', 'FicHubUnknownDateAnswer',
-]);
+/** settings.ini's timed-out answer for each case of a file without the app's own date (the helper's SCENARIO_SETTINGS) */
+const SCENARIO_INI: Record<string, string> = {
+  'ao3-older': 'AO3GuessedOlderAnswer', 'ao3-newer': 'AO3GuessedNewerAnswer', 'ao3-unknown': 'AO3UnknownDateAnswer',
+  'fichub-older': 'FicHubGuessedOlderAnswer', 'fichub-newer': 'FicHubGuessedNewerAnswer', 'fichub-unknown': 'FicHubUnknownDateAnswer',
+};
+const KEEP_OR_REPLACE_SETTINGS = new Set(Object.values(SCENARIO_INI));
 
 
 /** settings.ini's default answer for a retry reading its works again - in Advanced with its always-answer */
@@ -282,6 +284,8 @@ export class UserSettings implements OnDestroy {
   // hosted copy (sent with every run). shown in Advanced, so left out of the settings.ini list
   /** settings.ini keys shown in Advanced rather than in the settings.ini list */
   protected readonly ADVANCED_KEYS = [RUN_LOG_LINES_SETTING, TRIM_OLD_RUN_LOGS_SETTING, ...LOG_FILE_SETTINGS, RETRY_REREAD_SETTING];
+  /** settings.ini keys shown beside what they belong to, so left out of the settings.ini list */
+  protected readonly SHOWN_ELSEWHERE = [...this.ADVANCED_KEYS, ...KEEP_OR_REPLACE_SETTINGS];
   // the helper's log file and the update logs: on this computer only, where the files are
   protected readonly LOG_FILE_SETTINGS = LOG_FILE_SETTINGS;
   protected logFileSetting(key: string): IniSetting | undefined {
@@ -516,8 +520,19 @@ export class UserSettings implements OnDestroy {
    * A hosted copy's question defaults, kept by this browser (its settings.ini cannot be
    * edited from here): what is saved, and what the helper's own deployment says when not.
    */
-  /** every question's default but a retry's, which is in Advanced (`retryQuestion`) */
-  protected readonly questions = QUESTION_DEFAULTS.filter((q) => q.name !== 'retry-reread');
+  /**
+   * every question's default but a retry's, which is in Advanced (`retryQuestion`), and the six
+   * cases of a file without the app's own date, which sit under their always-answers (`scenarioQuestion`)
+   */
+  protected readonly questions = QUESTION_DEFAULTS.filter((q) => q.name !== 'retry-reread' && !(q.name in SCENARIO_INI));
+  protected scenarioQuestion(name: string): QuestionDefault {
+    return QUESTION_DEFAULTS.find((q) => q.name === name)!;
+  }
+  /** on this computer, a case's timed-out answer is settings.ini's */
+  protected scenarioIni(name: string): IniSetting | undefined {
+    const key = SCENARIO_INI[name];
+    return this.ini()?.editable ? this.ini()?.settings.find((x) => x.key === key) : undefined;
+  }
   /** a retry carrying on its downloads reading its works again - Advanced, at the owner's request */
   protected readonly retryQuestion = QUESTION_DEFAULTS.find((q) => q.name === 'retry-reread')!;
   private readonly savedAnswers = signal(savedAnswerDefaults());
