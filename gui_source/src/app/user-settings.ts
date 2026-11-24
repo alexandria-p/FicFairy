@@ -93,6 +93,9 @@ export interface ResetChange {
 /** something the Clear data window can clear from this browser */
 export type BrowserClear = 'settings' | 'username' | 'visitLog' | 'dropboxCache' | 'library';
 
+/** a section of User settings that the Clear data window can put back to its defaults */
+export type SettingsSection = 'formats' | 'ao3Zone' | 'appearance' | 'questions' | 'waits' | 'always' | 'prompts' | 'advanced';
+
 export interface ClearOption {
   id: BrowserClear;
   label: string;
@@ -433,18 +436,58 @@ export class UserSettings implements OnDestroy {
     ];
   });
 
+  /**
+   * The sections of User settings that resetting puts back, each named as its heading is - shown
+   * under 'Reset user settings' once it is ticked, and each cleared only if it is ticked too.
+   * The two question sections only where they are shown: on a hosted copy.
+   */
+  protected readonly settingsSections = computed<{ id: SettingsSection; label: string }[]>(() => [
+    { id: 'formats', label: 'Default download formats' },
+    { id: 'ao3Zone', label: 'Your AO3 time zone' },
+    { id: 'appearance', label: 'Appearance' },
+    ...(this.local ? [] : [
+      { id: 'questions' as const, label: 'Choose what happens during a run when a question times out' },
+      { id: 'waits' as const, label: 'How long a question waits during a run' },
+    ]),
+    { id: 'always', label: 'Deciding whether to replace or keep a file during a run' },
+    { id: 'prompts', label: "'Ask again' Prompts" },
+    { id: 'advanced', label: 'Advanced' },
+  ]);
+  /** which sections are ticked under 'Reset user settings' */
+  protected readonly sectionsTicked = signal<ReadonlySet<SettingsSection>>(new Set());
+
+  /** what goes: every ticked option but 'settings', which only shows the sections under it */
   protected readonly clearChosen = computed(() =>
-    this.clearOptions().filter((o) => !o.held && this.clearTicked().has(o.id)),
+    this.clearOptions().filter((o) => o.id !== 'settings' && !o.held && this.clearTicked().has(o.id)),
   );
+  /** the sections to put back: those ticked, while 'Reset user settings' is */
+  protected readonly sectionsChosen = computed(() =>
+    this.clearTicked().has('settings') ? this.settingsSections().filter((s) => this.sectionsTicked().has(s.id)) : [],
+  );
+  /** how many things Clear will do, for its button */
+  protected readonly clearCount = computed(() => this.clearChosen().length + this.sectionsChosen().length);
 
   /** open the window with everything it can clear ticked, but what starts unticked */
   protected chooseWhatToClear(): void {
     if (this.guestRefused()) return;
     this.clearTicked.set(new Set(this.clearOptions().filter((o) => !o.held && !o.unticked).map((o) => o.id)));
+    this.sectionsTicked.set(new Set());
     this.choosingClear.set(true);
   }
 
+  /** tick or untick one section under 'Reset user settings' */
+  protected tickSection(id: SettingsSection, ticked: boolean): void {
+    this.sectionsTicked.update((all) => {
+      const next = new Set(all);
+      if (ticked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
   protected tickClear(id: BrowserClear, ticked: boolean): void {
+    // ticking 'Reset user settings' opens its sections, every one ticked to begin with
+    if (id === 'settings') this.sectionsTicked.set(ticked ? new Set(this.settingsSections().map((s) => s.id)) : new Set());
     this.clearTicked.update((all) => {
       const next = new Set(all);
       if (ticked) next.add(id);
@@ -460,13 +503,14 @@ export class UserSettings implements OnDestroy {
   protected async clearBrowser(): Promise<void> {
     if (this.guestRefused() || this.clearingBrowser()) return;
     const chosen = new Set(this.clearChosen().map((o) => o.id));
-    if (!chosen.size) return;
+    const sections = this.sectionsChosen();
+    if (!chosen.size && !sections.length) return;
     this.clearingBrowser.set(true);
     const done: string[] = [];
     try {
-      if (chosen.has('settings')) {
-        this.resetBrowserSettings();
-        done.push('settings reset');
+      if (sections.length) {
+        this.resetBrowserSettings(new Set(sections.map((s) => s.id)));
+        done.push(`settings reset (${sections.map((s) => s.label).join(', ')})`);
       }
       if (chosen.has('username')) {
         safeRemove(SAVED_USERNAME_KEY);
@@ -906,35 +950,53 @@ export class UserSettings implements OnDestroy {
    * time zone, question defaults and waits, answers to always use, run-log and visit-log lengths.
    * settings.ini is not this browser's, and is left to Reset to defaults.
    */
-  private resetBrowserSettings(): void {
-    this.appearance.reset();
-    this.chime.set(true);
-    this.chime.choose(DEFAULT_SOUND);
-    for (const prompt of PROMPTS) setPromptAsks(prompt, true);
-    this.asking.set(Object.fromEntries(PROMPTS.map((p) => [p.key, 'ask' as Asking])));
-    this.updates.dismissed.set(false);
-    saveDefaultFiletypes(null);
-    saveAnswerDefaults(null);
-    saveQuestionTimeout(null);
-    saveGuessedDateTimeout(null);
-    this.savedGuessedTimeout.set(null);
-    for (const { name } of OWN_WAITS) saveOwnWait(name, null);
-    this.savedWaits.set({});
-    saveNobodyHere(null);
-    this.savedNobody.set(null);
-    for (const { name } of ALWAYS_LABELS) saveAlwaysAnswer(name, null);
-    this.alwaysAnswers.set({});
-    this.visit.setLimit(null);
-    saveRunLogLines(null);
-    this.savedLogLines.set(null);
-    saveTrimOldRunLogs(null);
-    this.savedTrimLogs.set(null);
-    saveAo3TimeZone(null);
-    this.ao3Zone.set(this.browserZone);
-    this.savedAnswers.set({});
-    this.savedTimeout.set(null);
-    const config = this.config();
-    if (config) this.formats.set(startingFiletypes(config));
+  private resetBrowserSettings(
+    only: ReadonlySet<SettingsSection> = new Set<SettingsSection>(['formats', 'ao3Zone', 'appearance', 'questions', 'waits', 'always', 'prompts', 'advanced']),
+  ): void {
+    if (only.has('appearance')) {
+      this.appearance.reset();
+      this.chime.set(true);
+      this.chime.choose(DEFAULT_SOUND);
+    }
+    if (only.has('prompts')) {
+      for (const prompt of PROMPTS) setPromptAsks(prompt, true);
+      this.asking.set(Object.fromEntries(PROMPTS.map((p) => [p.key, 'ask' as Asking])));
+      this.updates.dismissed.set(false);
+    }
+    if (only.has('formats')) {
+      saveDefaultFiletypes(null);
+      const config = this.config();
+      if (config) this.formats.set(startingFiletypes(config));
+    }
+    if (only.has('questions')) {
+      saveAnswerDefaults(null);
+      this.savedAnswers.set({});
+    }
+    if (only.has('waits')) {
+      saveQuestionTimeout(null);
+      this.savedTimeout.set(null);
+      saveGuessedDateTimeout(null);
+      this.savedGuessedTimeout.set(null);
+      for (const { name } of OWN_WAITS) saveOwnWait(name, null);
+      this.savedWaits.set({});
+      saveNobodyHere(null);
+      this.savedNobody.set(null);
+    }
+    if (only.has('always')) {
+      for (const { name } of ALWAYS_LABELS) saveAlwaysAnswer(name, null);
+      this.alwaysAnswers.set({});
+    }
+    if (only.has('advanced')) {
+      this.visit.setLimit(null);
+      saveRunLogLines(null);
+      this.savedLogLines.set(null);
+      saveTrimOldRunLogs(null);
+      this.savedTrimLogs.set(null);
+    }
+    if (only.has('ao3Zone')) {
+      saveAo3TimeZone(null);
+      this.ao3Zone.set(this.browserZone);
+    }
   }
 
   /** one setting changed and left: write it now. A refused value is put back as the file has it */

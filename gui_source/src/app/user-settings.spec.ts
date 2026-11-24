@@ -1061,6 +1061,49 @@ describe('UserSettings', () => {
     expect(toast()).toContain('Nothing in your library was touched');
   });
 
+  it('shows each section of User settings under Reset once ticked, and puts back only the sections ticked', async () => {
+    localStorage.setItem(PALETTE_KEY, 'charcoal');
+    localStorage.setItem(AO3_TIME_ZONE_KEY, 'Europe/London');
+    await open();
+    await openClear();
+    await untick('username', 'visitLog', 'dropboxCache', 'library');
+    expect(element.querySelector('.clear-sections')).toBeNull();
+    expect(element.querySelector<HTMLButtonElement>('.confirm-clear')!.disabled).toBe(true);
+
+    clearBox('settings').checked = true;
+    clearBox('settings').dispatchEvent(new Event('change'));
+    await settle();
+    const sections = [...element.querySelectorAll('[data-section]')].map((x) => x.getAttribute('data-section'));
+    // a copy on this computer keeps no question answers or waits of its own
+    expect(sections).toEqual(['formats', 'ao3Zone', 'appearance', 'always', 'prompts', 'advanced']);
+    expect([...element.querySelectorAll<HTMLInputElement>('[data-section] input')].every((b) => b.checked)).toBe(true);
+    expect(element.querySelector('.confirm-clear')?.textContent?.trim()).toBe('Clear 6 items');
+
+    const appearance = element.querySelector<HTMLInputElement>('[data-section="appearance"] input')!;
+    appearance.checked = false;
+    appearance.dispatchEvent(new Event('change'));
+    await settle();
+    expect(element.querySelector('.confirm-clear')?.textContent?.trim()).toBe('Clear 5 items');
+    element.querySelector<HTMLButtonElement>('.confirm-clear')!.click();
+    await settle();
+
+    expect(localStorage.getItem(PALETTE_KEY)).toBe('charcoal');
+    expect(localStorage.getItem(AO3_TIME_ZONE_KEY)).toBeNull();
+    expect(posted).toEqual([]);
+  });
+
+  it('offers the question sections under Reset on a hosted copy, where they are kept', async () => {
+    TestBed.inject(HelperConnection).settings.set({ ...DEFAULT_PAGE_CONFIG, helperUrl: 'https://helper.example.com' });
+    await open();
+    await openClear();
+    clearBox('settings').checked = true;
+    clearBox('settings').dispatchEvent(new Event('change'));
+    await settle();
+    const sections = [...element.querySelectorAll('[data-section]')].map((x) => x.getAttribute('data-section'));
+    expect(sections).toContain('questions');
+    expect(sections).toContain('waits');
+  });
+
   it('forgets the library and signs out of Dropbox, and empties the visit log and the cache', async () => {
     const library = TestBed.inject(Library);
     const forget = vi.spyOn(library, 'forget').mockResolvedValue();

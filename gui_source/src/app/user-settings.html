@@ -37,6 +37,20 @@
                     }
                   </span>
                 </label>
+                @if (option.id === 'settings' && clearTicked().has('settings')) {
+                  <ul class="clear-sections">
+                    @for (section of settingsSections(); track section.id) {
+                      <li [attr.data-section]="section.id">
+                        <label class="check">
+                          <input type="checkbox" [attr.aria-label]="section.label"
+                                 [checked]="sectionsTicked().has(section.id)"
+                                 (change)="tickSection(section.id, $any($event.target).checked)" />
+                          <span>{{ section.label }}</span>
+                        </label>
+                      </li>
+                    }
+                  </ul>
+                }
               </li>
             }
           </ul>
@@ -47,9 +61,9 @@
         </section>
         <footer>
           <button type="button" class="button" (click)="choosingClear.set(false)">Cancel</button>
-          <button type="button" class="button primary confirm-clear" [disabled]="!clearChosen().length || clearingBrowser()"
+          <button type="button" class="button primary confirm-clear" [disabled]="!clearCount() || clearingBrowser()"
                   (click)="clearBrowser()">
-            {{ clearChosen().length ? 'Clear ' + clearChosen().length + (clearChosen().length === 1 ? ' item' : ' items') : 'Nothing ticked' }}
+            {{ clearCount() ? 'Clear ' + clearCount() + (clearCount() === 1 ? ' item' : ' items') : 'Nothing ticked' }}
           </button>
         </footer>
       </div>
