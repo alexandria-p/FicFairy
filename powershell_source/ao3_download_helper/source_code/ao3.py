@@ -2881,6 +2881,9 @@ class Ao3:
         # always called from an except block, so the exception being handled is the current
         # one. a damaged file on disk says nothing about the login - don't pay to ask
         if isinstance(sys.exc_info()[1], exceptions.SavedFileException): return
+        # nor does AO3 being down - or made to fail from the debug panel - and asking it now
+        # would only fail too, and spend the one check a run gets
+        if isinstance(sys.exc_info()[1], exceptions.Ao3DownException): return
         if self.session_checked: return
         # a run told not to log in has no session to lose: a work that needs one fails on its
         # own, and goes to FicHub at the end like any other failure

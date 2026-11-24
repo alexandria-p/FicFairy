@@ -1352,6 +1352,8 @@ export class DownloadDialog implements OnDestroy {
   protected readonly debugTools = computed(() => this.debugMode.on());
   /** set once a skip has been asked for, so it cannot be sent twice by accident */
   protected readonly skipping = signal(false);
+  /** a Make AO3 fail for this step asked for and not yet answered */
+  protected readonly failingAo3 = signal(false);
 
   // region running in the background
 
@@ -2656,6 +2658,23 @@ export class DownloadDialog implements OnDestroy {
       this.append('debug: could not skip the current step');
     }
     this.skipping.set(false);
+  }
+
+  /**
+   * Debug only: make every request to AO3 fail until the step the run is on ends, as if AO3
+   * were down - so what it was fetching fails and is offered to FicHub at the end. The next
+   * step asks AO3 as usual.
+   */
+  protected async failAo3ForStep(): Promise<void> {
+    if (!this.jobId || this.failingAo3()) return;
+    this.failingAo3.set(true);
+    try {
+      await this.jobs.failAo3ForStep(this.jobId);
+      this.append('debug: AO3 made to fail until this step ends');
+    } catch {
+      this.append('debug: could not make AO3 fail - no step is in progress');
+    }
+    this.failingAo3.set(false);
   }
 
   /**

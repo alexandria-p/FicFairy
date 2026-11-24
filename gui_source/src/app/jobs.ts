@@ -1081,6 +1081,16 @@ export class Jobs {
     if (!response.ok) throw new Error('could not skip the current step');
   }
 
+  /**
+   * A debug tool: every request to AO3 fails, as if AO3 were down, until the step the run is on
+   * ends - so what it was fetching fails, and is offered to FicHub at the end. Throws when the
+   * helper refuses (409: no step in progress), so the page never claims it happened.
+   */
+  async failAo3ForStep(jobId: string): Promise<void> {
+    const response = await this.helper.call(`/api/jobs/${jobId}/fail-ao3`, { method: 'POST' });
+    if (!response.ok) throw new Error('could not make AO3 fail for this step');
+  }
+
   async start(request: StartRequest): Promise<string> {
     // the login goes sealed when this page was built with the helper's public key, and a
     // background run's Dropbox sign-in inside it - it is worth as much

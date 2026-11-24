@@ -762,9 +762,6 @@
         </fieldset>
         <fieldset class="repair-fallback">
           <legend>If AO3 can't give it, and FicHub has to be used</legend>
-          <p class="warning repair-warning" role="note">
-            FicHub keeps cached copies, which may be older than the newest version on AO3.
-          </p>
           <label class="check">
             <input type="radio" name="repairFallback" value="keep" [checked]="repairFallback() === 'keep'"
                    (change)="repairFallback.set('keep')" />
@@ -811,6 +808,10 @@
             </span>
           </label>
           @if (repairFallback() === 'replace') {
+            <!-- only where FicHub's copy replaces your file: a rename keeps what the file holds -->
+            <p class="warning repair-warning" role="note">
+              FicHub keeps cached copies, which may be older than the newest version on AO3.
+            </p>
             <div class="fichub-answers nested">
               <label>
                 <span>Overwrite files that seem to have an older date than FicHub's?</span>

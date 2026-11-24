@@ -107,6 +107,8 @@ class FakeJobs extends Jobs {
   pauseFails: string | null = null;
   /** job ids a debug skip was asked for */
   skipped: string[] = [];
+  failedAo3: string[] = [];
+  failAo3Fails = false;
   /** set by a test that needs a skip to be refused */
   skipFails = false;
   push: ((event: JobEvent) => void) | null = null;
@@ -159,6 +161,11 @@ class FakeJobs extends Jobs {
   override async skipStep(jobId: string): Promise<void> {
     if (this.skipFails) throw new Error('could not skip the current step');
     this.skipped.push(jobId);
+  }
+
+  override async failAo3ForStep(jobId: string): Promise<void> {
+    if (this.failAo3Fails) throw new Error('could not make AO3 fail for this step');
+    this.failedAo3.push(jobId);
   }
 
   override stream(_id: string, onEvent: (e: JobEvent) => void): () => void {
@@ -3861,6 +3868,7 @@ describe('DownloadDialog', () => {
     const panel = element.querySelector('.settings.debug');
     expect(panel).toBeTruthy();
     expect(button('Skip this step')).toBeTruthy();
+    expect(button('Make AO3 fail for this step')).toBeTruthy();
     expect(button('Show a made-up report')).toBeTruthy();
   });
 
@@ -3882,6 +3890,26 @@ describe('DownloadDialog', () => {
     await fixture.whenStable();
 
     expect(element.querySelector('.log')?.textContent).toContain('could not skip');
+  });
+
+  it('asks the helper to make AO3 fail for the step in progress, and says so', async () => {
+    await runningWithDebug(true);
+
+    button('Make AO3 fail for this step')!.click();
+    await fixture.whenStable();
+
+    expect(jobs.failedAo3).toEqual(['job-1']);
+    expect(element.querySelector('.log')?.textContent).toContain('AO3 made to fail until this step ends');
+  });
+
+  it('says so when AO3 cannot be made to fail, rather than pretending it was', async () => {
+    jobs.failAo3Fails = true;
+    await runningWithDebug(true);
+
+    button('Make AO3 fail for this step')!.click();
+    await fixture.whenStable();
+
+    expect(element.querySelector('.log')?.textContent).toContain('could not make AO3 fail');
   });
 
   it('fills both report lists with one of every kind, and says they are made up', async () => {

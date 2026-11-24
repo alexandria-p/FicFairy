@@ -2213,6 +2213,10 @@
                       (click)="skipCurrentStep()">
                 Skip this step
               </button>
+              <button type="button" class="button fail-ao3" [disabled]="failingAo3()"
+                      (click)="failAo3ForStep()">
+                Make AO3 fail for this step
+              </button>
               <button type="button" class="button" (click)="mockReport()">
                 Show a made-up report
               </button>
@@ -2220,6 +2224,9 @@
             <p class="hint">
               <strong>Skip this step</strong> really skips it - whatever it would have done
               does not happen, and the checklist marks it skipped rather than done.
+              <strong>Make AO3 fail for this step</strong> fails every request to AO3 until the
+              step ends, as if AO3 were down - what it was fetching fails, and is offered to
+              FicHub at the end. The next step asks AO3 as usual.
               <strong>Show a made-up report</strong> jumps to the end of the run and fills
               both lists with invented entries, so their layout can be checked without
               waiting for something to go wrong. Nothing in it happened.

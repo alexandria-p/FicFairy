@@ -363,6 +363,11 @@ AO3_INFO_GAP_WORK = '[{} of {}] {} - fetching {}'
 AO3_INFO_GAP_INDEXED = '    index updated'
 # the debug tool, which really does skip: whatever the step would have done does not happen
 AO3_INFO_STEP_SKIPPED = 'skipping the rest of this step at your request'
+# the debug panel's Make AO3 fail for this step: every request to AO3 fails as if AO3 were down,
+# until the step ends - so what the step was fetching fails, and FicHub is asked for it at the end
+AO3_INFO_MADE_TO_FAIL = ('debug: AO3 made to fail for this step ({}) - every request to AO3 fails until '
+                         'the step ends, and what it could not get is offered to FicHub at the end')
+ERROR_AO3_MADE_TO_FAIL = 'AO3 made to fail from the debug panel'
 # one fic on its own, by link or work number
 AO3_INFO_ONE_WORK = 'looking up work {} on AO3'
 # said before and after a fic run looks for the index entry it already has, once ao3 has

@@ -1656,6 +1656,63 @@ def test_asking_an_unknown_job_to_skip_says_so():
     assert sent['status'] == 404
 
 
+def test_ao3_is_made_to_fail_only_while_the_step_it_was_pressed_on_is_in_progress(capsys):
+    job = server.Job(server.ACTION_BOOKMARKS, ['JSON'], 'Someone')
+    job.steps = server.Steps(None, server.step_plan(job))
+    assert job.ao3_made_to_fail() is False
+
+    job.steps.start('index')
+    job.fail_ao3_step = 'index'
+    assert job.ao3_made_to_fail() is True
+    assert job.ao3_made_to_fail() is True
+    # said once, naming the step
+    said = capsys.readouterr().out
+    assert said.count('AO3 made to fail for this step') == 1
+    assert job.steps.label_of('index') in said
+
+    # the step ending ends it: the next step asks AO3 as usual
+    job.steps.fail('index')
+    assert job.ao3_made_to_fail() is False
+    job.steps.start('download')
+    assert job.ao3_made_to_fail() is False
+
+
+def test_asking_to_fail_ao3_holds_it_to_the_step_in_progress():
+    sent: dict = {}
+    handler = MagicMock()
+    handler.send_json.side_effect = lambda status, b: sent.update(status=status, body=b)
+    job = server.Job(server.ACTION_BOOKMARKS, ['JSON'], 'Someone')
+    job.steps = server.Steps(None, server.step_plan(job))
+    server.Handler.jobs[job.id] = job
+
+    # between steps there is nothing to fail
+    server.Handler.fail_ao3(handler, job.id)
+    assert sent['status'] == 409
+    assert job.fail_ao3_step is None
+
+    job.steps.start('download')
+    server.Handler.fail_ao3(handler, job.id)
+    assert sent['status'] == 202
+    assert job.fail_ao3_step == 'download'
+
+    server.Handler.fail_ao3(handler, 'no-such-job')
+    assert sent['status'] == 404
+
+
+def test_a_work_failing_because_ao3_is_down_does_not_spend_the_login_check():
+    # AO3 down - or made to fail from the debug panel - says nothing about the login, and the
+    # check would only fail too, using up the one a run gets
+    ao3 = server.Ao3.__new__(server.Ao3)
+    ao3.session_checked = False
+    ao3.repo = MagicMock()
+    try:
+        raise exceptions.Ao3DownException(strings.ERROR_AO3_MADE_TO_FAIL)
+    except exceptions.Ao3DownException:
+        ao3.check_session()
+    ao3.repo.still_logged_in.assert_not_called()
+    assert ao3.session_checked is False
+
+
 def test_the_debug_tools_are_not_a_setting_any_more(fake_environment):
     # debug mode, the page's own switch, turns them on: settings.ini no longer has a say
     fileops = fake_environment['fileops']

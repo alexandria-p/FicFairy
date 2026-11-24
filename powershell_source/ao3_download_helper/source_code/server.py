@@ -772,6 +772,10 @@ class Job:
         # same loop boundaries a stop is read at, and cleared by whichever pass consumes it,
         # so one press skips one step rather than every step after it.
         self.skip = threading.Event()
+        # the debug panel's Make AO3 fail for this step: the step it was pressed on, or None.
+        # AO3 fails only while that step is the one in progress (`ao3_made_to_fail`)
+        self.fail_ao3_step: str | None = None
+        self.fail_ao3_said = False
         # the checklist this run is working through. starts as one with nothing in it and
         # nowhere to report to, so every run function can mark its steps without first
         # checking whether anyone is listening - `run_job` swaps in the real one.
@@ -1004,6 +1008,18 @@ class Job:
         end of a run all make at once."""
         if self.record: self.record.data['skinsPending'] = list(works)
 
+
+    def ao3_made_to_fail(self) -> bool:
+        """Whether every request to AO3 should fail now - the debug panel asked for it on the
+        step still in progress. The step ending ends it, so the next step asks AO3 as usual.
+        Said once in the run, in the run's own thread, the first time a request is failed."""
+
+        step = self.fail_ao3_step
+        if not step or self.steps.current != step: return False
+        if not self.fail_ao3_said:
+            self.fail_ao3_said = True
+            print(strings.AO3_INFO_MADE_TO_FAIL.format(self.steps.label_of(step)))
+        return True
 
     def skipping(self) -> bool:
         """Whether the step in progress should be abandoned, consuming the request.
@@ -1428,6 +1444,8 @@ def run_job(job: Job, password: str) -> None:
                 if isinstance(fileops.storage, PageStorage): fileops.storage.gate = repo.hold_if_asked
                 # the zone a run's own lines say a time in - the person's AO3 zone
                 repo.zone = job.ao3_zone
+                # the debug panel's Make AO3 fail for this step reaches every request through this
+                repo.fail_check = job.ao3_made_to_fail
                 job.emit({'type': progress.STARTED, 'action': job.action,
                           'filetypes': job.filetypes, 'options': job.options})
                 # which zone the floors and ceilings are turned into dates in, said up front -
@@ -6708,6 +6726,10 @@ class Handler(BaseHTTPRequestHandler):
             self.skip_step(self.path.split('/')[3])
             return
 
+        if self.path.startswith('/api/jobs/') and self.path.endswith('/fail-ao3'):
+            self.fail_ao3(self.path.split('/')[3])
+            return
+
         if self.path != '/api/jobs':
             self.send_json(404, {'error': 'not found'})
             return
@@ -7002,6 +7024,28 @@ class Handler(BaseHTTPRequestHandler):
 
         job.skip.set()
         self.send_json(202, {'skipping': True})
+
+    def fail_ao3(self, job_id: str) -> None:
+        """Make every request to AO3 fail until the step a run is on ends - the debug panel's
+        way to send a run's works to FicHub without waiting for AO3 to go down.
+
+        The step carries on: what it was fetching fails as it would with AO3 down (a walk breaks
+        off and is recorded, each work becomes a failure), then the next step asks AO3 as usual,
+        and the FicHub step at the end is offered what failed. 409 when no step is in progress.
+        """
+
+        with Handler.jobs_lock:
+            job = Handler.jobs.get(job_id)
+        if not job:
+            self.send_json(404, {'error': 'no such job'})
+            return
+        step = job.steps.current
+        if not step:
+            self.send_json(409, {'error': 'no step in progress'})
+            return
+        job.fail_ao3_step = step
+        job.fail_ao3_said = False
+        self.send_json(202, {'failing': step})
 
     def hold_job(self, job_id: str, hold: bool) -> None:
         """Pause or resume a run.

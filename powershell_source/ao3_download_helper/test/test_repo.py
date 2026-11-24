@@ -264,6 +264,49 @@ def test_fichub_is_still_asked_about_an_ao3_link_once_ao3_is_down(mock_repo):
     assert mock_repo.my_request('GET', url).status_code == 200
 
 
+# region the debug panel's Make AO3 fail for this step
+
+def test_ao3_made_to_fail_fails_every_request_to_it_and_none_elsewhere(mock_repo):
+    failing = {'yes': True}
+    mock_repo.fail_check = lambda: failing['yes']
+
+    with pytest.raises(exceptions.Ao3DownException) as raised:
+        mock_repo.my_request('GET', AO3_URL)
+    assert str(raised.value) == strings.ERROR_AO3_MADE_TO_FAIL
+    mock_repo.session.request.assert_not_called()
+
+    # FicHub is still asked - the point is to send the works there
+    mock_repo.session.request.return_value = make_response(status_code=200, text='{}')
+    assert mock_repo.my_request('GET', 'https://fichub.net/api/v0/epub?q=x').status_code == 200
+
+    # and it is not kept, as AO3's maintenance page is: once the step ends AO3 is asked again
+    failing['yes'] = False
+    assert mock_repo.my_request('GET', AO3_URL).status_code == 200
+    assert mock_repo.ao3_down is False
+
+
+def test_ao3_made_to_fail_ends_a_wait_on_ao3_at_once(mock_repo):
+    # pressed while the run waits out a retry of AO3's error page: the wait ends, not retried
+    failing = {'yes': False}
+    mock_repo.cancelled = lambda: False
+    mock_repo.fail_check = lambda: failing['yes']
+    mock_repo.max_retries = 30
+
+    def answer(*args, **kwargs):
+        failing['yes'] = True
+        return make_response(status_code=503)
+
+    mock_repo.session.request.side_effect = answer
+    with pytest.raises(exceptions.Ao3DownException):
+        mock_repo.my_request('GET', AO3_URL)
+    assert mock_repo.session.request.call_count == 1
+    # nothing is left saying the request in hand is to AO3
+    assert mock_repo.asking_ao3 is False
+
+
+# endregion
+
+
 @pytest.mark.parametrize('url, ao3', [
     ('https://archiveofourown.org/works/1', True),
     ('http://archiveofourown.org/works/1', True),

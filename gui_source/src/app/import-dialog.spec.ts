@@ -1127,14 +1127,14 @@ describe('ImportDialog', () => {
     await fixture.whenStable();
   }
 
-  it("warns of FicHub's cache, leaves the file as it is to begin with, and shows each choice's questions only under it", async () => {
+  it("warns of FicHub's cache only for overwriting, leaves the file as it is to begin with, and shows each choice's questions only under it", async () => {
     await open();
     await click('Continue');
     await click('Repair remaining from AO3');
     await click('Continue');
 
-    expect(element.querySelector('.repair-warning')?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
-      'FicHub keeps cached copies, which may be older than the newest version on AO3.');
+    // FicHub's cache is warned of only where its copy would overwrite the file
+    expect(element.querySelector('.repair-warning')).toBeNull();
     expect(fallback('keep').checked).toBe(true);
     expect(fallback('rename').closest('label')!.textContent).toContain('Only rename the file');
     expect(fallback('replace').closest('label')!.textContent).toContain('Overwrite and rename the file');
@@ -1150,8 +1150,12 @@ describe('ImportDialog', () => {
     expect([answer('renameOlder')!.value, answer('renameUndated')!.value]).toEqual(['yes', 'yes']);
     expect(answer('replaceOlder')).toBeNull();
 
+    // renaming keeps what the file holds, so no warning there
+    expect(element.querySelector('.repair-warning')).toBeNull();
     fallback('replace').click();
     await fixture.whenStable();
+    expect(element.querySelector('.repair-warning')?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+      'FicHub keeps cached copies, which may be older than the newest version on AO3.');
     expect(answer('renameOlder')).toBeNull();
     expect(answer('replaceOlder')!.closest('label')!.textContent).toContain(
       "Overwrite files that seem to have an older date than FicHub's?");
