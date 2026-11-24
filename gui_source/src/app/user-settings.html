@@ -647,17 +647,23 @@
           What you have done since this page was opened - tabs you clicked, file imports, runs
           started and settings changed. It is deleted every time you close or reload the page.
         </p>
-        <label class="field visit-log-limit">
-          <span>Maximum length of the visit log (in lines)</span>
-          <input type="number" name="visitLogLimit" [min]="visitLogMin" [max]="visitLogMax" step="100"
-                 [value]="visitLimit()" (input)="checkVisitLogLimit($any($event.target))"
-                 (change)="setVisitLogLimit($any($event.target))" />
-          <span class="hint">The default is {{ visitLogDefault.toLocaleString() }} (this session's visit log is currently {{ visitSize().toLocaleString() }} lines)</span>
-          @if (visitLogLimitWarning(); as warning) {
-            <span class="limit-warning visit-log-limit-warning">{{ warning }}</span>
-          }
-        </label>
-        <button type="button" class="button download-visit-log" (click)="downloadVisitLog()">Download the full visit log for this session</button>
+        <ul class="rows">
+          <li class="row visit-log-limit">
+            <label class="about" for="visit-log-limit">
+              <span class="name">Maximum length of the visit log (in lines)</span>
+              <span class="description">The default is {{ visitLogDefault.toLocaleString() }}. This session's visit log is currently {{ visitSize().toLocaleString() }} lines.</span>
+              @if (visitLogLimitWarning(); as warning) {
+                <span class="limit-warning visit-log-limit-warning">{{ warning }}</span>
+              }
+            </label>
+            <input id="visit-log-limit" type="number" name="visitLogLimit" [min]="visitLogMin" [max]="visitLogMax" step="100"
+                   [value]="visitLimit()" (input)="checkVisitLogLimit($any($event.target))"
+                   (change)="setVisitLogLimit($any($event.target))" />
+          </li>
+        </ul>
+        <p class="part-actions">
+          <button type="button" class="button download-visit-log" (click)="downloadVisitLog()">Download the full visit log for this session</button>
+        </p>
       </div>
 
       @if (runLogsOffered()) {
@@ -673,24 +679,30 @@
           <p class="hint">
             What happened in each run. These logs can be downloaded from the History tab at any time.
           </p>
-          <label class="field run-log-lines">
-            <span>Maximum length of each log file (in lines)</span>
-            <input type="number" name="runLogMaxLines" [min]="runLogMin" [max]="runLogMax" step="500"
-                   [value]="runLogLinesNow()" (input)="checkRunLogLines($any($event.target))"
-                   (change)="setRunLogLines($any($event.target))" />
-            <span class="hint">Applies from the next run. The default is {{ runLogDefault.toLocaleString() }}.</span>
-            @if (runLogLinesWarning(); as warning) {
-              <span class="limit-warning run-log-lines-warning">{{ warning }}</span>
-            }
-          </label>
-          <label class="check">
-            <input type="checkbox" name="trimOldRunLogs" [checked]="trimOldRunLogsNow()"
-                   (change)="setTrimOldRunLogs($any($event.target))" />
-            <span>
-              Only keep logs of the last {{ recentRunLogs }} runs
-              <span class="hint">On by default, so the <code>runs</code> folder does not keep growing.</span>
-            </span>
-          </label>
+          <ul class="rows no-dividers">
+            <li class="row trim-run-logs">
+              <label class="check">
+                <input type="checkbox" name="trimOldRunLogs" [checked]="trimOldRunLogsNow()"
+                       (change)="setTrimOldRunLogs($any($event.target))" />
+                <span class="about">
+                  <span class="name">Only keep logs of the last {{ recentRunLogs }} runs</span>
+                  <span class="description">On by default, so the <code>runs</code> folder does not keep growing.</span>
+                </span>
+              </label>
+            </li>
+            <li class="row run-log-lines">
+              <label class="about" for="run-log-lines">
+                <span class="name">Maximum length of each log file (in lines)</span>
+                <span class="description">Applies from the next run. The default is {{ runLogDefault.toLocaleString() }}.</span>
+                @if (runLogLinesWarning(); as warning) {
+                  <span class="limit-warning run-log-lines-warning">{{ warning }}</span>
+                }
+              </label>
+              <input id="run-log-lines" type="number" name="runLogMaxLines" [min]="runLogMin" [max]="runLogMax" step="500"
+                     [value]="runLogLinesNow()" (input)="checkRunLogLines($any($event.target))"
+                     (change)="setRunLogLines($any($event.target))" />
+            </li>
+          </ul>
         </div>
       }
 
@@ -704,31 +716,37 @@
             How large each may grow before its oldest lines are dropped as new ones are written.
             0 for no limit.
           </p>
-          @if (logFileSetting('LogFileMaxMB'); as setting) {
-            <label class="field log-file-size">
-              <span>The helper's log file, in MB</span>
-              <input type="number" name="LogFileMaxMB" min="0" step="1" [value]="setting.value"
-                     (change)="setLogFileSize('LogFileMaxMB', $any($event.target))" />
-              <span class="hint">Default {{ setting.default }}. A line for each download and each error.
-                @if (ini()?.logFiles?.logFile; as where) { It is at <code class="log-path">{{ where }}</code>. }
-              </span>
-            </label>
-          }
-          @if (logFileSetting('UpdateLogMaxMB'); as setting) {
-            <label class="field log-file-size">
-              <span>The update logs, in MB each</span>
-              <input type="number" name="UpdateLogMaxMB" min="0" step="1" [value]="setting.value"
-                     (change)="setLogFileSize('UpdateLogMaxMB', $any($event.target))" />
-              <span class="hint">Default {{ setting.default }}. What each <strong>Update now</strong> did.
-                @if (ini()?.logFiles?.updateLogs; as places) {
-                  They are at
-                  @for (where of places; track where; let last = $last) {<code class="log-path">{{ where }}</code>{{ last ? '.' : ' and ' }}}
-                } @else {
-                  Only the downloaded app updates itself, so only it has them.
-                }
-              </span>
-            </label>
-          }
+          <ul class="rows">
+            @if (logFileSetting('LogFileMaxMB'); as setting) {
+              <li class="row log-file-size">
+                <label class="about" for="log-file-max">
+                  <span class="name">The helper's log file, in MB</span>
+                  <span class="description">Default {{ setting.default }}. A line for each download and each error.
+                    @if (ini()?.logFiles?.logFile; as where) { It is at <code class="log-path">{{ where }}</code>. }
+                  </span>
+                </label>
+                <input id="log-file-max" type="number" name="LogFileMaxMB" min="0" step="1" [value]="setting.value"
+                       (change)="setLogFileSize('LogFileMaxMB', $any($event.target))" />
+              </li>
+            }
+            @if (logFileSetting('UpdateLogMaxMB'); as setting) {
+              <li class="row log-file-size">
+                <label class="about" for="update-log-max">
+                  <span class="name">The update logs, in MB each</span>
+                  <span class="description">Default {{ setting.default }}. What each <strong>Update now</strong> did.
+                    @if (ini()?.logFiles?.updateLogs; as places) {
+                      They are at
+                      @for (where of places; track where; let last = $last) {<code class="log-path">{{ where }}</code>{{ last ? '.' : ' and ' }}}
+                    } @else {
+                      Only the downloaded app updates itself, so only it has them.
+                    }
+                  </span>
+                </label>
+                <input id="update-log-max" type="number" name="UpdateLogMaxMB" min="0" step="1" [value]="setting.value"
+                       (change)="setLogFileSize('UpdateLogMaxMB', $any($event.target))" />
+              </li>
+            }
+          </ul>
         </div>
       }
 
@@ -743,56 +761,58 @@
           its works again from AO3 first, in case AO3 updated any of them in between.
         </p>
         <ul class="rows">
-          <li class="row" [attr.data-always]="retryAlways.name">
-            <div class="about">
-              <span class="name">{{ retryAlways.label }}</span>
-              <span class="description">Choose an answer to always use, or be asked every time.</span>
+          <li class="row-group" [attr.data-always]="retryAlways.name">
+            <div class="row">
+              <div class="about">
+                <span class="name">{{ retryAlways.label }}</span>
+              </div>
+              <select
+                [attr.aria-label]="retryAlways.label"
+                (change)="setAlways(retryAlways.name, retryAlways.label, $any($event.target).value)"
+              >
+                <option value="" [selected]="!alwaysAnswers()[retryAlways.name]">Ask every time (default)</option>
+                <option value="yes" [selected]="alwaysAnswers()[retryAlways.name] === 'yes'">Always: {{ retryAlways.yes }}</option>
+                <option value="no" [selected]="alwaysAnswers()[retryAlways.name] === 'no'">Always: {{ retryAlways.no }}</option>
+              </select>
             </div>
-            <select
-              [attr.aria-label]="retryAlways.label"
-              (change)="setAlways(retryAlways.name, retryAlways.label, $any($event.target).value)"
-            >
-              <option value="" [selected]="!alwaysAnswers()[retryAlways.name]">Ask every time (default)</option>
-              <option value="yes" [selected]="alwaysAnswers()[retryAlways.name] === 'yes'">Always: {{ retryAlways.yes }}</option>
-              <option value="no" [selected]="alwaysAnswers()[retryAlways.name] === 'no'">Always: {{ retryAlways.no }}</option>
-            </select>
+            <!-- asked every time: what it takes if not answered in time, as each file case shows it -->
+            @if (!alwaysAnswers()[retryAlways.name]) {
+              @if (!local) {
+                <div class="row when-unanswered" [attr.data-question-setting]="retryQuestion.name">
+                  <div class="about">
+                    <span class="name">If you don't answer in time</span>
+                  </div>
+                  <select
+                    [attr.aria-label]="retryQuestion.label + ' - when nobody answers'"
+                    (change)="setAnswer(retryQuestion, $any($event.target).value)"
+                  >
+                    @for (choice of retryQuestion.choices; track choice.value) {
+                      <option [value]="choice.value" [selected]="answer(retryQuestion.name) === choice.value">
+                        {{ choice.label }}{{ choice.value === helperAnswer(retryQuestion.name) ? ' (default)' : '' }}
+                      </option>
+                    }
+                  </select>
+                </div>
+              } @else if (ini()?.editable && retryIni(); as setting) {
+                <!-- on this computer the same default is settings.ini's -->
+                <div class="row when-unanswered" [attr.data-setting]="setting.key">
+                  <div class="about">
+                    <span class="name">If you don't answer in time</span>
+                    <span class="description">Saved to <code>settings.ini</code> as <code>{{ setting.key }}</code>.</span>
+                  </div>
+                  <select
+                    [attr.aria-label]="setting.key"
+                    [value]="setting.value"
+                    (change)="editIni(setting, $any($event.target).value, $any($event.target))"
+                  >
+                    @for (choice of setting.choices ?? []; track choice) {
+                      <option [value]="choice" [selected]="setting.value === choice">{{ iniWords(setting.key, choice) }}{{ choice === setting.default ? ' (default)' : '' }}</option>
+                    }
+                  </select>
+                </div>
+              }
+            }
           </li>
-          @if (alwaysAnswers()[retryAlways.name]) {
-            <!-- an answer always used: no question is asked, so nothing can time out -->
-          } @else if (!local) {
-            <li class="row" [attr.data-question-setting]="retryQuestion.name">
-              <div class="about">
-                <span class="name">If you don't answer in time</span>
-              </div>
-              <select
-                [attr.aria-label]="retryQuestion.label + ' - when nobody answers'"
-                (change)="setAnswer(retryQuestion, $any($event.target).value)"
-              >
-                @for (choice of retryQuestion.choices; track choice.value) {
-                  <option [value]="choice.value" [selected]="answer(retryQuestion.name) === choice.value">
-                    {{ choice.label }}{{ choice.value === helperAnswer(retryQuestion.name) ? ' (default)' : '' }}
-                  </option>
-                }
-              </select>
-            </li>
-          } @else if (ini()?.editable && retryIni(); as setting) {
-            <!-- on this computer the same default is settings.ini's -->
-            <li class="row" [attr.data-setting]="setting.key">
-              <div class="about">
-                <span class="name">If you don't answer in time</span>
-                <span class="description">Saved to <code>settings.ini</code> as <code>{{ setting.key }}</code>.</span>
-              </div>
-              <select
-                [attr.aria-label]="setting.key"
-                [value]="setting.value"
-                (change)="editIni(setting, $any($event.target).value, $any($event.target))"
-              >
-                @for (choice of setting.choices ?? []; track choice) {
-                  <option [value]="choice" [selected]="setting.value === choice">{{ iniWords(setting.key, choice) }}{{ choice === setting.default ? ' (default)' : '' }}</option>
-                }
-              </select>
-            </li>
-          }
         </ul>
       </div>
 
