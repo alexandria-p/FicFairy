@@ -385,6 +385,7 @@
     </p>
     <!-- one part per place a copy comes from, so each case need not say it -->
     @for (source of scenarioSources; track source.title) {
+      <div class="scenario-part">
       <h4 class="scenario-source">{{ source.title }}</h4>
       <ul class="rows">
         @for (scenario of source.scenarios; track scenario.name) {
@@ -446,6 +447,7 @@
           </li>
         }
       </ul>
+      </div>
     }
   </details>
 

@@ -243,13 +243,25 @@ details.group[open] > summary {
   border-top: none;
 }
 
-/* From AO3 / From FicHub: a heading over each part's cases */
+/* From AO3 / From FicHub: each part a box of its own, its heading a bar across the top */
+.scenario-part {
+  margin: 14px 0 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
 h4.scenario-source {
-  margin: 18px 0 4px;
-  padding-bottom: 6px;
+  margin: 0;
+  padding: 8px 14px;
+  background: var(--accent-bg);
   border-bottom: 1px solid var(--border);
-  font-size: 1rem;
+  font-size: 0.95rem;
   color: var(--text-strong);
+}
+
+.scenario-part > .rows {
+  padding: 0 14px;
 }
 
 /* a case and, while it is asked every time, what it takes when not answered in time - one entry */
