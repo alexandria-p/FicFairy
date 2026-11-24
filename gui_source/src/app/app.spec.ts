@@ -1733,6 +1733,21 @@ describe('App', () => {
     expect(element.querySelector('app-import-dialog')).toBe(window);
     expect(window.style.display).toBe('');
 
+    // a run started elsewhere meanwhile: the repair window is let go, and Back does not bring it back
+    app.importStart({ request, dated: null });
+    await settled(fixture);
+    TestBed.inject(Jobs).activeRuns.set([going]);
+    await settled(fixture);
+    app.backToImport();
+    await settled(fixture);
+    expect(element.querySelector('app-import-dialog')).toBeNull();
+    expect(element.querySelector('app-download-dialog')).toBeNull();
+    TestBed.inject(Jobs).activeRuns.set([]);
+    await settled(fixture);
+    // the import window offers itself again once the run ends - closed here, for the last check
+    if (element.querySelector('app-import-dialog')) (fixture.componentInstance as unknown as { importOpen: { set(v: boolean): void } }).importOpen.set(false);
+    await settled(fixture);
+
     // closing the run window lets the repair window go
     app.importStart({ request, dated: null });
     await settled(fixture);

@@ -3309,8 +3309,9 @@ describe('DownloadDialog', () => {
       expect(box()!.checked).toBe(false);
       expect(box()!.closest('label')!.textContent?.trim()).toBe('Overwrite existing downloads');
       expect(element.querySelector('.import-overwrite-hint')?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
-        'Check this if you are concerned about file integrity issues and would like to re-download each file again. ' +
-        'Only the works being updated are re-downloaded, and files with no date in their name are never overwritten.');
+        'Allows you to overwrite existing files for any works being searched for updates. ' +
+        'Check this if you are concerned about file integrity and would like to re-download each file again. ' +
+        'Files with no date in the name are never overwritten.');
       // on the same page as Fetch work skins, above it
       const skins = element.querySelector('input[name="skins"]')!;
       expect(box()!.compareDocumentPosition(skins) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -3400,11 +3401,14 @@ describe('DownloadDialog', () => {
       expect(sent.options.overwrite).toBe(false);
     });
 
-    it('says on the overwrite box that the files chosen to repair keep what was chosen for them', async () => {
+    it("keeps Resolve issues' overwrite hint to Resolve issues - a full scan's box has its own", async () => {
       await openImport({ ...IMPORT, repair: ['1 Fic 1 - Someone.html'] });
-      expect(currentStep()).toBe('work-skins');
-      expect(element.querySelector('.import-overwrite-hint')?.textContent?.replace(/\s+/g, ' ')).toContain(
-        'The files you chose to repair are left to what you chose for them on the repair page.');
+      expect(element.querySelector('.import-overwrite-hint')).not.toBeNull();
+      await open('bookmarks');
+      await advanceTo('options');
+      expect(element.querySelector('input[name="overwrite"]')).not.toBeNull();
+      expect(element.querySelector('.import-overwrite-hint')).toBeNull();
+      expect(element.textContent).not.toContain('searched for updates');
     });
 
     it('says it will re-download and overwrite existing files when told to overwrite', async () => {

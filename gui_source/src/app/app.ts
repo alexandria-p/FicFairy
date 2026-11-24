@@ -312,6 +312,12 @@ export class App {
 
   /** the run window's Back from its first page: the repair window again, as it was left */
   protected backToImport(): void {
+    // let go already - a run started elsewhere meanwhile: nothing to go back to, and the repair
+    // window is never opened while a run is going
+    if (!this.importHeld()) {
+      this.dialogClosed();
+      return;
+    }
     this.dialogAction.set(null);
     this.importing.set(null);
     this.importHeld.set(false);

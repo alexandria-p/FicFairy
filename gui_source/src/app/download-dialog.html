@@ -1391,13 +1391,11 @@
                    (change)="importOverwrite.set($any($event.target).checked)" />
             <span>Overwrite existing downloads</span>
           </label>
+          <!-- Resolve issues' own wording: the scans' overwrite box keeps its own hint -->
           <p class="hint import-overwrite-hint">
-            Check this if you are concerned about file integrity issues and would like to re-download
-            each file again. Only the works being updated are re-downloaded, and files with no date
-            in their name are never overwritten.
-            @if (importing()?.repair?.length) {
-              The files you chose to repair are left to what you chose for them on the repair page.
-            }
+            Allows you to overwrite existing files for any works being searched for updates. Check
+            this if you are concerned about file integrity and would like to re-download each file
+            again. Files with no date in the name are never overwritten.
           </p>
         }
         <label class="check skins-option">

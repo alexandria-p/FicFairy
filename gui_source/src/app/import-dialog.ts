@@ -206,7 +206,7 @@ export class ImportDialog implements OnInit {
     this.step.set('index');
   }
 
-  /** every undated file, by name */
+  /** every undated file, by name - the works with date issues are read off this, dated or not */
   protected readonly undated = computed(() =>
     [...undatedFiles(this.works()), ...this.undatedElsewhere()].sort((a, b) =>
       a.name.localeCompare(b.name),

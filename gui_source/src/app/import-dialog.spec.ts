@@ -1272,6 +1272,22 @@ describe('ImportDialog', () => {
     expect(step()).toBe('repair');
   });
 
+  it('never offers files for dating again once they are renamed, however the window is gone back through', async () => {
+    await open();
+    await click('Continue');
+    await type(dateBox('works/2 C - D.html'), '2024-05-06');
+    await click('Skip remaining');
+    await click('Continue');
+    expect(step()).toBe('dating');
+    await click('Continue');
+    // back as far as the window goes, then on again
+    for (let i = 0; i < 6 && button('Back'); i++) await click('Back');
+    const at = step();
+    if (at === 'overview') await click('Continue');
+    expect(step()).not.toBe('dates');
+    expect(store.renamed).toEqual([['works/2 C - D.html', 'works/2 C - D 2024-05-06.html']]);
+  });
+
   describe('repairing from the FicFairy index first', () => {
     const indexed = () => TestBed.inject(Library).worksById.set(new Map([
       ['7', { id: '7', title: 'The Fic', authors: ['Writer'], date_updated: '14 Dec 2024' } as Bookmark]]));
