@@ -569,7 +569,8 @@ describe('Feedback', () => {
 
     // the run log alone fits, and is attached whole as it will be sent
     expect(element.querySelector('.too-long')).toBeNull();
-    expect(element.querySelector('.issue-size')?.textContent).toContain('of 65,536 characters');
+    expect(element.querySelector('.issue-size')?.textContent).toContain(`of ${(ISSUE_BODY_LIMIT - ISSUE_RESERVE).toLocaleString()} characters`);
+    expect(element.querySelector('.issue-size')?.textContent).not.toContain('kept for');
     expect(element.querySelector('details.log pre')).not.toBeNull();
     expect(sendButton().disabled).toBe(false);
 
@@ -634,7 +635,7 @@ describe('Feedback', () => {
     expect(preview).toContain('line 300');
     expect(preview).not.toContain('line 299');
     expect(element.querySelector('.log-cut')).not.toBeNull();
-    expect(element.querySelector('.issue-size')?.textContent).toContain((ISSUE_RESERVE + 'short'.length + preview.length).toLocaleString());
+    expect(element.querySelector('.issue-size')?.textContent).toContain(('short'.length + preview.length).toLocaleString() + ' of');
 
     await send();
     expect(sentBody(fetching)['log']).toBe(preview);

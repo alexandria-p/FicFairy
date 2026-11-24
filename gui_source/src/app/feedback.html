@@ -254,8 +254,7 @@
           }
           @if (!tooLong() && (attachLog() || attachVisit())) {
             <p class="hint issue-size">
-              {{ issueChars().toLocaleString() }} of {{ issueLimit.toLocaleString() }} characters,
-              {{ issueReserve.toLocaleString() }} of them kept for your name, the version and your browser.
+              {{ (issueChars() - issueReserve).toLocaleString() }} of {{ (issueLimit - issueReserve).toLocaleString() }} characters
             </p>
           }
           <footer>

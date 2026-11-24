@@ -116,6 +116,10 @@ header h2 {
   font-size: 0.9rem;
 }
 
+.issue-size {
+  text-align: center;
+}
+
 footer {
   display: flex;
   gap: 8px;
