@@ -392,7 +392,7 @@
             [attr.aria-label]="scenario.label"
             (change)="setAlways(scenario.name, scenario.label, $any($event.target).value)"
           >
-            <option value="" [selected]="!alwaysAnswers()[scenario.name]">Ask every time</option>
+            <option value="" [selected]="!alwaysAnswers()[scenario.name]">Ask every time (default)</option>
             <option value="yes" [selected]="alwaysAnswers()[scenario.name] === 'yes'">Always: {{ scenario.yes }}</option>
             <option value="no" [selected]="alwaysAnswers()[scenario.name] === 'no'">Always: {{ scenario.no }}</option>
             @if (scenario.both) {
@@ -705,7 +705,7 @@
               [attr.aria-label]="retryAlways.label"
               (change)="setAlways(retryAlways.name, retryAlways.label, $any($event.target).value)"
             >
-              <option value="" [selected]="!alwaysAnswers()[retryAlways.name]">Ask every time</option>
+              <option value="" [selected]="!alwaysAnswers()[retryAlways.name]">Ask every time (default)</option>
               <option value="yes" [selected]="alwaysAnswers()[retryAlways.name] === 'yes'">Always: {{ retryAlways.yes }}</option>
               <option value="no" [selected]="alwaysAnswers()[retryAlways.name] === 'no'">Always: {{ retryAlways.no }}</option>
             </select>

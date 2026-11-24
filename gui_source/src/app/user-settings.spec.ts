@@ -810,11 +810,11 @@ describe('UserSettings', () => {
     expect(rows).toEqual(['ao3-older', 'ao3-newer', 'ao3-unknown', 'fichub-older', 'fichub-newer', 'fichub-unknown', 'retry-reread']);
     // each in its own question's words
     expect([...element.querySelectorAll('[data-always="retry-reread"] option')].map((x) => x.textContent?.trim()))
-      .toEqual(['Ask every time', 'Always: Yes, read them again', 'Always: No, use the index as it is']);
+      .toEqual(['Ask every time (default)', 'Always: Yes, read them again', 'Always: No, use the index as it is']);
     expect(element.querySelector<HTMLSelectElement>('[data-always="ao3-older"] select')!.value).toBe('yes');
     // worded as the question's own buttons
     expect([...element.querySelectorAll('[data-always="ao3-older"] option')].map((x) => x.textContent?.trim()))
-      .toEqual(['Ask every time', 'Always: Replace it', 'Always: Keep mine', 'Always: Keep both']);
+      .toEqual(['Ask every time (default)', 'Always: Replace it', 'Always: Keep mine', 'Always: Keep both']);
 
     choose('[data-always="fichub-unknown"] select', 'no');
     await settle();
