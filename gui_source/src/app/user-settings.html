@@ -679,7 +679,17 @@
           <p class="hint">
             What happened in each run. These logs can be downloaded from the History tab at any time.
           </p>
-          <ul class="rows">
+          <ul class="rows no-dividers">
+            <li class="row trim-run-logs">
+              <label class="check">
+                <input type="checkbox" name="trimOldRunLogs" [checked]="trimOldRunLogsNow()"
+                       (change)="setTrimOldRunLogs($any($event.target))" />
+                <span class="about">
+                  <span class="name">Only keep logs of the last {{ recentRunLogs }} runs</span>
+                  <span class="description">On by default, so the <code>runs</code> folder does not keep growing.</span>
+                </span>
+              </label>
+            </li>
             <li class="row run-log-lines">
               <label class="about" for="run-log-lines">
                 <span class="name">Maximum length of each log file (in lines)</span>
@@ -691,16 +701,6 @@
               <input id="run-log-lines" type="number" name="runLogMaxLines" [min]="runLogMin" [max]="runLogMax" step="500"
                      [value]="runLogLinesNow()" (input)="checkRunLogLines($any($event.target))"
                      (change)="setRunLogLines($any($event.target))" />
-            </li>
-            <li class="row trim-run-logs">
-              <label class="check">
-                <input type="checkbox" name="trimOldRunLogs" [checked]="trimOldRunLogsNow()"
-                       (change)="setTrimOldRunLogs($any($event.target))" />
-                <span class="about">
-                  <span class="name">Only keep logs of the last {{ recentRunLogs }} runs</span>
-                  <span class="description">On by default, so the <code>runs</code> folder does not keep growing.</span>
-                </span>
-              </label>
             </li>
           </ul>
         </div>

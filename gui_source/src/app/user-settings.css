@@ -572,6 +572,11 @@ select.zone-select {
   margin-top: 0.25em;
 }
 
+/* rows that read as one setting: no line between them */
+.rows.no-dividers > .row {
+  border-top: none;
+}
+
 /* a part's own button, under its rows */
 .part-actions {
   margin: 10px 0 0;
