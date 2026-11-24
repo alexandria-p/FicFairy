@@ -243,6 +243,62 @@ details.group[open] > summary {
   border-top: none;
 }
 
+/* From AO3 / From FicHub: each part a box of its own, its heading a bar across the top */
+.scenario-part {
+  margin: 14px 0 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+h4.scenario-source {
+  margin: 0;
+  padding: 8px 14px;
+  background: var(--accent-bg);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.95rem;
+  color: var(--text-strong);
+}
+
+.scenario-part > .rows {
+  padding: 0 14px;
+}
+
+/* a case and, while it is asked every time, what it takes when not answered in time - one entry */
+.row-group {
+  border-top: 1px solid var(--border);
+}
+
+.row-group:first-child {
+  border-top: none;
+}
+
+.row-group > .row {
+  border-top: none;
+}
+
+.row.when-unanswered {
+  padding-top: 0;
+  padding-left: 20px;
+}
+
+.when-unanswered .name {
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+/* the two dropdowns of one case the same width, one under the other */
+.row-group .row > select {
+  width: 240px;
+  min-width: 0;
+}
+
+@media (max-width: 620px) {
+  .row-group .row > select {
+    width: 100%;
+  }
+}
+
 .about {
   display: flex;
   flex-direction: column;
@@ -517,9 +573,76 @@ select.zone-select {
   gap: 10px;
 }
 
+/* each box on its label's first line, not centred against the hint under it */
+.clear-options .check {
+  align-items: flex-start;
+}
+
+.clear-options .check input {
+  margin-top: 0.2em;
+}
+
 .clear-options .hint {
   display: block;
   margin-top: 2px;
+}
+
+/* Clear data's two ways to start afresh: what each does on the left, its button on the right */
+.data-actions {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin: 8px 0 12px;
+}
+
+.data-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 12px 14px;
+}
+
+.data-action + .data-action {
+  border-top: 1px solid var(--border);
+}
+
+.data-action-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.data-action-text strong {
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+.data-action-text .hint {
+  margin: 0;
+}
+
+.data-action .button {
+  flex: none;
+}
+
+@media (max-width: 560px) {
+  .data-action {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* the Reset window: a tick per change, and a row left unticked dimmed, as it will be kept */
+.changes .tick {
+  width: 1px;
+  padding-right: 4px;
+}
+
+.changes tr.kept th,
+.changes tr.kept td:not(.tick) {
+  opacity: 0.5;
 }
 
 .clear-options li.held {
@@ -549,7 +672,12 @@ select.zone-select {
   font-size: 0.85rem;
 }
 
-/* which sound: a dropdown in the same row as the switch and Play it */
+/* the switch on a line of its own, the sound and Play it on the line under it */
+.sound-choice > .check {
+  flex-basis: 100%;
+}
+
+/* which sound: a dropdown beside Play it, under the switch */
 .sound-choice .chime-sound {
   display: inline-flex;
   align-items: center;

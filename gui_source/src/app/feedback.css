@@ -116,6 +116,18 @@ header h2 {
   font-size: 0.9rem;
 }
 
+/* how much of each ticked log goes, beside its box - so a trim or a smaller amount shows */
+.attach-size {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.issue-size {
+  text-align: center;
+}
+
 footer {
   display: flex;
   gap: 8px;

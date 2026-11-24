@@ -810,11 +810,11 @@ describe('UserSettings', () => {
     expect(rows).toEqual(['ao3-older', 'ao3-newer', 'ao3-unknown', 'fichub-older', 'fichub-newer', 'fichub-unknown', 'retry-reread']);
     // each in its own question's words
     expect([...element.querySelectorAll('[data-always="retry-reread"] option')].map((x) => x.textContent?.trim()))
-      .toEqual(['Ask every time', 'Always: Yes, read them again', 'Always: No, use the index as it is']);
+      .toEqual(['Ask every time (default)', 'Always: Yes, read them again', 'Always: No, use the index as it is']);
     expect(element.querySelector<HTMLSelectElement>('[data-always="ao3-older"] select')!.value).toBe('yes');
     // worded as the question's own buttons
     expect([...element.querySelectorAll('[data-always="ao3-older"] option')].map((x) => x.textContent?.trim()))
-      .toEqual(['Ask every time', 'Always: Replace it', 'Always: Keep mine', 'Always: Keep both']);
+      .toEqual(['Ask every time (default)', 'Always: Replace it', 'Always: Keep mine', 'Always: Keep both']);
 
     choose('[data-always="fichub-unknown"] select', 'no');
     await settle();
@@ -823,6 +823,77 @@ describe('UserSettings', () => {
     choose('[data-always="ao3-older"] select', '');
     await settle();
     expect(JSON.parse(localStorage.getItem('ao3.alwaysAnswers')!)).toEqual({ 'fichub-unknown': 'no' });
+  });
+
+  it('moves the six cases\' timed-out answers under their always-answers, shown only while asked every time', async () => {
+    TestBed.inject(HelperConnection).settings.set({ ...DEFAULT_PAGE_CONFIG, helperUrl: 'https://helper.example.com' });
+    localStorage.setItem('ao3.alwaysAnswers', JSON.stringify({ 'ao3-newer': 'no' }));
+    await open();
+    const questions = element.querySelector('details.questions')!;
+    const always = element.querySelector('details.always-answers')!;
+    for (const name of ['ao3-older', 'ao3-newer', 'ao3-unknown', 'fichub-older', 'fichub-newer', 'fichub-unknown']) {
+      // no longer in the timed-out answers' own list
+      expect(questions.querySelector(`[data-question-setting="${name}"]`), name).toBeNull();
+    }
+    expect(questions.querySelector('[data-question-setting="fichub"]')).not.toBeNull();
+
+    // asked every time: what it takes if not answered in time, under it
+    const older = always.querySelector('[data-always="ao3-older"]')!;
+    expect(older.querySelector('.when-unanswered[data-question-setting="ao3-older"]')).not.toBeNull();
+    expect([...older.querySelectorAll('.when-unanswered option')].map((x) => x.textContent?.trim()))
+      .toEqual(['Keep mine (default)', 'Replace it', 'Keep both']);
+    choose('[data-always="ao3-older"] .when-unanswered select', 'yes');
+    await settle();
+    expect(JSON.parse(localStorage.getItem('ao3.answerDefaults')!)).toEqual({ 'ao3-older': 'yes' });
+
+    // an answer always used asks nothing, so nothing can time out
+    expect(always.querySelector('[data-always="ao3-newer"] .when-unanswered')).toBeNull();
+    choose('[data-always="ao3-older"] > .row select', 'no');
+    await settle();
+    expect(always.querySelector('[data-always="ao3-older"] .when-unanswered')).toBeNull();
+    choose('[data-always="ao3-older"] > .row select', '');
+    await settle();
+    expect(always.querySelector('[data-always="ao3-older"] .when-unanswered')).not.toBeNull();
+  });
+
+  it('splits the six cases into From AO3 and From FicHub, each case\'s own words without the prefix', async () => {
+    await open();
+    const always = element.querySelector('details.always-answers')!;
+    expect([...always.querySelectorAll('h4.scenario-source')].map((h) => h.textContent?.trim())).toEqual(['From AO3', 'From FicHub']);
+    const names = [...always.querySelectorAll('.row-group > .row .name')].map((n) => n.textContent?.trim());
+    expect(names).toHaveLength(6);
+    expect(names.some((n) => n?.startsWith('From '))).toBe(false);
+    expect(names[2]).toBe("No date can be read from your file's name");
+    // the full words stay with the dropdown, for a screen reader
+    expect(always.querySelector('[data-always="fichub-unknown"] > .row select')?.getAttribute('aria-label'))
+      .toBe("From FicHub: no date can be read from your file's name");
+  });
+
+  it('on this computer, puts each case\'s settings.ini answer under its always-answer, not in the settings.ini list', async () => {
+    iniAnswer = { editable: true, file: 'settings.ini', settings: [
+      ...INI,
+      { key: 'FicHubUnknownDateAnswer', value: 'no', default: 'no', kind: 'choice', choices: ['no', 'yes', 'both'], about: 'no date' },
+    ] };
+    await open();
+    expect(element.querySelector('details.questions')).toBeNull();
+    const row = element.querySelector('[data-always="fichub-unknown"] .when-unanswered[data-setting="FicHubUnknownDateAnswer"]')!;
+    expect(row).not.toBeNull();
+    expect(row.textContent).toContain('settings.ini');
+    expect(element.querySelectorAll('[data-setting="FicHubUnknownDateAnswer"]').length).toBe(1);
+    expect(element.querySelector('.ini [data-setting="FicHubUnknownDateAnswer"]')).toBeNull();
+    choose('[data-setting="FicHubUnknownDateAnswer"] select', 'both');
+    await settle();
+    expect(posted).toEqual([{ FicHubUnknownDateAnswer: 'both' }]);
+  });
+
+  it('asks what a retry takes when not answered in time only while it is asked every time', async () => {
+    TestBed.inject(HelperConnection).settings.set({ ...DEFAULT_PAGE_CONFIG, helperUrl: 'https://helper.example.com' });
+    localStorage.setItem('ao3.alwaysAnswers', JSON.stringify({ 'retry-reread': 'yes' }));
+    await open();
+    expect(element.querySelector('.advanced-part.retry-reread [data-question-setting="retry-reread"]')).toBeNull();
+    choose('[data-always="retry-reread"] select', '');
+    await settle();
+    expect(element.querySelector('.advanced-part.retry-reread [data-question-setting="retry-reread"]')).not.toBeNull();
   });
 
   it('starts the AO3 time zone at this browser\'s own, keeps another when chosen, and Reset puts it back', async () => {
@@ -936,8 +1007,10 @@ describe('UserSettings', () => {
     await settle();
     // every value that will change, current then default
     const rows = Array.from(element.querySelectorAll('.changes tbody tr')).map((r) =>
-      Array.from(r.children).map((c) => c.textContent?.replace(/\s+/g, ' ').trim()),
+      Array.from(r.children).slice(1).map((c) => c.textContent?.replace(/\s+/g, ' ').trim()),
     );
+    // each ticked to begin with
+    expect([...element.querySelectorAll<HTMLInputElement>('.changes tbody .tick input')].every((b) => b.checked)).toBe(true);
     expect(rows).toEqual([
       ...PROMPTS.map((p) => [`Prompts ${p.name}`, promptLabels(p).skip, `→ ${promptLabels(p).ask}`]),
       ['Download formats Formats a run starts with', 'JSON, PDF', '→ JSON, HTML'],
@@ -954,9 +1027,52 @@ describe('UserSettings', () => {
     expect(updates.dismissed()).toBe(false);
     expect(localStorage.getItem(DEFAULT_FILETYPES_KEY)).toBeNull();
     expect(element.querySelector<HTMLInputElement>('input[name="format-PDF"]')!.checked).toBe(false);
-    expect(posted).toEqual([{ reset: true }]);
+    expect(posted).toEqual([{ ExtraWaitTime: '40' }]);
     expect(element.querySelector<HTMLInputElement>('[data-setting="ExtraWaitTime"] input')!.value).toBe('40');
-    expect(toast()).toContain('settings.ini holds its defaults');
+    expect(toast()).toContain('settings.ini included');
+  });
+
+  it('resets only the changes left ticked, and keeps the rest', async () => {
+    localStorage.setItem(DEFAULT_FILETYPES_KEY, JSON.stringify(['JSON', 'PDF']));
+    localStorage.setItem(SYNC_ACK_KEY, 'true');
+    await open();
+    element.querySelector<HTMLButtonElement>('button.reset-all')!.click();
+    await settle();
+    const confirm = element.querySelector<HTMLButtonElement>('.confirm-reset button.confirm')!;
+    const ticks = element.querySelectorAll('.changes tbody tr').length;
+    expect(confirm.textContent?.trim()).toBe(`Reset ${ticks} settings`);
+
+    // keep the formats and settings.ini: untick them
+    for (const name of ['Formats a run starts with', 'ExtraWaitTime']) {
+      const box = element.querySelector<HTMLInputElement>(`[data-change="${name}"] .tick input`)!;
+      box.checked = false;
+      box.dispatchEvent(new Event('change'));
+    }
+    await settle();
+    expect(element.querySelector('[data-change="ExtraWaitTime"]')?.classList).toContain('kept');
+    expect(confirm.textContent?.trim()).toBe(`Reset ${ticks - 2} setting${ticks - 2 === 1 ? "" : "s"}`);
+    confirm.click();
+    await settle();
+
+    expect(localStorage.getItem(SYNC_ACK_KEY)).toBeNull();
+    expect(localStorage.getItem(DEFAULT_FILETYPES_KEY)).toBe(JSON.stringify(['JSON', 'PDF']));
+    expect(posted).toEqual([]);
+  });
+
+  it('ticks and unticks every change at once from the heading box, and holds Reset with none ticked', async () => {
+    localStorage.setItem(SYNC_ACK_KEY, 'true');
+    await open();
+    element.querySelector<HTMLButtonElement>('button.reset-all')!.click();
+    await settle();
+    const all = element.querySelector<HTMLInputElement>('.changes .tick-all')!;
+    expect(all.checked).toBe(true);
+    all.checked = false;
+    all.dispatchEvent(new Event('change'));
+    await settle();
+    expect([...element.querySelectorAll<HTMLInputElement>('.changes tbody .tick input')].some((b) => b.checked)).toBe(false);
+    const confirm = element.querySelector<HTMLButtonElement>('.confirm-reset button.confirm')!;
+    expect(confirm.disabled).toBe(true);
+    expect(confirm.textContent?.trim()).toBe('Nothing ticked');
   });
 
   it('resets only what this browser keeps when there is no settings.ini to offer', async () => {
@@ -1021,16 +1137,25 @@ describe('UserSettings', () => {
     await settle();
   }
 
-  it('says nothing in the library is lost, and opens on everything it can clear, ticked', async () => {
+  it('says nothing in the library is lost, and opens on everything it can clear, ticked - settings left to Reset', async () => {
     await open();
     expect(element.querySelector('.clear-browser .nothing-lost')?.textContent).toContain('Your downloaded works will not be lost');
     expect(element.querySelector('.choose-clear')?.textContent).toContain('Choose what to clear');
     await openClear();
     const ids = [...element.querySelectorAll('[data-clear]')].map((x) => x.getAttribute('data-clear'));
-    // a copy on this computer has no passcode to forget
-    expect(ids).toEqual(['settings', 'username', 'visitLog', 'dropboxCache', 'library']);
+    // a copy on this computer has no passcode to forget, and settings are Reset to defaults' alone
+    expect(ids).toEqual(['username', 'visitLog', 'dropboxCache', 'library']);
     expect(ids.every((id) => clearBox(id!).checked)).toBe(true);
-    expect(element.querySelector('.confirm-clear')?.textContent?.trim()).toBe('Clear 5 items');
+    expect(element.querySelector('.confirm-clear')?.textContent?.trim()).toBe('Clear 4 items');
+  });
+
+  it('opens Reset to defaults from the Clear data panel too', async () => {
+    localStorage.setItem(PALETTE_KEY, 'fairy');
+    await open();
+    expect(element.querySelector('.clear-browser .reset-settings')?.textContent).toContain('Reset settings to their defaults');
+    element.querySelector<HTMLButtonElement>('.clear-browser .reset-from-clear')!.click();
+    await settle();
+    expect(element.querySelector('.confirm-reset [data-change="Palette"]')).not.toBeNull();
   });
 
   it('clears only what is ticked, from this browser alone, and never touches settings.ini', async () => {
@@ -1046,8 +1171,9 @@ describe('UserSettings', () => {
     element.querySelector<HTMLButtonElement>('.confirm-clear')!.click();
     await settle();
 
-    expect(localStorage.getItem(PALETTE_KEY)).toBeNull();
-    expect(localStorage.getItem(AO3_TIME_ZONE_KEY)).toBeNull();
+    // settings are not this window's to clear any more
+    expect(localStorage.getItem(PALETTE_KEY)).toBe('charcoal');
+    expect(localStorage.getItem(AO3_TIME_ZONE_KEY)).toBe('Europe/London');
     expect(localStorage.getItem('ao3.username')).toBeNull();
     expect(localStorage.getItem('ao3.remember')).toBeNull();
     expect(posted).toEqual([]);
@@ -1067,7 +1193,7 @@ describe('UserSettings', () => {
     visit.note('something done earlier');
     await open();
     await openClear();
-    await untick('settings', 'username');
+    await untick('username');
     element.querySelector<HTMLButtonElement>('.confirm-clear')!.click();
     await settle();
 
@@ -1085,7 +1211,7 @@ describe('UserSettings', () => {
     await openClear();
     expect(clearBox('library').disabled).toBe(true);
     expect(element.querySelector('[data-clear="library"]')?.textContent).toContain('active run');
-    expect(element.querySelector('.confirm-clear')?.textContent?.trim()).toBe('Clear 4 items');
+    expect(element.querySelector('.confirm-clear')?.textContent?.trim()).toBe('Clear 3 items');
   });
 
   it('offers neither the passcode nor debug mode, even on a hosted copy that has both', async () => {
@@ -1094,7 +1220,7 @@ describe('UserSettings', () => {
     await open();
     await openClear();
     const ids = [...element.querySelectorAll('[data-clear]')].map((x) => x.getAttribute('data-clear'));
-    expect(ids).toEqual(['settings', 'username', 'visitLog', 'dropboxCache', 'library']);
+    expect(ids).toEqual(['username', 'visitLog', 'dropboxCache', 'library']);
   });
 
   // endregion

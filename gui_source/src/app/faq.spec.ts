@@ -38,12 +38,13 @@ describe('the FAQ on work skins', () => {
   it('says a skin is fetched as css and shown only when the html is opened through FicFairy', async () => {
     const { element } = await faq();
     const heading = element.querySelector('h3.reading-skins')!;
-    expect(heading.textContent).toBe('Reading skins');
+    expect(heading.textContent).toBe('Work skins');
     const text = element.textContent!.replace(/\s+/g, ' ');
-    expect(text).toContain('However, we\'ve built a workaround for this - FicFairy can optionally fetch work skins for HTML downloads, and save them as CSS files.');
+    expect(text).toContain('However, we\'ve built a workaround for this - FicFairy can optionally fetch work skins for HTML downloads, and save them separately as CSS files.');
     // the workaround closes the paragraph saying styling does not survive a download
     expect(element.querySelector('em')?.closest('p')?.textContent).toContain('will read as ordinary paragraphs');
     expect(element.querySelector('.site-skins')?.textContent).toContain('User settings tab');
+    expect(element.querySelector('.site-skins em')?.textContent).toBe('Work skins');
     expect(text).toContain('Fetch work skin for HTML downloads');
     expect(text).toContain('Skins are only applied when you open the work through FicFairy, and only for HTML files.');
     // the rainbow brush the Works tab marks a skinned work with

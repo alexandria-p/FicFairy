@@ -88,10 +88,16 @@ export interface ResetChange {
   name: string;
   current: string;
   default: string;
+  /** puts this one value back, in this browser - absent for a settings.ini key */
+  reset?: () => void;
+  /** the settings.ini key, written back to its default through the helper */
+  iniKey?: string;
+  /** default value to write for `iniKey` */
+  iniDefault?: string;
 }
 
 /** something the Clear data window can clear from this browser */
-export type BrowserClear = 'settings' | 'username' | 'visitLog' | 'dropboxCache' | 'library';
+export type BrowserClear = 'username' | 'visitLog' | 'dropboxCache' | 'library';
 
 export interface ClearOption {
   id: BrowserClear;
@@ -136,10 +142,12 @@ const ANSWER_SETTINGS: Record<string, DefaultName> = {
   OverwriteNewerCopyAnswer: 'overwrite-older', RetryRereadAnswer: 'retry-reread',
 };
 
-const KEEP_OR_REPLACE_SETTINGS = new Set([
-  'AO3GuessedOlderAnswer', 'AO3GuessedNewerAnswer', 'AO3UnknownDateAnswer',
-  'FicHubGuessedOlderAnswer', 'FicHubGuessedNewerAnswer', 'FicHubUnknownDateAnswer',
-]);
+/** settings.ini's timed-out answer for each case of a file without the app's own date (the helper's SCENARIO_SETTINGS) */
+const SCENARIO_INI: Record<string, string> = {
+  'ao3-older': 'AO3GuessedOlderAnswer', 'ao3-newer': 'AO3GuessedNewerAnswer', 'ao3-unknown': 'AO3UnknownDateAnswer',
+  'fichub-older': 'FicHubGuessedOlderAnswer', 'fichub-newer': 'FicHubGuessedNewerAnswer', 'fichub-unknown': 'FicHubUnknownDateAnswer',
+};
+const KEEP_OR_REPLACE_SETTINGS = new Set(Object.values(SCENARIO_INI));
 
 
 /** settings.ini's default answer for a retry reading its works again - in Advanced with its always-answer */
@@ -276,6 +284,8 @@ export class UserSettings implements OnDestroy {
   // hosted copy (sent with every run). shown in Advanced, so left out of the settings.ini list
   /** settings.ini keys shown in Advanced rather than in the settings.ini list */
   protected readonly ADVANCED_KEYS = [RUN_LOG_LINES_SETTING, TRIM_OLD_RUN_LOGS_SETTING, ...LOG_FILE_SETTINGS, RETRY_REREAD_SETTING];
+  /** settings.ini keys shown beside what they belong to, so left out of the settings.ini list */
+  protected readonly SHOWN_ELSEWHERE = [...this.ADVANCED_KEYS, ...KEEP_OR_REPLACE_SETTINGS];
   // the helper's log file and the update logs: on this computer only, where the files are
   protected readonly LOG_FILE_SETTINGS = LOG_FILE_SETTINGS;
   protected logFileSetting(key: string): IniSetting | undefined {
@@ -416,7 +426,6 @@ export class UserSettings implements OnDestroy {
    */
   protected readonly clearOptions = computed<ClearOption[]>(() => {
     return [
-      { id: 'settings', label: 'Reset user settings back to their defaults' },
       { id: 'username', label: 'Forget any saved AO3 username' },
       { id: 'visitLog', label: 'Empty the visit log',
         hint: 'This always gets cleared upon closing the page.' },
@@ -459,10 +468,6 @@ export class UserSettings implements OnDestroy {
     this.clearingBrowser.set(true);
     const done: string[] = [];
     try {
-      if (chosen.has('settings')) {
-        this.resetBrowserSettings();
-        done.push('settings reset');
-      }
       if (chosen.has('username')) {
         safeRemove(SAVED_USERNAME_KEY);
         safeRemove(REMEMBER_USERNAME_KEY);
@@ -515,8 +520,19 @@ export class UserSettings implements OnDestroy {
    * A hosted copy's question defaults, kept by this browser (its settings.ini cannot be
    * edited from here): what is saved, and what the helper's own deployment says when not.
    */
-  /** every question's default but a retry's, which is in Advanced (`retryQuestion`) */
-  protected readonly questions = QUESTION_DEFAULTS.filter((q) => q.name !== 'retry-reread');
+  /**
+   * every question's default but a retry's, which is in Advanced (`retryQuestion`), and the six
+   * cases of a file without the app's own date, which sit under their always-answers (`scenarioQuestion`)
+   */
+  protected readonly questions = QUESTION_DEFAULTS.filter((q) => q.name !== 'retry-reread' && !(q.name in SCENARIO_INI));
+  protected scenarioQuestion(name: string): QuestionDefault {
+    return QUESTION_DEFAULTS.find((q) => q.name === name)!;
+  }
+  /** on this computer, a case's timed-out answer is settings.ini's */
+  protected scenarioIni(name: string): IniSetting | undefined {
+    const key = SCENARIO_INI[name];
+    return this.ini()?.editable ? this.ini()?.settings.find((x) => x.key === key) : undefined;
+  }
   /** a retry carrying on its downloads reading its works again - Advanced, at the owner's request */
   protected readonly retryQuestion = QUESTION_DEFAULTS.find((q) => q.name === 'retry-reread')!;
   private readonly savedAnswers = signal(savedAnswerDefaults());
@@ -559,6 +575,16 @@ export class UserSettings implements OnDestroy {
   /** the answers kept for a file with no date of ours; the retry's own is in Advanced (`retryAlways`) */
   protected readonly scenarios = ALWAYS_LABELS.filter((a) => a.name !== 'retry-reread');
   protected readonly retryAlways = ALWAYS_LABELS.find((a) => a.name === 'retry-reread')!;
+  /** the six cases, in two parts: where the incoming copy comes from */
+  protected readonly scenarioSources = [
+    { title: 'From AO3', scenarios: this.scenarios.filter((a) => a.name.startsWith('ao3-')) },
+    { title: 'From FicHub', scenarios: this.scenarios.filter((a) => a.name.startsWith('fichub-')) },
+  ];
+  /** a case's label without the 'From AO3: ' its part's heading already says */
+  protected shortLabel(label: string): string {
+    const rest = label.replace(/^From (AO3|FicHub): /, '');
+    return rest.charAt(0).toUpperCase() + rest.slice(1);
+  }
   /** settings.ini's default for it, on a helper on this computer - shown in Advanced, not the list */
   protected readonly retryIni = computed(() => this.ini()?.settings.find((x) => x.key === RETRY_REREAD_SETTING));
   protected readonly alwaysAnswers = signal(savedAlwaysAnswers());
@@ -620,22 +646,29 @@ export class UserSettings implements OnDestroy {
     const changes: ResetChange[] = [];
     if (this.appearance.palette() !== DEFAULT_PALETTE) {
       changes.push({ group: 'Appearance', name: 'Palette', current: paletteById(this.appearance.palette()).name,
-                     default: paletteById(DEFAULT_PALETTE).name });
+                     default: paletteById(DEFAULT_PALETTE).name, reset: () => this.appearance.setPalette(DEFAULT_PALETTE) });
     }
     if (this.appearance.font() !== DEFAULT_FONT) {
-      changes.push({ group: 'Appearance', name: 'Font', current: this.fontName(), default: fontById(DEFAULT_FONT).name });
+      changes.push({ group: 'Appearance', name: 'Font', current: this.fontName(), default: fontById(DEFAULT_FONT).name,
+                     reset: () => this.appearance.setFont(DEFAULT_FONT, '') });
     }
     if (!this.chime.on()) {
-      changes.push({ group: 'Appearance', name: 'Sound when waiting for you', current: 'Off', default: 'On' });
+      changes.push({ group: 'Appearance', name: 'Sound when waiting for you', current: 'Off', default: 'On',
+                     reset: () => this.chime.set(true) });
     }
     if (this.chime.sound() !== DEFAULT_SOUND) {
       changes.push({ group: 'Appearance', name: 'Sound', current: soundById(this.chime.sound()).name,
-                     default: soundById(DEFAULT_SOUND).name });
+                     default: soundById(DEFAULT_SOUND).name, reset: () => this.chime.choose(DEFAULT_SOUND) });
     }
     const askingNow = this.asking();
     for (const prompt of PROMPTS) {
       if (askingNow[prompt.key] === 'skip') {
-        changes.push({ group: 'Prompts', name: prompt.name, current: promptLabels(prompt).skip, default: promptLabels(prompt).ask });
+        changes.push({ group: 'Prompts', name: prompt.name, current: promptLabels(prompt).skip, default: promptLabels(prompt).ask,
+                       reset: () => {
+                         setPromptAsks(prompt, true);
+                         this.asking.update((all) => ({ ...all, [prompt.key]: 'ask' }));
+                         if (prompt.key === UPDATE_BANNER_KEY) this.updates.dismissed.set(false);
+                       } });
       }
     }
     const config = this.config();
@@ -643,56 +676,79 @@ export class UserSettings implements OnDestroy {
       const order = (list: string[]) => config.filetypes.filter((x) => list.includes(x)).join(', ');
       const now = order(this.formats());
       const fresh = order([...config.forced, ...(config.defaults ?? [])]);
-      if (now !== fresh) changes.push({ group: 'Download formats', name: 'Formats a run starts with', current: now, default: fresh });
+      if (now !== fresh) {
+        changes.push({ group: 'Download formats', name: 'Formats a run starts with', current: now, default: fresh,
+                       reset: () => { saveDefaultFiletypes(null); this.formats.set(startingFiletypes(config)); } });
+      }
     }
     if (this.ao3Zone() !== this.browserZone) {
       changes.push({ group: 'AO3 time zone', name: 'Your AO3 time zone', current: this.ao3Zone(),
-                     default: `${this.browserZone} (this browser)` });
+                     default: `${this.browserZone} (this browser)`,
+                     reset: () => { saveAo3TimeZone(null); this.ao3Zone.set(this.browserZone); } });
     }
     if (!this.local) {
       if (this.guessedTimeout() !== this.helperGuessedTimeout()) {
         changes.push({ group: 'How long a question waits', name: 'Minutes a question about a file with no date in its name waits',
-                       current: String(this.guessedTimeout()), default: String(this.helperGuessedTimeout()) });
+                       current: String(this.guessedTimeout()), default: String(this.helperGuessedTimeout()),
+                       reset: () => { saveGuessedDateTimeout(null); this.savedGuessedTimeout.set(null); } });
       }
       if (this.questionTimeout() !== this.helperTimeout()) {
         changes.push({ group: 'How long a question waits', name: 'Minutes a question waits for you',
-                       current: String(this.questionTimeout()), default: String(this.helperTimeout()) });
+                       current: String(this.questionTimeout()), default: String(this.helperTimeout()),
+                       reset: () => { saveQuestionTimeout(null); this.savedTimeout.set(null); } });
       }
       for (const { name, label } of OWN_WAITS) {
         if (this.ownWait(name) !== this.helperWait(name)) {
           changes.push({ group: 'How long a question waits', name: label,
-                         current: String(this.ownWait(name)), default: String(this.helperWait(name)) });
+                         current: String(this.ownWait(name)), default: String(this.helperWait(name)),
+                         reset: () => {
+                           saveOwnWait(name, null);
+                           this.savedWaits.update((all) => { const next = { ...all }; delete next[name]; return next; });
+                         } });
         }
       }
       if (this.nobodyHere() !== this.helperNobodyHere()) {
         changes.push({ group: 'How long a question waits', name: "When nobody answers, don't wait on the rest",
-                       current: this.nobodyHere() ? 'On' : 'Off', default: this.helperNobodyHere() ? 'On' : 'Off' });
+                       current: this.nobodyHere() ? 'On' : 'Off', default: this.helperNobodyHere() ? 'On' : 'Off',
+                       reset: () => { saveNobodyHere(null); this.savedNobody.set(null); } });
       }
       for (const question of QUESTION_DEFAULTS) {
         const now = this.answer(question.name);
         const fresh = this.helperAnswer(question.name);
         if (now !== fresh) {
           changes.push({ group: 'Questions', name: question.label,
-                         current: this.choiceLabel(question, now), default: this.choiceLabel(question, fresh) });
+                         current: this.choiceLabel(question, now), default: this.choiceLabel(question, fresh),
+                         reset: () => {
+                           const answers = { ...this.savedAnswers() };
+                           delete answers[question.name];
+                           saveAnswerDefaults(Object.keys(answers).length ? answers : null);
+                           this.savedAnswers.set(answers);
+                         } });
         }
       }
     }
     if (!this.local && this.savedLogLines() !== null) {
       changes.push({ group: 'Run logs', name: 'Maximum length of each log file (in lines)', current: this.runLogLinesNow().toLocaleString(),
-                     default: RUN_LOG_LINES_DEFAULT.toLocaleString() });
+                     default: RUN_LOG_LINES_DEFAULT.toLocaleString(),
+                     reset: () => { saveRunLogLines(null); this.savedLogLines.set(null); } });
     }
     if (!this.local && this.savedTrimLogs() === false) {
-      changes.push({ group: 'Run logs', name: `Only keep logs of the last ${RECENT_RUN_LOGS} runs`, current: 'Off', default: 'On' });
+      changes.push({ group: 'Run logs', name: `Only keep logs of the last ${RECENT_RUN_LOGS} runs`, current: 'Off', default: 'On',
+                     reset: () => { saveTrimOldRunLogs(null); this.savedTrimLogs.set(null); } });
     }
     if (this.visitLimit() !== VISIT_LOG_LIMIT) {
       changes.push({ group: 'Visit log', name: 'Maximum length of the visit log (in lines)', current: this.visitLimit().toLocaleString(),
-                     default: VISIT_LOG_LIMIT.toLocaleString() });
+                     default: VISIT_LOG_LIMIT.toLocaleString(), reset: () => this.visit.setLimit(null) });
     }
     const always = this.alwaysAnswers();
     for (const { name, label } of ALWAYS_LABELS) {
       if (always[name]) {
         changes.push({ group: 'Deciding whether to replace or keep a file during a run', name: label,
-                       current: this.alwaysWords(always[name], name), default: this.alwaysWords(undefined) });
+                       current: this.alwaysWords(always[name], name), default: this.alwaysWords(undefined),
+                       reset: () => {
+                         saveAlwaysAnswer(name, null);
+                         this.alwaysAnswers.update((all) => { const next = { ...all }; delete next[name]; return next; });
+                       } });
       }
     }
     const file = this.ini();
@@ -700,12 +756,36 @@ export class UserSettings implements OnDestroy {
       for (const setting of file.settings) {
         // the naming pattern is left as it is by a reset (the DEBUG tab changes it)
         if (setting.key !== 'FileNamePattern' && setting.value !== setting.default) {
-          changes.push({ group: 'settings.ini', name: setting.key, current: this.iniWords(setting.key, setting.value) || '(empty)', default: this.iniWords(setting.key, setting.default) || '(empty)' });
+          changes.push({ group: 'settings.ini', name: setting.key, current: this.iniWords(setting.key, setting.value) || '(empty)', default: this.iniWords(setting.key, setting.default) || '(empty)',
+                         iniKey: setting.key, iniDefault: setting.default });
         }
       }
     }
     return changes;
   });
+
+  /** which of the listed changes are ticked to be reset, by `changeId` - all of them as the window opens */
+  protected readonly resetTicked = signal<ReadonlySet<string>>(new Set());
+  protected changeId(change: ResetChange): string {
+    return `${change.group}\u0000${change.name}`;
+  }
+  protected readonly resetChosen = computed(() => this.resetChanges().filter((c) => this.resetTicked().has(this.changeId(c))));
+  protected readonly allResetTicked = computed(() =>
+    this.resetChanges().length > 0 && this.resetChosen().length === this.resetChanges().length);
+
+  protected tickReset(change: ResetChange, ticked: boolean): void {
+    const id = this.changeId(change);
+    this.resetTicked.update((all) => {
+      const next = new Set(all);
+      if (ticked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  protected tickAllReset(ticked: boolean): void {
+    this.resetTicked.set(ticked ? new Set(this.resetChanges().map((c) => this.changeId(c))) : new Set());
+  }
 
   readonly toast = signal<Toast | null>(null);
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
@@ -724,6 +804,7 @@ export class UserSettings implements OnDestroy {
     if (this.guestRefused()) return;
     clearTimeout(this.toastTimer);
     this.toast.set(null);
+    this.resetTicked.set(new Set(this.resetChanges().map((c) => this.changeId(c))));
     this.confirmingReset.set(true);
   }
 
@@ -862,74 +943,40 @@ export class UserSettings implements OnDestroy {
   }
 
   /**
-   * Everything back as it came: every prompt asks always, runs start with the app's own
-   * formats, and settings.ini - where it is offered - holds the values this copy was built
-   * with (the downloaded app's own; the template's for anything else).
+   * Put back what is ticked in the Reset window, one value at a time: this browser's at once, and
+   * settings.ini's keys - where it is offered - in one write through the helper, to the values this
+   * copy was built with (the downloaded app's own; the template's for anything else).
    */
   protected async resetAll(): Promise<void> {
     if (this.guestRefused()) return;
+    const chosen = this.resetChosen();
+    if (!chosen.length) return;
     this.confirmingReset.set(false);
-    this.resetBrowserSettings();
-
-    if (!this.ini()?.editable) {
-      this.say(this.local
-        ? 'Reset: the page looks as it came, every prompt asks always, and runs start with the app\'s default formats'
-        : 'Reset: the page looks as it came, every prompt asks always, runs start with the app\'s default formats, and questions take the app\'s default answers');
+    for (const change of chosen) change.reset?.();
+    const browser = chosen.filter((c) => c.reset).length;
+    const ini = chosen.filter((c) => c.iniKey);
+    const done = `Reset ${chosen.length} setting${chosen.length === 1 ? '' : 's'} to ${chosen.length === 1 ? 'its default' : 'their defaults'}`;
+    if (!ini.length) {
+      this.say(done);
       return;
     }
     try {
       const response = await this.helper.call('/api/settings-file', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reset: true }),
+        body: JSON.stringify({ values: Object.fromEntries(ini.map((c) => [c.iniKey!, c.iniDefault ?? ''])) }),
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || `the helper answered ${response.status}`);
       this.ini.set(body as IniFile);
       void this.jobs.loadConfig();
-      this.say('Reset: the page looks as it came, every prompt asks always, runs start with the app\'s default formats, and settings.ini holds its defaults');
+      this.say(`${done}, settings.ini included`);
     } catch (e) {
       this.say(
-        `Prompts and formats were reset, but settings.ini was not: ${e instanceof Error ? e.message : String(e)}`,
+        `${browser ? `Reset ${browser} setting${browser === 1 ? '' : 's'} in this browser, but` : 'Nothing was reset:'} settings.ini was not: ${e instanceof Error ? e.message : String(e)}`,
         'problem',
       );
     }
-  }
-
-  /**
-   * Every setting this browser keeps back to its default - appearance, prompts, formats, the AO3
-   * time zone, question defaults and waits, answers to always use, run-log and visit-log lengths.
-   * settings.ini is not this browser's, and is left to Reset to defaults.
-   */
-  private resetBrowserSettings(): void {
-    this.appearance.reset();
-    this.chime.set(true);
-    this.chime.choose(DEFAULT_SOUND);
-    for (const prompt of PROMPTS) setPromptAsks(prompt, true);
-    this.asking.set(Object.fromEntries(PROMPTS.map((p) => [p.key, 'ask' as Asking])));
-    this.updates.dismissed.set(false);
-    saveDefaultFiletypes(null);
-    saveAnswerDefaults(null);
-    saveQuestionTimeout(null);
-    saveGuessedDateTimeout(null);
-    this.savedGuessedTimeout.set(null);
-    for (const { name } of OWN_WAITS) saveOwnWait(name, null);
-    this.savedWaits.set({});
-    saveNobodyHere(null);
-    this.savedNobody.set(null);
-    for (const { name } of ALWAYS_LABELS) saveAlwaysAnswer(name, null);
-    this.alwaysAnswers.set({});
-    this.visit.setLimit(null);
-    saveRunLogLines(null);
-    this.savedLogLines.set(null);
-    saveTrimOldRunLogs(null);
-    this.savedTrimLogs.set(null);
-    saveAo3TimeZone(null);
-    this.ao3Zone.set(this.browserZone);
-    this.savedAnswers.set({});
-    this.savedTimeout.set(null);
-    const config = this.config();
-    if (config) this.formats.set(startingFiletypes(config));
   }
 
   /** one setting changed and left: write it now. A refused value is put back as the file has it */
