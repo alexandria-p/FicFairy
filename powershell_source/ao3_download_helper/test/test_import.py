@@ -674,6 +674,38 @@ def test_a_work_only_renamed_and_also_updated_is_fetched_only_in_the_formats_it_
     assert '1 Fic 1 - Someone 2026-05-01.html' in works_files(library)
 
 
+def test_overwriting_never_downloads_a_file_only_renamed_but_still_replaces_the_works_others(
+        library, monkeypatch):
+    # *Only rename the file* on the repair page, and *Overwrite existing downloads* for the update
+    # of the same work: the repair page decided the renamed html, so it is kept; the overwrite is
+    # for the work's other files
+    a_copy(library, '1 Fic 1 - Someone.html')
+    a_copy(library, '1 Fic 1 - Someone 2026-05-01.epub')
+    replacing: dict = {}
+
+    _, fetched = importing(library, monkeypatch, ['JSON', 'HTML', 'EPUB'], replace=True,
+                           repair=['1 Fic 1 - Someone.html'], repairRenameOnly=True,
+                           overwrite=True, replacing=replacing)
+
+    assert fetched['1'] == ['EPUB']
+    assert 'HTML' not in (replacing.get('1') or {})
+    assert '1 Fic 1 - Someone 2026-05-01.html' in works_files(library)
+
+
+def test_overwriting_alongside_a_repair_from_ao3_replaces_the_repaired_file_and_the_others(
+        library, monkeypatch):
+    # *Overwrite and rename the file*: the repair replaces the chosen file whatever the box says,
+    # and the box re-downloads the work's other dated files
+    a_copy(library, '1 Fic 1 - Someone.html')
+    a_copy(library, '1 Fic 1 - Someone 2026-05-01.epub')
+    replacing: dict = {}
+
+    _, fetched = importing(library, monkeypatch, ['JSON', 'HTML', 'EPUB'], replace=True,
+                           repair=['1 Fic 1 - Someone.html'], overwrite=True, replacing=replacing)
+
+    assert sorted(replacing['1']) == ['EPUB', 'HTML']
+
+
 def test_only_renaming_is_a_repairs_alone():
     _, [job], _ = start_request(server.ACTION_IMPORT, '1', repairRenameOnly=True)
     assert job.options['repairRenameOnly'] is False

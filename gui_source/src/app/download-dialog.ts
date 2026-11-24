@@ -837,7 +837,8 @@ export class DownloadDialog implements OnDestroy {
     const updated = this.importUpdated();
     if (updated) lines.push(`Search ${updated.toLocaleString()} ${updated === 1 ? 'work' : 'works'} for updates`);
     if (updated && this.importOverwrite()) {
-      lines.push('Will re-download and overwrite existing files to repair them');
+      // only the works updated - the files chosen to repair go by the repair page, said below
+      lines.push('Will re-download and overwrite the existing files of the works being updated');
     }
     // every work the import reads gives its skin for nothing - saved as css, never into the html
     if (this.picksImportSkins() && this.importSkins()) {

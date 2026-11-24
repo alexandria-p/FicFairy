@@ -2905,7 +2905,8 @@ def download_planned(job: Job, fileops: FileOps, ao3: Ao3, records: list[dict],
                      downloadtypes: list[str], report,
                      overwrite: list[str] | None = None, keep_existing: bool = False,
                      repair: dict[str, dict[str, str]] | None = None,
-                     repair_only: set[str] | None = None) -> None:
+                     repair_only: set[str] | None = None,
+                     repaired: dict[str, dict[str, str]] | None = None) -> None:
     """Settle anything undated among these works, then download them.
 
     The same rule a full run downloads by, applied to whichever slice of the index the
@@ -2933,6 +2934,8 @@ def download_planned(job: Job, fileops: FileOps, ao3: Ao3, records: list[dict],
                       fileops.get_ini_value_integer(strings.INI_NAME_LENGTH,
                                                     strings.INI_DEFAULT_NAME_LENGTH),
                       ao3.repair_clashes)
+    # files the import already repaired by renaming them are the repair page's alone
+    if repaired: keep_repaired(records, plan, repaired, downloadtypes)
     # an out-of-date copy is not 'already downloaded', so it must not be skipped
     visited = shared.already_downloaded(plan['existing'], downloadtypes, records, plan['stale'])
     if ao3.held_only:
@@ -3620,7 +3623,12 @@ def run_fic_list(job: Job, fileops: FileOps, repo: Repository, report, importing
             # nothing is downloaded for them; one AO3 did not give goes to FicHub at the end
             print(strings.AO3_INFO_IMPORT_RENAMING.format(sum(len(x) for x in repair.values())))
             rename_from_ao3(fileops, records, repair, ao3.repair_clashes)
+            # and then left alone: the repair page decided what happens to them, so an update's
+            # *Overwrite existing downloads* never downloads them again (`keep_repaired`)
+            renamed = repair
             repair = {}
+        else:
+            renamed = {}
         # a work with a file to repair is downloaded for it - only for it, if it was otherwise
         # only looked up (`repair_copies`)
         repair_only = set(job.options.get('indexOnly') or []) & set(repair)
@@ -3648,7 +3656,8 @@ def run_fic_list(job: Job, fileops: FileOps, repo: Repository, report, importing
                 downloadtypes = downloadtypes + extra
                 ao3.filetypes = downloadtypes
         download_planned(job, fileops, ao3, updating, downloadtypes, report,
-                         keep_existing=not replace, repair=repair, repair_only=repair_only)
+                         keep_existing=not replace, repair=repair, repair_only=repair_only,
+                         repaired=renamed)
     else:
         records = merge_by_work(records, index_marked_series(job, ao3, report))
         download_planned(job, fileops, ao3, records, downloadtypes, report, overwrite=asked)
@@ -6138,6 +6147,33 @@ def keep_undated_copies(records: list[dict], plan: dict, existing: dict, filetyp
         if link in plan['stale'] and all(have.get(x.upper()) for x in filetypes):
             plan['stale'].remove(link)
     if kept: print(strings.AO3_INFO_IMPORT_OVERWRITE_UNDATED_KEPT.format(kept))
+
+
+def keep_repaired(records: list[dict], plan: dict, repaired: dict[str, dict[str, str]],
+                  filetypes: list[str]) -> None:
+    """Keep the files an import's repair page already settled - each named with AO3's date by
+    *Only rename the file* - whatever an update of the same work would do to them. An import told
+    to *Overwrite existing downloads* puts every copy in `superseded`; these leave it for
+    `plan['keep']`, so the repair page's choice stands, and the overwrite applies to every other
+    file of the works it updates. A work with nothing left to replace or fetch leaves `stale`."""
+
+    keep: dict[str, set[str]] = plan.setdefault('keep', {})
+    existing = plan.get('existing') or {}
+    for record in records:
+        work = str(record.get('id') or '')
+        link = record.get('link') or ''
+        if not link or work not in repaired: continue
+        formats = {x.upper() for x in repaired[work]}
+        replacing = plan['superseded'].get(link) or {}
+        for filetype in list(replacing):
+            if filetype.upper() in formats: replacing.pop(filetype, None)
+        keep.setdefault(link, set()).update(formats)
+        if replacing: continue
+        plan['superseded'].pop(link, None)
+        have = existing.get(work) or {}
+        wanted = [x for x in filetypes if x.upper() not in formats]
+        if link in plan['stale'] and all(have.get(x.upper()) for x in wanted):
+            plan['stale'].remove(link)
 
 
 def keep_existing_copies(records: list[dict], plan: dict, filetypes: list[str]) -> None:
