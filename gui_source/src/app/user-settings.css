@@ -289,7 +289,7 @@ h4.scenario-source {
 
 /* the two dropdowns of one case the same width, one under the other */
 .row-group .row > select {
-  width: 240px;
+  width: 280px;
   min-width: 0;
 }
 
@@ -556,6 +556,27 @@ select.zone-select {
   top: 12px;
   right: 0;
 }
+/* Advanced's numbers sit at the right of their row, as every other setting's dropdown does */
+.advanced-part .row > input[type='number'] {
+  flex: none;
+  width: 140px;
+}
+
+/* a tick box in a row: the box on its name's first line, the explanation under the name */
+.advanced-part .row > .check {
+  align-items: flex-start;
+  margin: 0;
+}
+
+.advanced-part .row > .check input {
+  margin-top: 0.25em;
+}
+
+/* a part's own button, under its rows */
+.part-actions {
+  margin: 10px 0 0;
+}
+
 .advanced-part h4 {
   margin: 0;
   font-size: 1rem;
