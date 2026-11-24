@@ -936,8 +936,10 @@ describe('UserSettings', () => {
     await settle();
     // every value that will change, current then default
     const rows = Array.from(element.querySelectorAll('.changes tbody tr')).map((r) =>
-      Array.from(r.children).map((c) => c.textContent?.replace(/\s+/g, ' ').trim()),
+      Array.from(r.children).slice(1).map((c) => c.textContent?.replace(/\s+/g, ' ').trim()),
     );
+    // each ticked to begin with
+    expect([...element.querySelectorAll<HTMLInputElement>('.changes tbody .tick input')].every((b) => b.checked)).toBe(true);
     expect(rows).toEqual([
       ...PROMPTS.map((p) => [`Prompts ${p.name}`, promptLabels(p).skip, `→ ${promptLabels(p).ask}`]),
       ['Download formats Formats a run starts with', 'JSON, PDF', '→ JSON, HTML'],
@@ -954,9 +956,52 @@ describe('UserSettings', () => {
     expect(updates.dismissed()).toBe(false);
     expect(localStorage.getItem(DEFAULT_FILETYPES_KEY)).toBeNull();
     expect(element.querySelector<HTMLInputElement>('input[name="format-PDF"]')!.checked).toBe(false);
-    expect(posted).toEqual([{ reset: true }]);
+    expect(posted).toEqual([{ ExtraWaitTime: '40' }]);
     expect(element.querySelector<HTMLInputElement>('[data-setting="ExtraWaitTime"] input')!.value).toBe('40');
-    expect(toast()).toContain('settings.ini holds its defaults');
+    expect(toast()).toContain('settings.ini included');
+  });
+
+  it('resets only the changes left ticked, and keeps the rest', async () => {
+    localStorage.setItem(DEFAULT_FILETYPES_KEY, JSON.stringify(['JSON', 'PDF']));
+    localStorage.setItem(SYNC_ACK_KEY, 'true');
+    await open();
+    element.querySelector<HTMLButtonElement>('button.reset-all')!.click();
+    await settle();
+    const confirm = element.querySelector<HTMLButtonElement>('.confirm-reset button.confirm')!;
+    const ticks = element.querySelectorAll('.changes tbody tr').length;
+    expect(confirm.textContent?.trim()).toBe(`Reset ${ticks} settings`);
+
+    // keep the formats and settings.ini: untick them
+    for (const name of ['Formats a run starts with', 'ExtraWaitTime']) {
+      const box = element.querySelector<HTMLInputElement>(`[data-change="${name}"] .tick input`)!;
+      box.checked = false;
+      box.dispatchEvent(new Event('change'));
+    }
+    await settle();
+    expect(element.querySelector('[data-change="ExtraWaitTime"]')?.classList).toContain('kept');
+    expect(confirm.textContent?.trim()).toBe(`Reset ${ticks - 2} setting${ticks - 2 === 1 ? "" : "s"}`);
+    confirm.click();
+    await settle();
+
+    expect(localStorage.getItem(SYNC_ACK_KEY)).toBeNull();
+    expect(localStorage.getItem(DEFAULT_FILETYPES_KEY)).toBe(JSON.stringify(['JSON', 'PDF']));
+    expect(posted).toEqual([]);
+  });
+
+  it('ticks and unticks every change at once from the heading box, and holds Reset with none ticked', async () => {
+    localStorage.setItem(SYNC_ACK_KEY, 'true');
+    await open();
+    element.querySelector<HTMLButtonElement>('button.reset-all')!.click();
+    await settle();
+    const all = element.querySelector<HTMLInputElement>('.changes .tick-all')!;
+    expect(all.checked).toBe(true);
+    all.checked = false;
+    all.dispatchEvent(new Event('change'));
+    await settle();
+    expect([...element.querySelectorAll<HTMLInputElement>('.changes tbody .tick input')].some((b) => b.checked)).toBe(false);
+    const confirm = element.querySelector<HTMLButtonElement>('.confirm-reset button.confirm')!;
+    expect(confirm.disabled).toBe(true);
+    expect(confirm.textContent?.trim()).toBe('Nothing ticked');
   });
 
   it('resets only what this browser keeps when there is no settings.ini to offer', async () => {
@@ -1021,18 +1066,25 @@ describe('UserSettings', () => {
     await settle();
   }
 
-  it('says nothing in the library is lost, and opens on everything it can clear ticked, but resetting settings - last, apart', async () => {
+  it('says nothing in the library is lost, and opens on everything it can clear, ticked - settings left to Reset', async () => {
     await open();
     expect(element.querySelector('.clear-browser .nothing-lost')?.textContent).toContain('Your downloaded works will not be lost');
     expect(element.querySelector('.choose-clear')?.textContent).toContain('Choose what to clear');
     await openClear();
     const ids = [...element.querySelectorAll('[data-clear]')].map((x) => x.getAttribute('data-clear'));
-    // a copy on this computer has no passcode to forget
-    expect(ids).toEqual(['username', 'visitLog', 'dropboxCache', 'library', 'settings']);
-    expect(ids.filter((id) => clearBox(id!).checked)).toEqual(['username', 'visitLog', 'dropboxCache', 'library']);
-    expect(element.querySelector('[data-clear="settings"]')?.classList).toContain('apart');
-    expect(element.querySelectorAll('.clear-options li.apart').length).toBe(1);
+    // a copy on this computer has no passcode to forget, and settings are Reset to defaults' alone
+    expect(ids).toEqual(['username', 'visitLog', 'dropboxCache', 'library']);
+    expect(ids.every((id) => clearBox(id!).checked)).toBe(true);
     expect(element.querySelector('.confirm-clear')?.textContent?.trim()).toBe('Clear 4 items');
+  });
+
+  it('opens Reset to defaults from the Clear data panel too', async () => {
+    localStorage.setItem(PALETTE_KEY, 'fairy');
+    await open();
+    expect(element.querySelector('.clear-browser .reset-settings')?.textContent).toContain('Reset settings to their defaults');
+    element.querySelector<HTMLButtonElement>('.clear-browser .reset-from-clear')!.click();
+    await settle();
+    expect(element.querySelector('.confirm-reset [data-change="Palette"]')).not.toBeNull();
   });
 
   it('clears only what is ticked, from this browser alone, and never touches settings.ini', async () => {
@@ -1045,63 +1097,18 @@ describe('UserSettings', () => {
     await open();
     await openClear();
     await untick('visitLog', 'dropboxCache', 'library');
-    clearBox('settings').checked = true;
-    clearBox('settings').dispatchEvent(new Event('change'));
-    await settle();
     element.querySelector<HTMLButtonElement>('.confirm-clear')!.click();
     await settle();
 
-    expect(localStorage.getItem(PALETTE_KEY)).toBeNull();
-    expect(localStorage.getItem(AO3_TIME_ZONE_KEY)).toBeNull();
+    // settings are not this window's to clear any more
+    expect(localStorage.getItem(PALETTE_KEY)).toBe('charcoal');
+    expect(localStorage.getItem(AO3_TIME_ZONE_KEY)).toBe('Europe/London');
     expect(localStorage.getItem('ao3.username')).toBeNull();
     expect(localStorage.getItem('ao3.remember')).toBeNull();
     expect(posted).toEqual([]);
     expect(forget).not.toHaveBeenCalled();
     expect(element.querySelector('.choose-clear-dialog')).toBeNull();
     expect(toast()).toContain('Nothing in your library was touched');
-  });
-
-  it('shows each section of User settings under Reset once ticked, and puts back only the sections ticked', async () => {
-    localStorage.setItem(PALETTE_KEY, 'charcoal');
-    localStorage.setItem(AO3_TIME_ZONE_KEY, 'Europe/London');
-    await open();
-    await openClear();
-    await untick('username', 'visitLog', 'dropboxCache', 'library');
-    expect(element.querySelector('.clear-sections')).toBeNull();
-    expect(element.querySelector<HTMLButtonElement>('.confirm-clear')!.disabled).toBe(true);
-
-    clearBox('settings').checked = true;
-    clearBox('settings').dispatchEvent(new Event('change'));
-    await settle();
-    const sections = [...element.querySelectorAll('[data-section]')].map((x) => x.getAttribute('data-section'));
-    // a copy on this computer keeps no question answers or waits of its own
-    expect(sections).toEqual(['formats', 'ao3Zone', 'appearance', 'always', 'prompts', 'advanced']);
-    expect([...element.querySelectorAll<HTMLInputElement>('[data-section] input')].every((b) => b.checked)).toBe(true);
-    expect(element.querySelector('.confirm-clear')?.textContent?.trim()).toBe('Clear 6 items');
-
-    const appearance = element.querySelector<HTMLInputElement>('[data-section="appearance"] input')!;
-    appearance.checked = false;
-    appearance.dispatchEvent(new Event('change'));
-    await settle();
-    expect(element.querySelector('.confirm-clear')?.textContent?.trim()).toBe('Clear 5 items');
-    element.querySelector<HTMLButtonElement>('.confirm-clear')!.click();
-    await settle();
-
-    expect(localStorage.getItem(PALETTE_KEY)).toBe('charcoal');
-    expect(localStorage.getItem(AO3_TIME_ZONE_KEY)).toBeNull();
-    expect(posted).toEqual([]);
-  });
-
-  it('offers the question sections under Reset on a hosted copy, where they are kept', async () => {
-    TestBed.inject(HelperConnection).settings.set({ ...DEFAULT_PAGE_CONFIG, helperUrl: 'https://helper.example.com' });
-    await open();
-    await openClear();
-    clearBox('settings').checked = true;
-    clearBox('settings').dispatchEvent(new Event('change'));
-    await settle();
-    const sections = [...element.querySelectorAll('[data-section]')].map((x) => x.getAttribute('data-section'));
-    expect(sections).toContain('questions');
-    expect(sections).toContain('waits');
   });
 
   it('forgets the library and signs out of Dropbox, and empties the visit log and the cache', async () => {
@@ -1115,7 +1122,7 @@ describe('UserSettings', () => {
     visit.note('something done earlier');
     await open();
     await openClear();
-    await untick('settings', 'username');
+    await untick('username');
     element.querySelector<HTMLButtonElement>('.confirm-clear')!.click();
     await settle();
 
@@ -1142,7 +1149,7 @@ describe('UserSettings', () => {
     await open();
     await openClear();
     const ids = [...element.querySelectorAll('[data-clear]')].map((x) => x.getAttribute('data-clear'));
-    expect(ids).toEqual(['username', 'visitLog', 'dropboxCache', 'library', 'settings']);
+    expect(ids).toEqual(['username', 'visitLog', 'dropboxCache', 'library']);
   });
 
   // endregion

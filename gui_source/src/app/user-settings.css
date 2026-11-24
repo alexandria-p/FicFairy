@@ -531,18 +531,62 @@ select.zone-select {
   margin-top: 2px;
 }
 
-.clear-options li.apart {
-  border-top: 1px solid var(--border);
-  padding-top: 10px;
-}
-
-.clear-sections {
-  list-style: none;
-  margin: 8px 0 0 26px;
-  padding: 0;
+/* Clear data's two ways to start afresh: what each does on the left, its button on the right */
+.data-actions {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin: 8px 0 12px;
+}
+
+.data-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 12px 14px;
+}
+
+.data-action + .data-action {
+  border-top: 1px solid var(--border);
+}
+
+.data-action-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.data-action-text strong {
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+.data-action-text .hint {
+  margin: 0;
+}
+
+.data-action .button {
+  flex: none;
+}
+
+@media (max-width: 560px) {
+  .data-action {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* the Reset window: a tick per change, and a row left unticked dimmed, as it will be kept */
+.changes .tick {
+  width: 1px;
+  padding-right: 4px;
+}
+
+.changes tr.kept th,
+.changes tr.kept td:not(.tick) {
+  opacity: 0.5;
 }
 
 .clear-options li.held {

@@ -25,7 +25,7 @@
           <p>Tick what to clear from this browser:</p>
           <ul class="clear-options">
             @for (option of clearOptions(); track option.id) {
-              <li [attr.data-clear]="option.id" [class.held]="!!option.held" [class.apart]="!!option.apart">
+              <li [attr.data-clear]="option.id" [class.held]="!!option.held">
                 <label class="check" [title]="option.held || ''">
                   <input type="checkbox" [attr.aria-label]="option.label" [disabled]="!!option.held"
                          [checked]="!option.held && clearTicked().has(option.id)"
@@ -37,20 +37,6 @@
                     }
                   </span>
                 </label>
-                @if (option.id === 'settings' && clearTicked().has('settings')) {
-                  <ul class="clear-sections">
-                    @for (section of settingsSections(); track section.id) {
-                      <li [attr.data-section]="section.id">
-                        <label class="check">
-                          <input type="checkbox" [attr.aria-label]="section.label"
-                                 [checked]="sectionsTicked().has(section.id)"
-                                 (change)="tickSection(section.id, $any($event.target).checked)" />
-                          <span>{{ section.label }}</span>
-                        </label>
-                      </li>
-                    }
-                  </ul>
-                }
               </li>
             }
           </ul>
@@ -61,9 +47,9 @@
         </section>
         <footer>
           <button type="button" class="button" (click)="choosingClear.set(false)">Cancel</button>
-          <button type="button" class="button primary confirm-clear" [disabled]="!clearCount() || clearingBrowser()"
+          <button type="button" class="button primary confirm-clear" [disabled]="!clearChosen().length || clearingBrowser()"
                   (click)="clearBrowser()">
-            {{ clearCount() ? 'Clear ' + clearCount() + (clearCount() === 1 ? ' item' : ' items') : 'Nothing ticked' }}
+            {{ clearChosen().length ? 'Clear ' + clearChosen().length + (clearChosen().length === 1 ? ' item' : ' items') : 'Nothing ticked' }}
           </button>
         </footer>
       </div>
@@ -80,14 +66,26 @@
         </header>
         <section class="body">
           @if (resetChanges().length) {
-            <p>These will change:</p>
+            <p>These are the settings you have changed. Tick the ones to put back to their defaults:</p>
             <table class="changes">
               <thead>
-                <tr><th scope="col">Setting</th><th scope="col">Current</th><th scope="col">Default</th></tr>
+                <tr>
+                  <th scope="col" class="tick">
+                    <input type="checkbox" class="tick-all" aria-label="Reset every one" [checked]="allResetTicked()"
+                           [indeterminate]="!allResetTicked() && resetChosen().length > 0"
+                           (change)="tickAllReset($any($event.target).checked)" />
+                  </th>
+                  <th scope="col">Setting</th><th scope="col">Current</th><th scope="col">Default</th>
+                </tr>
               </thead>
               <tbody>
                 @for (change of resetChanges(); track change.group + change.name) {
-                  <tr [attr.data-change]="change.name">
+                  <tr [attr.data-change]="change.name" [class.kept]="!resetTicked().has(changeId(change))">
+                    <td class="tick">
+                      <input type="checkbox" [attr.aria-label]="'Reset ' + change.name"
+                             [checked]="resetTicked().has(changeId(change))"
+                             (change)="tickReset(change, $any($event.target).checked)" />
+                    </td>
                     <th scope="row">
                       <span class="change-group">{{ change.group }}</span>
                       {{ change.name }}
@@ -104,8 +102,8 @@
         </section>
         <footer>
           <button type="button" class="button" (click)="confirmingReset.set(false)">Cancel</button>
-          <button type="button" class="button primary confirm" [disabled]="!resetChanges().length" (click)="resetAll()">
-            Reset to defaults
+          <button type="button" class="button primary confirm" [disabled]="!resetChosen().length" (click)="resetAll()">
+            {{ resetChosen().length ? 'Reset ' + resetChosen().length + (resetChosen().length === 1 ? ' setting' : ' settings') : 'Nothing ticked' }}
           </button>
         </footer>
       </div>
@@ -461,18 +459,35 @@
       <h3>Clear data saved in this browser</h3>
       <span class="saved-to">Saved to this browser</span>
     </div>
-    <p class="hint">
-      This shows you any information saved to your browser memory (such as user settings, logs,
-      Dropbox cache). Choose whether to clear part or all of it.
-    </p>
+    <!-- two ways to start afresh, each a row: what it does, and its button -->
+    <div class="data-actions">
+      <div class="data-action reset-settings">
+        <div class="data-action-text">
+          <strong>Reset settings to their defaults</strong>
+          <span class="hint">
+            See every setting you have changed, and choose which to put back as they came{{ ini()?.editable ? ' - settings.ini included' : '' }}.
+          </span>
+        </div>
+        <button type="button" class="button reset-from-clear" (click)="openReset()">Reset to defaults&hellip;</button>
+      </div>
+      <div class="data-action clear-data">
+        <div class="data-action-text">
+          <strong>Clear saved data</strong>
+          <span class="hint">
+            Forget your saved AO3 username, empty the visit log, clear the Dropbox cache, or forget
+            the open library.
+          </span>
+        </div>
+        <button type="button" class="button choose-clear" (click)="chooseWhatToClear()">
+          Choose what to clear&hellip;
+        </button>
+      </div>
+    </div>
     <p class="hint nothing-lost">
       <strong>Your downloaded works will not be lost.</strong> Fics, indexing, collections, run
       history, hidden works and import lists always stay in your folder or in Dropbox, ready for
       when you open it again.
     </p>
-    <button type="button" class="button choose-clear" (click)="chooseWhatToClear()">
-      Choose what to clear&hellip;
-    </button>
   </section>
 
   @if (local && ini(); as file) {

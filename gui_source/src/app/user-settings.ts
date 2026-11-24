@@ -88,13 +88,16 @@ export interface ResetChange {
   name: string;
   current: string;
   default: string;
+  /** puts this one value back, in this browser - absent for a settings.ini key */
+  reset?: () => void;
+  /** the settings.ini key, written back to its default through the helper */
+  iniKey?: string;
+  /** default value to write for `iniKey` */
+  iniDefault?: string;
 }
 
 /** something the Clear data window can clear from this browser */
-export type BrowserClear = 'settings' | 'username' | 'visitLog' | 'dropboxCache' | 'library';
-
-/** a section of User settings that the Clear data window can put back to its defaults */
-export type SettingsSection = 'formats' | 'ao3Zone' | 'appearance' | 'questions' | 'waits' | 'always' | 'prompts' | 'advanced';
+export type BrowserClear = 'username' | 'visitLog' | 'dropboxCache' | 'library';
 
 export interface ClearOption {
   id: BrowserClear;
@@ -103,10 +106,6 @@ export interface ClearOption {
   hint?: string;
   /** why it cannot be ticked now, if it cannot */
   held?: string;
-  /** left unticked as the window opens - resetting settings is not wanted by the way */
-  unticked?: boolean;
-  /** set apart from the options above it by a line */
-  apart?: boolean;
 }
 
 export interface Toast {
@@ -431,63 +430,21 @@ export class UserSettings implements OnDestroy {
       { id: 'library', label: 'Forget the open library, and sign out of Dropbox',
         hint: 'Close the file storage location this browser was given, and/or sign out of Dropbox.',
         held: this.jobs.activeRuns().length > 0 ? 'Cannot be changed while an active run is in progress' : '' },
-      // last, apart and unticked, at the owner's request: clearing data seldom means losing settings
-      { id: 'settings', label: 'Reset user settings back to their defaults', unticked: true, apart: true },
     ];
   });
 
-  /**
-   * The sections of User settings that resetting puts back, each named as its heading is - shown
-   * under 'Reset user settings' once it is ticked, and each cleared only if it is ticked too.
-   * The two question sections only where they are shown: on a hosted copy.
-   */
-  protected readonly settingsSections = computed<{ id: SettingsSection; label: string }[]>(() => [
-    { id: 'formats', label: 'Default download formats' },
-    { id: 'ao3Zone', label: 'Your AO3 time zone' },
-    { id: 'appearance', label: 'Appearance' },
-    ...(this.local ? [] : [
-      { id: 'questions' as const, label: 'Choose what happens during a run when a question times out' },
-      { id: 'waits' as const, label: 'How long a question waits during a run' },
-    ]),
-    { id: 'always', label: 'Deciding whether to replace or keep a file during a run' },
-    { id: 'prompts', label: "'Ask again' Prompts" },
-    { id: 'advanced', label: 'Advanced' },
-  ]);
-  /** which sections are ticked under 'Reset user settings' */
-  protected readonly sectionsTicked = signal<ReadonlySet<SettingsSection>>(new Set());
-
-  /** what goes: every ticked option but 'settings', which only shows the sections under it */
   protected readonly clearChosen = computed(() =>
-    this.clearOptions().filter((o) => o.id !== 'settings' && !o.held && this.clearTicked().has(o.id)),
+    this.clearOptions().filter((o) => !o.held && this.clearTicked().has(o.id)),
   );
-  /** the sections to put back: those ticked, while 'Reset user settings' is */
-  protected readonly sectionsChosen = computed(() =>
-    this.clearTicked().has('settings') ? this.settingsSections().filter((s) => this.sectionsTicked().has(s.id)) : [],
-  );
-  /** how many things Clear will do, for its button */
-  protected readonly clearCount = computed(() => this.clearChosen().length + this.sectionsChosen().length);
 
-  /** open the window with everything it can clear ticked, but what starts unticked */
+  /** open the window with everything it can clear ticked */
   protected chooseWhatToClear(): void {
     if (this.guestRefused()) return;
-    this.clearTicked.set(new Set(this.clearOptions().filter((o) => !o.held && !o.unticked).map((o) => o.id)));
-    this.sectionsTicked.set(new Set());
+    this.clearTicked.set(new Set(this.clearOptions().filter((o) => !o.held).map((o) => o.id)));
     this.choosingClear.set(true);
   }
 
-  /** tick or untick one section under 'Reset user settings' */
-  protected tickSection(id: SettingsSection, ticked: boolean): void {
-    this.sectionsTicked.update((all) => {
-      const next = new Set(all);
-      if (ticked) next.add(id);
-      else next.delete(id);
-      return next;
-    });
-  }
-
   protected tickClear(id: BrowserClear, ticked: boolean): void {
-    // ticking 'Reset user settings' opens its sections, every one ticked to begin with
-    if (id === 'settings') this.sectionsTicked.set(ticked ? new Set(this.settingsSections().map((s) => s.id)) : new Set());
     this.clearTicked.update((all) => {
       const next = new Set(all);
       if (ticked) next.add(id);
@@ -503,15 +460,10 @@ export class UserSettings implements OnDestroy {
   protected async clearBrowser(): Promise<void> {
     if (this.guestRefused() || this.clearingBrowser()) return;
     const chosen = new Set(this.clearChosen().map((o) => o.id));
-    const sections = this.sectionsChosen();
-    if (!chosen.size && !sections.length) return;
+    if (!chosen.size) return;
     this.clearingBrowser.set(true);
     const done: string[] = [];
     try {
-      if (sections.length) {
-        this.resetBrowserSettings(new Set(sections.map((s) => s.id)));
-        done.push(`settings reset (${sections.map((s) => s.label).join(', ')})`);
-      }
       if (chosen.has('username')) {
         safeRemove(SAVED_USERNAME_KEY);
         safeRemove(REMEMBER_USERNAME_KEY);
@@ -669,22 +621,29 @@ export class UserSettings implements OnDestroy {
     const changes: ResetChange[] = [];
     if (this.appearance.palette() !== DEFAULT_PALETTE) {
       changes.push({ group: 'Appearance', name: 'Palette', current: paletteById(this.appearance.palette()).name,
-                     default: paletteById(DEFAULT_PALETTE).name });
+                     default: paletteById(DEFAULT_PALETTE).name, reset: () => this.appearance.setPalette(DEFAULT_PALETTE) });
     }
     if (this.appearance.font() !== DEFAULT_FONT) {
-      changes.push({ group: 'Appearance', name: 'Font', current: this.fontName(), default: fontById(DEFAULT_FONT).name });
+      changes.push({ group: 'Appearance', name: 'Font', current: this.fontName(), default: fontById(DEFAULT_FONT).name,
+                     reset: () => this.appearance.setFont(DEFAULT_FONT, '') });
     }
     if (!this.chime.on()) {
-      changes.push({ group: 'Appearance', name: 'Sound when waiting for you', current: 'Off', default: 'On' });
+      changes.push({ group: 'Appearance', name: 'Sound when waiting for you', current: 'Off', default: 'On',
+                     reset: () => this.chime.set(true) });
     }
     if (this.chime.sound() !== DEFAULT_SOUND) {
       changes.push({ group: 'Appearance', name: 'Sound', current: soundById(this.chime.sound()).name,
-                     default: soundById(DEFAULT_SOUND).name });
+                     default: soundById(DEFAULT_SOUND).name, reset: () => this.chime.choose(DEFAULT_SOUND) });
     }
     const askingNow = this.asking();
     for (const prompt of PROMPTS) {
       if (askingNow[prompt.key] === 'skip') {
-        changes.push({ group: 'Prompts', name: prompt.name, current: promptLabels(prompt).skip, default: promptLabels(prompt).ask });
+        changes.push({ group: 'Prompts', name: prompt.name, current: promptLabels(prompt).skip, default: promptLabels(prompt).ask,
+                       reset: () => {
+                         setPromptAsks(prompt, true);
+                         this.asking.update((all) => ({ ...all, [prompt.key]: 'ask' }));
+                         if (prompt.key === UPDATE_BANNER_KEY) this.updates.dismissed.set(false);
+                       } });
       }
     }
     const config = this.config();
@@ -692,56 +651,79 @@ export class UserSettings implements OnDestroy {
       const order = (list: string[]) => config.filetypes.filter((x) => list.includes(x)).join(', ');
       const now = order(this.formats());
       const fresh = order([...config.forced, ...(config.defaults ?? [])]);
-      if (now !== fresh) changes.push({ group: 'Download formats', name: 'Formats a run starts with', current: now, default: fresh });
+      if (now !== fresh) {
+        changes.push({ group: 'Download formats', name: 'Formats a run starts with', current: now, default: fresh,
+                       reset: () => { saveDefaultFiletypes(null); this.formats.set(startingFiletypes(config)); } });
+      }
     }
     if (this.ao3Zone() !== this.browserZone) {
       changes.push({ group: 'AO3 time zone', name: 'Your AO3 time zone', current: this.ao3Zone(),
-                     default: `${this.browserZone} (this browser)` });
+                     default: `${this.browserZone} (this browser)`,
+                     reset: () => { saveAo3TimeZone(null); this.ao3Zone.set(this.browserZone); } });
     }
     if (!this.local) {
       if (this.guessedTimeout() !== this.helperGuessedTimeout()) {
         changes.push({ group: 'How long a question waits', name: 'Minutes a question about a file with no date in its name waits',
-                       current: String(this.guessedTimeout()), default: String(this.helperGuessedTimeout()) });
+                       current: String(this.guessedTimeout()), default: String(this.helperGuessedTimeout()),
+                       reset: () => { saveGuessedDateTimeout(null); this.savedGuessedTimeout.set(null); } });
       }
       if (this.questionTimeout() !== this.helperTimeout()) {
         changes.push({ group: 'How long a question waits', name: 'Minutes a question waits for you',
-                       current: String(this.questionTimeout()), default: String(this.helperTimeout()) });
+                       current: String(this.questionTimeout()), default: String(this.helperTimeout()),
+                       reset: () => { saveQuestionTimeout(null); this.savedTimeout.set(null); } });
       }
       for (const { name, label } of OWN_WAITS) {
         if (this.ownWait(name) !== this.helperWait(name)) {
           changes.push({ group: 'How long a question waits', name: label,
-                         current: String(this.ownWait(name)), default: String(this.helperWait(name)) });
+                         current: String(this.ownWait(name)), default: String(this.helperWait(name)),
+                         reset: () => {
+                           saveOwnWait(name, null);
+                           this.savedWaits.update((all) => { const next = { ...all }; delete next[name]; return next; });
+                         } });
         }
       }
       if (this.nobodyHere() !== this.helperNobodyHere()) {
         changes.push({ group: 'How long a question waits', name: "When nobody answers, don't wait on the rest",
-                       current: this.nobodyHere() ? 'On' : 'Off', default: this.helperNobodyHere() ? 'On' : 'Off' });
+                       current: this.nobodyHere() ? 'On' : 'Off', default: this.helperNobodyHere() ? 'On' : 'Off',
+                       reset: () => { saveNobodyHere(null); this.savedNobody.set(null); } });
       }
       for (const question of QUESTION_DEFAULTS) {
         const now = this.answer(question.name);
         const fresh = this.helperAnswer(question.name);
         if (now !== fresh) {
           changes.push({ group: 'Questions', name: question.label,
-                         current: this.choiceLabel(question, now), default: this.choiceLabel(question, fresh) });
+                         current: this.choiceLabel(question, now), default: this.choiceLabel(question, fresh),
+                         reset: () => {
+                           const answers = { ...this.savedAnswers() };
+                           delete answers[question.name];
+                           saveAnswerDefaults(Object.keys(answers).length ? answers : null);
+                           this.savedAnswers.set(answers);
+                         } });
         }
       }
     }
     if (!this.local && this.savedLogLines() !== null) {
       changes.push({ group: 'Run logs', name: 'Maximum length of each log file (in lines)', current: this.runLogLinesNow().toLocaleString(),
-                     default: RUN_LOG_LINES_DEFAULT.toLocaleString() });
+                     default: RUN_LOG_LINES_DEFAULT.toLocaleString(),
+                     reset: () => { saveRunLogLines(null); this.savedLogLines.set(null); } });
     }
     if (!this.local && this.savedTrimLogs() === false) {
-      changes.push({ group: 'Run logs', name: `Only keep logs of the last ${RECENT_RUN_LOGS} runs`, current: 'Off', default: 'On' });
+      changes.push({ group: 'Run logs', name: `Only keep logs of the last ${RECENT_RUN_LOGS} runs`, current: 'Off', default: 'On',
+                     reset: () => { saveTrimOldRunLogs(null); this.savedTrimLogs.set(null); } });
     }
     if (this.visitLimit() !== VISIT_LOG_LIMIT) {
       changes.push({ group: 'Visit log', name: 'Maximum length of the visit log (in lines)', current: this.visitLimit().toLocaleString(),
-                     default: VISIT_LOG_LIMIT.toLocaleString() });
+                     default: VISIT_LOG_LIMIT.toLocaleString(), reset: () => this.visit.setLimit(null) });
     }
     const always = this.alwaysAnswers();
     for (const { name, label } of ALWAYS_LABELS) {
       if (always[name]) {
         changes.push({ group: 'Deciding whether to replace or keep a file during a run', name: label,
-                       current: this.alwaysWords(always[name], name), default: this.alwaysWords(undefined) });
+                       current: this.alwaysWords(always[name], name), default: this.alwaysWords(undefined),
+                       reset: () => {
+                         saveAlwaysAnswer(name, null);
+                         this.alwaysAnswers.update((all) => { const next = { ...all }; delete next[name]; return next; });
+                       } });
       }
     }
     const file = this.ini();
@@ -749,12 +731,36 @@ export class UserSettings implements OnDestroy {
       for (const setting of file.settings) {
         // the naming pattern is left as it is by a reset (the DEBUG tab changes it)
         if (setting.key !== 'FileNamePattern' && setting.value !== setting.default) {
-          changes.push({ group: 'settings.ini', name: setting.key, current: this.iniWords(setting.key, setting.value) || '(empty)', default: this.iniWords(setting.key, setting.default) || '(empty)' });
+          changes.push({ group: 'settings.ini', name: setting.key, current: this.iniWords(setting.key, setting.value) || '(empty)', default: this.iniWords(setting.key, setting.default) || '(empty)',
+                         iniKey: setting.key, iniDefault: setting.default });
         }
       }
     }
     return changes;
   });
+
+  /** which of the listed changes are ticked to be reset, by `changeId` - all of them as the window opens */
+  protected readonly resetTicked = signal<ReadonlySet<string>>(new Set());
+  protected changeId(change: ResetChange): string {
+    return `${change.group}\u0000${change.name}`;
+  }
+  protected readonly resetChosen = computed(() => this.resetChanges().filter((c) => this.resetTicked().has(this.changeId(c))));
+  protected readonly allResetTicked = computed(() =>
+    this.resetChanges().length > 0 && this.resetChosen().length === this.resetChanges().length);
+
+  protected tickReset(change: ResetChange, ticked: boolean): void {
+    const id = this.changeId(change);
+    this.resetTicked.update((all) => {
+      const next = new Set(all);
+      if (ticked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  protected tickAllReset(ticked: boolean): void {
+    this.resetTicked.set(ticked ? new Set(this.resetChanges().map((c) => this.changeId(c))) : new Set());
+  }
 
   readonly toast = signal<Toast | null>(null);
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
@@ -773,6 +779,7 @@ export class UserSettings implements OnDestroy {
     if (this.guestRefused()) return;
     clearTimeout(this.toastTimer);
     this.toast.set(null);
+    this.resetTicked.set(new Set(this.resetChanges().map((c) => this.changeId(c))));
     this.confirmingReset.set(true);
   }
 
@@ -911,91 +918,39 @@ export class UserSettings implements OnDestroy {
   }
 
   /**
-   * Everything back as it came: every prompt asks always, runs start with the app's own
-   * formats, and settings.ini - where it is offered - holds the values this copy was built
-   * with (the downloaded app's own; the template's for anything else).
+   * Put back what is ticked in the Reset window, one value at a time: this browser's at once, and
+   * settings.ini's keys - where it is offered - in one write through the helper, to the values this
+   * copy was built with (the downloaded app's own; the template's for anything else).
    */
   protected async resetAll(): Promise<void> {
     if (this.guestRefused()) return;
+    const chosen = this.resetChosen();
+    if (!chosen.length) return;
     this.confirmingReset.set(false);
-    this.resetBrowserSettings();
-
-    if (!this.ini()?.editable) {
-      this.say(this.local
-        ? 'Reset: the page looks as it came, every prompt asks always, and runs start with the app\'s default formats'
-        : 'Reset: the page looks as it came, every prompt asks always, runs start with the app\'s default formats, and questions take the app\'s default answers');
+    for (const change of chosen) change.reset?.();
+    const browser = chosen.filter((c) => c.reset).length;
+    const ini = chosen.filter((c) => c.iniKey);
+    const done = `Reset ${chosen.length} setting${chosen.length === 1 ? '' : 's'} to ${chosen.length === 1 ? 'its default' : 'their defaults'}`;
+    if (!ini.length) {
+      this.say(done);
       return;
     }
     try {
       const response = await this.helper.call('/api/settings-file', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reset: true }),
+        body: JSON.stringify({ values: Object.fromEntries(ini.map((c) => [c.iniKey!, c.iniDefault ?? ''])) }),
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || `the helper answered ${response.status}`);
       this.ini.set(body as IniFile);
       void this.jobs.loadConfig();
-      this.say('Reset: the page looks as it came, every prompt asks always, runs start with the app\'s default formats, and settings.ini holds its defaults');
+      this.say(`${done}, settings.ini included`);
     } catch (e) {
       this.say(
-        `Prompts and formats were reset, but settings.ini was not: ${e instanceof Error ? e.message : String(e)}`,
+        `${browser ? `Reset ${browser} setting${browser === 1 ? '' : 's'} in this browser, but` : 'Nothing was reset:'} settings.ini was not: ${e instanceof Error ? e.message : String(e)}`,
         'problem',
       );
-    }
-  }
-
-  /**
-   * Every setting this browser keeps back to its default - appearance, prompts, formats, the AO3
-   * time zone, question defaults and waits, answers to always use, run-log and visit-log lengths.
-   * settings.ini is not this browser's, and is left to Reset to defaults.
-   */
-  private resetBrowserSettings(
-    only: ReadonlySet<SettingsSection> = new Set<SettingsSection>(['formats', 'ao3Zone', 'appearance', 'questions', 'waits', 'always', 'prompts', 'advanced']),
-  ): void {
-    if (only.has('appearance')) {
-      this.appearance.reset();
-      this.chime.set(true);
-      this.chime.choose(DEFAULT_SOUND);
-    }
-    if (only.has('prompts')) {
-      for (const prompt of PROMPTS) setPromptAsks(prompt, true);
-      this.asking.set(Object.fromEntries(PROMPTS.map((p) => [p.key, 'ask' as Asking])));
-      this.updates.dismissed.set(false);
-    }
-    if (only.has('formats')) {
-      saveDefaultFiletypes(null);
-      const config = this.config();
-      if (config) this.formats.set(startingFiletypes(config));
-    }
-    if (only.has('questions')) {
-      saveAnswerDefaults(null);
-      this.savedAnswers.set({});
-    }
-    if (only.has('waits')) {
-      saveQuestionTimeout(null);
-      this.savedTimeout.set(null);
-      saveGuessedDateTimeout(null);
-      this.savedGuessedTimeout.set(null);
-      for (const { name } of OWN_WAITS) saveOwnWait(name, null);
-      this.savedWaits.set({});
-      saveNobodyHere(null);
-      this.savedNobody.set(null);
-    }
-    if (only.has('always')) {
-      for (const { name } of ALWAYS_LABELS) saveAlwaysAnswer(name, null);
-      this.alwaysAnswers.set({});
-    }
-    if (only.has('advanced')) {
-      this.visit.setLimit(null);
-      saveRunLogLines(null);
-      this.savedLogLines.set(null);
-      saveTrimOldRunLogs(null);
-      this.savedTrimLogs.set(null);
-    }
-    if (only.has('ao3Zone')) {
-      saveAo3TimeZone(null);
-      this.ao3Zone.set(this.browserZone);
     }
   }
 
