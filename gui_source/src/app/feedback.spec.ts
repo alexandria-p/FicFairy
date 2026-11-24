@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { VisitLog } from './visit-log';
 import { Jobs } from './jobs';
-import { Feedback, ISSUE_BODY_LIMIT, LOG_ATTACH_LIMIT, LOG_CUT_NOTE, VISIT_ATTACH_LIMIT, VISIT_CUT_NOTE, newestPart, Turnstile, USERNAME_REMOVED, issueLength, ISSUE_RESERVE, runSummary, logExcerpt, ZONE_REMOVED, PATH_REMOVED, failureReason, readLatestLog, redactLog } from './feedback';
+import { Feedback, ISSUE_BODY_LIMIT, SEND_LIMIT, SHOW_COUNT_FROM, amountsThatDiffer, LOG_ATTACH_LIMIT, LOG_CUT_NOTE, VISIT_ATTACH_LIMIT, VISIT_CUT_NOTE, newestPart, Turnstile, USERNAME_REMOVED, issueLength, ISSUE_RESERVE, runSummary, logExcerpt, ZONE_REMOVED, PATH_REMOVED, failureReason, readLatestLog, redactLog } from './feedback';
 import { DEFAULT_PAGE_CONFIG, HelperConnection } from './helper-connection';
 import { Library } from './library';
 import { DirectoryHandle } from './folder-store';
@@ -569,8 +569,8 @@ describe('Feedback', () => {
 
     // the run log alone fits, and is attached whole as it will be sent
     expect(element.querySelector('.too-long')).toBeNull();
-    expect(element.querySelector('.issue-size')?.textContent).toContain(`of ${(ISSUE_BODY_LIMIT - ISSUE_RESERVE).toLocaleString()} characters`);
-    expect(element.querySelector('.issue-size')?.textContent).not.toContain('kept for');
+    // well under the limit, so no count is shown
+    expect(element.querySelector('.issue-size')).toBeNull();
     expect(element.querySelector('details.log pre')).not.toBeNull();
     expect(sendButton().disabled).toBe(false);
 
@@ -635,13 +635,67 @@ describe('Feedback', () => {
     expect(preview).toContain('line 300');
     expect(preview).not.toContain('line 299');
     expect(element.querySelector('.log-cut')).not.toBeNull();
-    expect(element.querySelector('.issue-size')?.textContent).toContain(('short'.length + preview.length).toLocaleString() + ' of');
+    expect(element.querySelector('.issue-size')).toBeNull();
 
     await send();
     expect(sentBody(fetching)['log']).toBe(preview);
   });
 
-  it('trims the logs to fit - the visit log first, the run\'s details kept - and then it can be sent', async () => {
+  it('says the count, of 64,000, only once what is sent passes 63,000 characters', async () => {
+    const long = Array.from({ length: 1500 }, (_, i) => `line ${i} ${'x'.repeat(40)}`);
+    TestBed.inject(Library).store.set(storeWith({ 'runs/20261020T100000Z-aaaa1111.json': record({ log: long }) }));
+    await make();
+    await openForm();
+    await fill('bug', 'short');
+    await tickLog();
+    expect(element.querySelector('.issue-size')).toBeNull();
+
+    await fill('bug', 'm'.repeat(3500));
+    const preview = element.querySelector('details.log pre')?.textContent ?? '';
+    const count = 3500 + preview.length;
+    expect(count).toBeGreaterThan(SHOW_COUNT_FROM);
+    expect(count).toBeLessThanOrEqual(SEND_LIMIT);
+    const said = element.querySelector('.issue-size')?.textContent?.replace(/\s+/g, ' ').trim();
+    expect(said).toBe(`${count.toLocaleString()} of 64,000 characters`);
+    expect(sendButton().disabled).toBe(false);
+  });
+
+  it('offers only the amounts that change what is sent, for the run log and the visit log alike', async () => {
+    const long = Array.from({ length: 1500 }, (_, i) => `line ${i} ${'x'.repeat(40)}`);
+    TestBed.inject(Library).store.set(storeWith({ 'runs/20261020T100000Z-aaaa1111.json': record({ log: long }) }));
+    for (let i = 0; i < 1200; i++) TestBed.inject(VisitLog).note(`step ${i} ${'z'.repeat(40)}`);
+    await make();
+    await openForm();
+    await fill('bug', 'm'.repeat(3500));
+    await tickLog();
+    const visit = element.querySelector('input[name="attachVisit"]') as HTMLInputElement;
+    visit.checked = true;
+    visit.dispatchEvent(new Event('change'));
+    await settle();
+
+    for (const [name, pre] of [['logAmount', 'details.log:not(.visit) pre'], ['visitAmount', 'details.log.visit pre']]) {
+      const select = element.querySelector(`select[name="${name}"]`) as HTMLSelectElement;
+      const values = [...select.options].map(o => o.value);
+      expect(values, name).toEqual(name === 'logAmount' ? ['most', '1000', '500', '100'] : ['most', '100']);
+      const sent = new Set<number>();
+      const counts = new Set<string>();
+      for (const value of values) {
+        select.value = value;
+        select.dispatchEvent(new Event('change'));
+        await settle();
+        sent.add((element.querySelector(pre)?.textContent ?? '').length);
+        counts.add(String((fixture.componentInstance as unknown as { sendChars(): number }).sendChars()));
+      }
+      // every choice offered sends a different amount, and the count follows it
+      expect(sent.size, name).toBe(values.length);
+      expect(counts.size, name).toBe(values.length);
+      select.value = 'most';
+      select.dispatchEvent(new Event('change'));
+      await settle();
+    }
+  });
+
+    it('trims the logs to fit - the visit log first, the run\'s details kept - and then it can be sent', async () => {
     const fetching = answering(201, { ok: true, number: 8, url: 'https://github.com/o/r/issues/8' });
     const long = Array.from({ length: 1500 }, (_, i) => `line ${i} ${'x'.repeat(40)}`);
     TestBed.inject(Library).store.set(storeWith({ 'runs/20261020T100000Z-aaaa1111.json': record({ log: long }) }));
@@ -753,6 +807,7 @@ describe('Feedback', () => {
     expect(sent).not.toContain('step 0 ');
   });
 
+
   it('says so when the library has no run log to attach, and does not send without one', async () => {
     TestBed.inject(Library).store.set(storeWith({}));
     await make();
@@ -775,6 +830,17 @@ describe('newestPart', () => {
     expect(part.text.length).toBeLessThanOrEqual(200);
     expect(part.text.split('\n')[1]).toMatch(/^line \d+$/);
     expect(part.text.endsWith('line 99')).toBe(true);
+  });
+});
+
+describe('amountsThatDiffer', () => {
+  it('offers only the line counts that would send less than as much as fits', () => {
+    const lines = (n: number, width = 10) => Array.from({ length: n }, (_, i) => `${i}`.padEnd(width, 'z')).join('\n');
+    expect(amountsThatDiffer(lines(50), 30000, 'note')).toEqual(['most']);
+    expect(amountsThatDiffer(lines(300), 30000, 'note')).toEqual(['most', 100]);
+    expect(amountsThatDiffer(lines(2000), 100000, 'note')).toEqual(['most', 1000, 500, 100]);
+    // a cap that holds only ~600 lines makes 1,000 the same as as much as fits
+    expect(amountsThatDiffer(lines(2000, 49), 30000, 'note')).toEqual(['most', 500, 100]);
   });
 });
 

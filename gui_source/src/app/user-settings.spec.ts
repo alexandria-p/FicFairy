@@ -1021,16 +1021,18 @@ describe('UserSettings', () => {
     await settle();
   }
 
-  it('says nothing in the library is lost, and opens on everything it can clear, ticked', async () => {
+  it('says nothing in the library is lost, and opens on everything it can clear ticked, but resetting settings - last, apart', async () => {
     await open();
     expect(element.querySelector('.clear-browser .nothing-lost')?.textContent).toContain('Your downloaded works will not be lost');
     expect(element.querySelector('.choose-clear')?.textContent).toContain('Choose what to clear');
     await openClear();
     const ids = [...element.querySelectorAll('[data-clear]')].map((x) => x.getAttribute('data-clear'));
     // a copy on this computer has no passcode to forget
-    expect(ids).toEqual(['settings', 'username', 'visitLog', 'dropboxCache', 'library']);
-    expect(ids.every((id) => clearBox(id!).checked)).toBe(true);
-    expect(element.querySelector('.confirm-clear')?.textContent?.trim()).toBe('Clear 5 items');
+    expect(ids).toEqual(['username', 'visitLog', 'dropboxCache', 'library', 'settings']);
+    expect(ids.filter((id) => clearBox(id!).checked)).toEqual(['username', 'visitLog', 'dropboxCache', 'library']);
+    expect(element.querySelector('[data-clear="settings"]')?.classList).toContain('apart');
+    expect(element.querySelectorAll('.clear-options li.apart').length).toBe(1);
+    expect(element.querySelector('.confirm-clear')?.textContent?.trim()).toBe('Clear 4 items');
   });
 
   it('clears only what is ticked, from this browser alone, and never touches settings.ini', async () => {
@@ -1043,6 +1045,9 @@ describe('UserSettings', () => {
     await open();
     await openClear();
     await untick('visitLog', 'dropboxCache', 'library');
+    clearBox('settings').checked = true;
+    clearBox('settings').dispatchEvent(new Event('change'));
+    await settle();
     element.querySelector<HTMLButtonElement>('.confirm-clear')!.click();
     await settle();
 
@@ -1085,7 +1090,7 @@ describe('UserSettings', () => {
     await openClear();
     expect(clearBox('library').disabled).toBe(true);
     expect(element.querySelector('[data-clear="library"]')?.textContent).toContain('active run');
-    expect(element.querySelector('.confirm-clear')?.textContent?.trim()).toBe('Clear 4 items');
+    expect(element.querySelector('.confirm-clear')?.textContent?.trim()).toBe('Clear 3 items');
   });
 
   it('offers neither the passcode nor debug mode, even on a hosted copy that has both', async () => {
@@ -1094,7 +1099,7 @@ describe('UserSettings', () => {
     await open();
     await openClear();
     const ids = [...element.querySelectorAll('[data-clear]')].map((x) => x.getAttribute('data-clear'));
-    expect(ids).toEqual(['settings', 'username', 'visitLog', 'dropboxCache', 'library']);
+    expect(ids).toEqual(['username', 'visitLog', 'dropboxCache', 'library', 'settings']);
   });
 
   // endregion

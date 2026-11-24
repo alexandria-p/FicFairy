@@ -82,6 +82,12 @@ export const SEND_TIMEOUT_MS = 30_000;
  */
 export const ISSUE_BODY_LIMIT = 65536;
 export const ISSUE_RESERVE = 1500;
+/**
+ * What may be written and attached, the reserve aside: a round number under what GitHub leaves
+ * (65,536 less the reserve), so the count reads simply. Its line shows only past `SHOW_COUNT_FROM`.
+ */
+export const SEND_LIMIT = 64000;
+export const SHOW_COUNT_FROM = 63000;
 
 /** how long the issue would be: the message and each log as they will be sent, plus the reserve */
 export function issueLength(message: string, log: string, visit: string): number {
@@ -126,6 +132,17 @@ export function logExcerpt(text: string, amount: 'most' | number, limit: number,
   if (cut && kept.length + note.length + 1 <= limit) return { text: `${note}\n${kept}`, cut };
   const part = newestPart(kept, limit, note);
   return { text: part.text, cut: cut || part.cut };
+}
+
+/**
+ * The choices of how much of a log to attach that would send something different: 'most', and
+ * only the line counts below what 'most' already keeps - a short log, or one whose cap holds
+ * fewer lines than a choice, would send exactly the same for it, so it is not offered.
+ */
+export function amountsThatDiffer(text: string, limit: number, note: string): LogAmount[] {
+  const most = logExcerpt(text, 'most', limit, note);
+  const kept = most.text ? most.text.split('\n').length - (most.cut ? 1 : 0) : 0;
+  return LOG_AMOUNTS.filter(amount => amount === 'most' || amount < kept);
 }
 
 /** the newest part of a log, at most `limit` long, starting on a whole line, and whether any was left out */
@@ -400,7 +417,16 @@ export class Feedback implements OnDestroy {
   /** only the newest part of the visit's log is attached - the form says so */
   protected readonly visitCut = computed(() => this.visitPart().cut);
   protected readonly visitLines = computed(() => this.visitText() ? this.visitText().split('\n').length : 0);
-  protected readonly logAmounts = LOG_AMOUNTS;
+  /** the choices that would change what is sent, for each log (`amountsThatDiffer`) */
+  protected readonly visitAmounts = computed(() =>
+    amountsThatDiffer(this.visitText(), VISIT_ATTACH_LIMIT, VISIT_CUT_NOTE));
+  protected readonly logAmounts = computed(() => {
+    const read = this.logRead();
+    return read ? amountsThatDiffer(read.body, LOG_ATTACH_LIMIT - read.head.length - 2, LOG_CUT_NOTE) : LOG_AMOUNTS;
+  });
+  /** the choice shown as picked: one no longer offered sends what 'most' does, so reads as it */
+  protected readonly shownLogAmount = computed(() => (this.logAmounts().includes(this.logAmount()) ? this.logAmount() : 'most'));
+  protected readonly shownVisitAmount = computed(() => (this.visitAmounts().includes(this.visitAmount()) ? this.visitAmount() : 'most'));
   /** the chosen run's overview and its log, redacted, before any of the log is left out */
   private readonly logRead = signal<{ head: string; body: string } | null>(null);
   private readonly logPart = computed(() => {
@@ -429,10 +455,13 @@ export class Feedback implements OnDestroy {
   protected readonly issueChars = computed(() =>
     issueLength(this.message().trim(), this.logToSend(), this.attachVisit() ? this.visitPreview() : ''));
   /** over GitHub's limit: Send is held until something is taken off */
-  protected readonly tooLong = computed(() => this.issueChars() > ISSUE_BODY_LIMIT);
-  protected readonly overBy = computed(() => Math.max(0, this.issueChars() - ISSUE_BODY_LIMIT));
-  protected readonly issueLimit = ISSUE_BODY_LIMIT;
-  protected readonly issueReserve = ISSUE_RESERVE;
+  /** what was written and attached, the reserve aside - the count the form shows */
+  protected readonly sendChars = computed(() => this.issueChars() - ISSUE_RESERVE);
+  protected readonly tooLong = computed(() => this.sendChars() > SEND_LIMIT);
+  protected readonly overBy = computed(() => Math.max(0, this.sendChars() - SEND_LIMIT));
+  protected readonly sendLimit = SEND_LIMIT;
+  /** the count is shown only once it is getting near the limit */
+  protected readonly showCount = computed(() => this.sendChars() > SHOW_COUNT_FROM);
   protected readonly canAttach = computed(() => !!this.library.store());
 
   protected readonly token = signal('');
@@ -626,7 +655,7 @@ export class Feedback implements OnDestroy {
 
   /** how many characters of the logs fit beside what was written, once the reserve is kept */
   private logRoom(): number {
-    return ISSUE_BODY_LIMIT - ISSUE_RESERVE - this.message().trim().length;
+    return SEND_LIMIT - this.message().trim().length;
   }
 
   /**

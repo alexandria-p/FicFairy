@@ -100,6 +100,10 @@ export interface ClearOption {
   hint?: string;
   /** why it cannot be ticked now, if it cannot */
   held?: string;
+  /** left unticked as the window opens - resetting settings is not wanted by the way */
+  unticked?: boolean;
+  /** set apart from the options above it by a line */
+  apart?: boolean;
 }
 
 export interface Toast {
@@ -416,7 +420,6 @@ export class UserSettings implements OnDestroy {
    */
   protected readonly clearOptions = computed<ClearOption[]>(() => {
     return [
-      { id: 'settings', label: 'Reset user settings back to their defaults' },
       { id: 'username', label: 'Forget any saved AO3 username' },
       { id: 'visitLog', label: 'Empty the visit log',
         hint: 'This always gets cleared upon closing the page.' },
@@ -425,6 +428,8 @@ export class UserSettings implements OnDestroy {
       { id: 'library', label: 'Forget the open library, and sign out of Dropbox',
         hint: 'Close the file storage location this browser was given, and/or sign out of Dropbox.',
         held: this.jobs.activeRuns().length > 0 ? 'Cannot be changed while an active run is in progress' : '' },
+      // last, apart and unticked, at the owner's request: clearing data seldom means losing settings
+      { id: 'settings', label: 'Reset user settings back to their defaults', unticked: true, apart: true },
     ];
   });
 
@@ -432,10 +437,10 @@ export class UserSettings implements OnDestroy {
     this.clearOptions().filter((o) => !o.held && this.clearTicked().has(o.id)),
   );
 
-  /** open the window with everything it can clear ticked */
+  /** open the window with everything it can clear ticked, but what starts unticked */
   protected chooseWhatToClear(): void {
     if (this.guestRefused()) return;
-    this.clearTicked.set(new Set(this.clearOptions().filter((o) => !o.held).map((o) => o.id)));
+    this.clearTicked.set(new Set(this.clearOptions().filter((o) => !o.held && !o.unticked).map((o) => o.id)));
     this.choosingClear.set(true);
   }
 

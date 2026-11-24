@@ -517,9 +517,23 @@ select.zone-select {
   gap: 10px;
 }
 
+/* each box on its label's first line, not centred against the hint under it */
+.clear-options .check {
+  align-items: flex-start;
+}
+
+.clear-options .check input {
+  margin-top: 0.2em;
+}
+
 .clear-options .hint {
   display: block;
   margin-top: 2px;
+}
+
+.clear-options li.apart {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
 }
 
 .clear-options li.held {
@@ -549,7 +563,12 @@ select.zone-select {
   font-size: 0.85rem;
 }
 
-/* which sound: a dropdown in the same row as the switch and Play it */
+/* the switch on a line of its own, the sound and Play it on the line under it */
+.sound-choice > .check {
+  flex-basis: 100%;
+}
+
+/* which sound: a dropdown beside Play it, under the switch */
 .sound-choice .chime-sound {
   display: inline-flex;
   align-items: center;

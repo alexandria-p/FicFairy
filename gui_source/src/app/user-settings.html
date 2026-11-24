@@ -25,7 +25,7 @@
           <p>Tick what to clear from this browser:</p>
           <ul class="clear-options">
             @for (option of clearOptions(); track option.id) {
-              <li [attr.data-clear]="option.id" [class.held]="!!option.held">
+              <li [attr.data-clear]="option.id" [class.held]="!!option.held" [class.apart]="!!option.apart">
                 <label class="check" [title]="option.held || ''">
                   <input type="checkbox" [attr.aria-label]="option.label" [disabled]="!!option.held"
                          [checked]="!option.held && clearTicked().has(option.id)"

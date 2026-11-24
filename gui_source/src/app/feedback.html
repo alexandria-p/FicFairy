@@ -143,14 +143,16 @@
                   }
                 </div>
                 @if (logPreview()) {
-                  <label class="field log-amount">
-                    <span>How much of it to attach</span>
-                    <select name="logAmount" (change)="setLogAmount($any($event.target).value)">
-                      @for (amount of logAmounts; track amount) {
-                        <option [value]="amount" [selected]="logAmount() === amount">{{ amountWords(amount, logAttachLimit) }}</option>
-                      }
-                    </select>
-                  </label>
+                  @if (logAmounts().length > 1) {
+                    <label class="field log-amount">
+                      <span>How much of it to attach</span>
+                      <select name="logAmount" (change)="setLogAmount($any($event.target).value)">
+                        @for (amount of logAmounts(); track amount) {
+                          <option [value]="amount" [selected]="shownLogAmount() === amount">{{ amountWords(amount, logAttachLimit) }}</option>
+                        }
+                      </select>
+                    </label>
+                  }
                   @if (logCut()) {
                     <p class="hint log-cut" role="status">
                       Only the most recent part of this run's log is attached{{ logTrimmedTo() !== null ? ', trimmed to fit' : '' }},
@@ -162,7 +164,7 @@
                     <summary>See exactly what will be sent</summary>
                     <pre>{{ logPreview() }}</pre>
                   </details>
-                  } @else if (logNote()) {
+                } @else if (logNote()) {
                   <p class="hint">{{ logNote() }}</p>
                 } @else if (logChoice() === 'latest' || chosenRun()) {
                   <p class="hint">Reading the log...</p>
@@ -182,14 +184,16 @@
                   What actions you took this session: the tabs you opened, library reads, windows, runs
                   started and the settings you changed.
                 </p>
-                <label class="field log-amount">
-                  <span>How much of it to attach</span>
-                  <select name="visitAmount" (change)="setVisitAmount($any($event.target).value)">
-                    @for (amount of logAmounts; track amount) {
-                      <option [value]="amount" [selected]="visitAmount() === amount">{{ amountWords(amount, visitAttachLimit) }}</option>
-                    }
-                  </select>
-                </label>
+                @if (visitAmounts().length > 1) {
+                  <label class="field log-amount">
+                    <span>How much of it to attach</span>
+                    <select name="visitAmount" (change)="setVisitAmount($any($event.target).value)">
+                      @for (amount of visitAmounts(); track amount) {
+                        <option [value]="amount" [selected]="shownVisitAmount() === amount">{{ amountWords(amount, visitAttachLimit) }}</option>
+                      }
+                    </select>
+                  </label>
+                }
                 @if (visitCut()) {
                   <p class="hint visit-cut" role="status">
                     Only the most recent part of your visit log is attached{{ visitTrimmedTo() !== null ? ', trimmed to fit' : '' }}.
@@ -234,8 +238,8 @@
 
           @if (tooLong()) {
             <p class="problem too-long" role="alert">
-              Sorry - this is {{ overBy().toLocaleString() }} characters too long to send (GitHub takes
-              {{ issueLimit.toLocaleString() }} in all). Untick a log, or shorten what you wrote. A
+              Sorry - this is {{ overBy().toLocaleString() }} characters too long to send (feedback can be
+              up to {{ sendLimit.toLocaleString() }} characters). Untick a log, or shorten what you wrote. A
               run's whole log can always be downloaded from the <strong>History</strong> tab, and
               this visit's from <strong>User settings</strong>, under <strong>Advanced</strong>.
             </p>
@@ -252,9 +256,9 @@
               <span class="hint">Puts back the lines Trim to fit took out.</span>
             </p>
           }
-          @if (!tooLong() && (attachLog() || attachVisit())) {
+          @if (!tooLong() && showCount()) {
             <p class="hint issue-size">
-              {{ (issueChars() - issueReserve).toLocaleString() }} of {{ (issueLimit - issueReserve).toLocaleString() }} characters
+              {{ sendChars().toLocaleString() }} of {{ sendLimit.toLocaleString() }} characters
             </p>
           }
           <footer>
