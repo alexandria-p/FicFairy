@@ -1374,17 +1374,16 @@
     <!-- Resolve issues: whether to save each work's skin as its page is read -->
     @if (step() === 'work-skins') {
       <section class="body">
-        @if (firstStep() === 'work-skins') {
-          @if (importRequestCount() > longImport && !background()) {
-            <p class="long-run-note" role="note">
-              This may take a long time, with ~{{ importRequestCount() | number }} requests to work through.
-              Please leave this window open until it finishes.
-            </p>
-          }
-          <ul class="import-summary">
-            @for (line of importPlan(); track line) { <li>{{ line }}</li> }
-          </ul>
+        @if (firstStep() === 'work-skins' && importRequestCount() > longImport && !background()) {
+          <p class="long-run-note" role="note">
+            This may take a long time, with ~{{ importRequestCount() | number }} requests to work through.
+            Please leave this window open until it finishes.
+          </p>
         }
+        <!-- always here, after a background page too: its choices below change what it says -->
+        <ul class="import-summary">
+          @for (line of importPlan(); track line) { <li>{{ line }}</li> }
+        </ul>
         <!-- the update's own choice, here beside the skins at the owner's request -->
         @if (importUpdated() > 0) {
           <label class="check import-overwrite">

@@ -1704,6 +1704,43 @@ describe('App', () => {
     expect(element.querySelector('app-import-dialog')).not.toBeNull();
   });
 
+  it('keeps the repair window, hidden, while its run window asks the rest, so Back shows it as it was', async () => {
+    localStorage.clear();
+    libraryWithFiles(['works/999 Not Indexed - Writer.html']);
+    TestBed.inject(Library).data.set(exportOf(1));
+    const fixture = TestBed.createComponent(App);
+    await settled(fixture);
+    const element = fixture.nativeElement as HTMLElement;
+    const app = fixture.componentInstance as unknown as {
+      importStart(chosen: { request: unknown; dated: null }): void;
+      backToImport(): void;
+      dialogClosed(): void;
+    };
+    const window = element.querySelector<HTMLElement>('app-import-dialog')!;
+    expect(window).not.toBeNull();
+    const request = { links: '999', count: 1, filetypes: ['JSON'], replaceOutdated: true, indexOnly: ['999'], lookups: 1, scope: 'skip' };
+
+    app.importStart({ request, dated: null });
+    await settled(fixture);
+    expect(element.querySelector('app-download-dialog')).not.toBeNull();
+    // the same window, only hidden
+    expect(element.querySelector('app-import-dialog')).toBe(window);
+    expect(window.style.display).toBe('none');
+
+    app.backToImport();
+    await settled(fixture);
+    expect(element.querySelector('app-download-dialog')).toBeNull();
+    expect(element.querySelector('app-import-dialog')).toBe(window);
+    expect(window.style.display).toBe('');
+
+    // closing the run window lets the repair window go
+    app.importStart({ request, dated: null });
+    await settled(fixture);
+    app.dialogClosed();
+    await settled(fixture);
+    expect(element.querySelector('app-import-dialog')).toBeNull();
+  });
+
   it('offers undated files of works the index has, on the Works tab and by itself', async () => {
     localStorage.clear();
     libraryWithFiles(['works/1 Work 1 - Writer.html']);

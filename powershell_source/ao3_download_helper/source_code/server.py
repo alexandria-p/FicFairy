@@ -3356,6 +3356,11 @@ def repair_copies(records: list[dict], plan: dict, filetypes: list[str],
             if others:
                 keep.setdefault(link, set()).update(others)
                 plan.setdefault('keptSaid', set()).add(link)
+                # nor are they replaced: *Overwrite existing downloads* is for the works updated
+                replacing = plan['superseded'].get(link) or {}
+                for filetype in [x for x in replacing if x.upper() in others]:
+                    replacing.pop(filetype)
+                if link in plan['superseded'] and not replacing: plan['superseded'].pop(link)
         for filetype in filetypes:
             if filetype.upper() not in repair[work]: continue
             copy = undated_copy((existing.get(work) or {}).get(filetype.upper()))

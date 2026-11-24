@@ -268,6 +268,8 @@ export class DownloadDialog implements OnDestroy {
    * issues on what it finds.
    */
   readonly resolveIssues = output<void>();
+  /** Back from a Resolve issues run's first page: to the repair window, as it was left */
+  readonly backToImport = output<void>();
 
   protected readonly step = signal<Step>('preparing');
   protected readonly config = this.jobs.config;
@@ -831,19 +833,7 @@ export class DownloadDialog implements OnDestroy {
     const importing = this.importing();
     if (!importing) return [];
     const lines: string[] = [];
-    const lookups = importing.lookups ?? 0;
-    if (lookups) lines.push(`Look-up ${lookups.toLocaleString()} ${lookups === 1 ? 'work' : 'works'} with missing index`);
-    // the works updated are those not only looked up; the formats are not said, at the owner's request
-    const updated = this.importUpdated();
-    if (updated) lines.push(`Search ${updated.toLocaleString()} ${updated === 1 ? 'work' : 'works'} for updates`);
-    if (updated && this.importOverwrite()) {
-      // only the works updated - the files chosen to repair go by the repair page, said below
-      lines.push('Will re-download and overwrite the existing files of the works being updated');
-    }
-    // every work the import reads gives its skin for nothing - saved as css, never into the html
-    if (this.picksImportSkins() && this.importSkins()) {
-      lines.push('Fetch and save work skins from AO3, where possible');
-    }
+    // the repairs first, at the owner's request - they are what the reader came here for
     const repairs = importing.repair?.length ?? 0;
     if (repairs) {
       const files = `${repairs.toLocaleString()} ${repairs === 1 ? 'file' : 'files'} with no date`;
@@ -861,6 +851,19 @@ export class DownloadDialog implements OnDestroy {
           ? `Where AO3 can't, overwrite with FicHub's copy - ${which}`
           : `Where AO3 can't, name the file with FicHub's date - ${which}`);
       }
+    }
+    const lookups = importing.lookups ?? 0;
+    if (lookups) lines.push(`Look-up ${lookups.toLocaleString()} ${lookups === 1 ? 'work' : 'works'} with missing index`);
+    // the works updated are those not only looked up; the formats are not said, at the owner's request
+    const updated = this.importUpdated();
+    if (updated) lines.push(`Search ${updated.toLocaleString()} ${updated === 1 ? 'work' : 'works'} for updates`);
+    if (updated && this.importOverwrite()) {
+      // only the works updated - the files chosen to repair go by the repair page, said above
+      lines.push('Will re-download and overwrite the existing files of the works being updated');
+    }
+    // every work the import reads gives its skin for nothing - saved as css, never into the html
+    if (this.picksImportSkins() && this.importSkins()) {
+      lines.push('Fetch and save work skins from AO3, where possible');
     }
     return lines;
   });
@@ -2036,12 +2039,17 @@ export class DownloadDialog implements OnDestroy {
       this.step.set(previous);
       return;
     }
+    // a Resolve issues run's first page goes back to the repair window, its choices kept
+    if (this.action() === 'import' && this.importing()) {
+      this.backToImport.emit();
+      return;
+    }
     this.close();
   }
 
   /** whether stepping back from here goes anywhere other than out of the dialog */
   protected hasStepBefore(step: Step): boolean {
-    return this.stepBefore(step) !== null;
+    return this.stepBefore(step) !== null || (this.action() === 'import' && !!this.importing());
   }
 
   /**

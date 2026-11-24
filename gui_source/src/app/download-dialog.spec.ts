@@ -230,7 +230,7 @@ function currentStep(): string {
  * the file types and everything else asks them after, and several runs put an
  * acknowledgement in between. Counting clicks made every test quietly depend on which.
  */
-async function advanceTo(target: 'options' | 'more-options' | 'filetypes' | 'credentials' | 'running') {
+async function advanceTo(target: 'options' | 'more-options' | 'work-skins' | 'filetypes' | 'credentials' | 'running') {
   for (let guard = 0; guard < 8; guard++) {
     const at = currentStep();
     if (at === target || at === 'running') return;
@@ -3279,6 +3279,30 @@ describe('DownloadDialog', () => {
       expect(element.querySelector('input[name="username"]')).toBeNull();
     });
 
+    it('says what it will do on the work skins page after a background page too, the repairs first', async () => {
+      TestBed.inject(HelperConnection).settings.set({ ...DEFAULT_PAGE_CONFIG, helperUrl: 'https://ao3-helper.example.com' });
+      await openImport({ ...IMPORT, repair: ['1 A.html'] });
+      expect(currentStep()).toBe('background');
+      await advanceTo('work-skins');
+      const lines = [...element.querySelectorAll('.import-summary li')].map((li) => li.textContent?.trim());
+      expect(lines[0]).toBe('Repair 1 file with no date from AO3, replacing it with the latest version');
+      expect(lines).toContain('Search 1 work for updates');
+    });
+
+    it('goes Back from its first page to the repair window, never closing', async () => {
+      await openImport();
+      let back = 0;
+      let closed = 0;
+      fixture.componentInstance.backToImport.subscribe(() => back++);
+      fixture.componentInstance.closed.subscribe(() => closed++);
+      expect(currentStep()).toBe('work-skins');
+      expect(button('Cancel')).toBeFalsy();
+      button('Back')!.click();
+      await fixture.whenStable();
+      expect(back).toBe(1);
+      expect(closed).toBe(0);
+    });
+
     it('asks whether to overwrite on the work skins page, only when the import updates works', async () => {
       await openImport();
       const box = () => element.querySelector<HTMLInputElement>('input[name="overwrite"]');
@@ -3413,7 +3437,8 @@ describe('DownloadDialog', () => {
       expect(box.checked).toBe(false);
       expect(box.disabled).toBe(false);
       expect(element.querySelector('.skins-hint')).toBeNull();
-      expect(button('Cancel')).toBeTruthy();
+      // the first page goes Back to the repair window, not Cancel
+      expect(button('Back')).toBeTruthy();
 
       box.click();
       await fixture.whenStable();
@@ -3475,10 +3500,11 @@ describe('DownloadDialog', () => {
       await openImport({ ...IMPORT, filetypes: ['JSON'], replaceOutdated: false, scope: 'skip',
                          repair: ['1 A.html', '2 B.pdf'], repairFicHub: true, repairFicHubUndated: false });
       const lines = [...element.querySelectorAll('.import-summary li')].map((li) => li.textContent?.trim());
+      // the repairs first
       expect(lines).toEqual([
-        'Look-up 2 works with missing index',
         'Repair 2 files with no date from AO3, replacing each with the latest version',
         "Where AO3 can't, overwrite with FicHub's copy - only when the date guessed from the file's name is the same or older",
+        'Look-up 2 works with missing index',
       ]);
       await advanceTo('running');
       expect(jobs.started[0].options.repair).toEqual(['1 A.html', '2 B.pdf']);

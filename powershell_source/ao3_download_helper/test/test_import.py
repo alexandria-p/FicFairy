@@ -706,6 +706,27 @@ def test_overwriting_alongside_a_repair_from_ao3_replaces_the_repaired_file_and_
     assert sorted(replacing['1']) == ['EPUB', 'HTML']
 
 
+@pytest.mark.parametrize('rename_only', [False, True])
+def test_overwriting_is_for_the_works_updated_alone_never_a_work_only_looked_up_or_repaired(
+        library, monkeypatch, rename_only):
+    # *Overwrite existing downloads* is the update's: work 2 is searched for updates and has its
+    # current epub fetched again; work 1 is only looked up, with a file chosen to repair - its
+    # other files are the repair page's, and the overwrite never touches them
+    a_copy(library, '1 Fic 1 - Someone.html')
+    a_copy(library, '1 Fic 1 - Someone 2026-05-01.epub')
+    a_copy(library, '2 Fic 2 - Someone 2026-05-01.epub')
+    replacing: dict = {}
+
+    _, fetched = importing(library, monkeypatch, ['JSON', 'HTML', 'EPUB'], replace=True,
+                           index_only=['1'], repair=['1 Fic 1 - Someone.html'],
+                           repairRenameOnly=rename_only, overwrite=True, replacing=replacing)
+
+    assert 'EPUB' in replacing['2']
+    assert 'EPUB' not in (replacing.get('1') or {})
+    assert 'EPUB' not in fetched.get('1', [])
+    assert '1 Fic 1 - Someone 2026-05-01.epub' in works_files(library)
+
+
 def test_only_renaming_is_a_repairs_alone():
     _, [job], _ = start_request(server.ACTION_IMPORT, '1', repairRenameOnly=True)
     assert job.options['repairRenameOnly'] is False
