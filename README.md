@@ -134,9 +134,9 @@ The logo was hand-drawn by me using Procreate on my iPad. I hand-wrote the fake 
 
 ## Work skins
 
-Works with a CSS skin get a rainbow paintbrush 🖌️; open the work using FicFairy to read it with its original styling preserved (HTML downloads only). You can also create your own site skin in **User settings**, to style any fic you read in FicFairy.
+Works with a CSS skin get a rainbow paintbrush 🖌️ Open the work using FicFairy to read it with its original styling preserved (HTML downloads only). You can also create your own site skin in **User settings**, to style any fic you read in FicFairy.
 
-![The Reading skins section of User settings, with the rainbow paintbrush, and a work opened in its group chat skin](docs/screenshots/work-skins.png)
+![The Work skins section of User settings, with the rainbow paintbrush, and a work opened in its group chat skin](docs/screenshots/work-skins.png)
 
 ## More
 
