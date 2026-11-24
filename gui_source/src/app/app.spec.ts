@@ -1733,6 +1733,15 @@ describe('App', () => {
     expect(element.querySelector('app-import-dialog')).toBe(window);
     expect(window.style.display).toBe('');
 
+    // Start pressed: the repair window is let go at once, before the helper's run list says so
+    app.importStart({ request, dated: null });
+    await settled(fixture);
+    (app as unknown as { releaseHeldImport(): void }).releaseHeldImport();
+    await settled(fixture);
+    expect(element.querySelector('app-import-dialog')).toBeNull();
+    app.dialogClosed();
+    await settled(fixture);
+
     // a run started elsewhere meanwhile: the repair window is let go, and Back does not bring it back
     app.importStart({ request, dated: null });
     await settled(fixture);

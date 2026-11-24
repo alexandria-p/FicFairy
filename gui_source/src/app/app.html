@@ -395,7 +395,7 @@
 
 @if (dialogAction(); as action) {
   <app-download-dialog [action]="action" [resumeFrom]="resumeFrom()" [attachTo]="attachTo()" [prefill]="prefillLink()" [skinWorks]="skinWorks()"
-                       [importing]="importing()" (closed)="dialogClosed()" (backToImport)="backToImport()"
+                       [importing]="importing()" (closed)="dialogClosed()" (backToImport)="backToImport()" (started)="releaseHeldImport()"
                        (resolveIssues)="resolveIssuesAfterRun()" />
 }
 

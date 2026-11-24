@@ -618,8 +618,12 @@ export interface ImportRequest {
   /** the works' links, one to a line */
   links: string;
   count: number;
-  /** JSON, and whichever formats to fetch for works without them */
+  /** JSON - the formats to fetch for works without them are chosen in the run window (`formats`) */
   filetypes: string[];
+  /** the formats the run window offers for works without them, JSON aside */
+  offered?: string[];
+  /** of those, the formats some of the found files are already in, so the run window can say so */
+  held?: string[];
   replaceOutdated: boolean;
   /** *Overwrite existing downloads*: every dated copy of the works updated fetched again, current or not */
   overwrite?: boolean;

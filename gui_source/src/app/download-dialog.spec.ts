@@ -3279,14 +3279,79 @@ describe('DownloadDialog', () => {
       expect(element.querySelector('input[name="username"]')).toBeNull();
     });
 
-    it('says what it will do on the work skins page after a background page too, the repairs first', async () => {
+    it('says what it will do on its options page, the repairs first, ahead of the background page', async () => {
       TestBed.inject(HelperConnection).settings.set({ ...DEFAULT_PAGE_CONFIG, helperUrl: 'https://ao3-helper.example.com' });
       await openImport({ ...IMPORT, repair: ['1 A.html'] });
-      expect(currentStep()).toBe('background');
-      await advanceTo('work-skins');
+      expect(currentStep()).toBe('work-skins');
       const lines = [...element.querySelectorAll('.import-summary li')].map((li) => li.textContent?.trim());
       expect(lines[0]).toBe('Repair 1 file with no date from AO3, replacing it with the latest version');
       expect(lines).toContain('Search 1 work for updates');
+      button('Continue')!.click();
+      await fixture.whenStable();
+      expect(currentStep()).toBe('background');
+      // said once, on the options page
+      expect(element.querySelector('.import-summary')).toBeNull();
+    });
+
+    it('asks its options, then its formats, then the background page, then the login - as every run does', async () => {
+      TestBed.inject(HelperConnection).settings.set({ ...DEFAULT_PAGE_CONFIG, helperUrl: 'https://ao3-helper.example.com' });
+      await openImport({ ...IMPORT, filetypes: ['JSON'], offered: ['HTML', 'EPUB', 'PDF'], held: ['HTML'] });
+      const next = async () => { button('Continue')!.click(); await fixture.whenStable(); };
+      expect(currentStep()).toBe('work-skins');
+      await next();
+      expect(currentStep()).toBe('import-formats');
+      const box = (format: string) => element.querySelector<HTMLInputElement>(`input[name="format-${format}"]`)!;
+      expect([...element.querySelectorAll('.import-formats input')].map((x) => x.getAttribute('name')))
+        .toEqual(['format-HTML', 'format-EPUB', 'format-PDF']);
+      // none ticked to begin with, and the formats some files are in already said so
+      expect(box('HTML').checked).toBe(false);
+      expect(box('HTML').closest('label')!.textContent).toContain('(some already have it)');
+      expect(box('EPUB').closest('label')!.textContent).not.toContain('(some already have it)');
+      box('EPUB').click();
+      await fixture.whenStable();
+      await next();
+      expect(currentStep()).toBe('background');
+      // back keeps what was ticked
+      button('Back')!.click();
+      await fixture.whenStable();
+      expect(currentStep()).toBe('import-formats');
+      expect(box('EPUB').checked).toBe(true);
+      button('Back')!.click();
+      await fixture.whenStable();
+      expect(currentStep()).toBe('work-skins');
+      await next();
+      await next();
+      await next();
+      expect(currentStep()).toBe('credentials');
+      checkbox('Skip AO3 login?')!.click();
+      await fixture.whenStable();
+      button('Start repair')!.click();
+      await fixture.whenStable();
+      expect(jobs.started[0].filetypes).toEqual(['JSON', 'EPUB']);
+    });
+
+    it('goes from its formats straight to the login on a copy with no background runs', async () => {
+      await openImport({ ...IMPORT, filetypes: ['JSON'], offered: ['HTML', 'EPUB'] });
+      button('Continue')!.click();
+      await fixture.whenStable();
+      expect(currentStep()).toBe('import-formats');
+      button('Continue')!.click();
+      await fixture.whenStable();
+      expect(currentStep()).toBe('credentials');
+      checkbox('Skip AO3 login?')!.click();
+      await fixture.whenStable();
+      button('Start repair')!.click();
+      await fixture.whenStable();
+      // nothing ticked: only the index, and copies held checked for a newer version
+      expect(jobs.started[0].filetypes).toEqual(['JSON']);
+    });
+
+    it('asks no formats when it only looks works up', async () => {
+      await openImport({ ...IMPORT, filetypes: ['JSON'], offered: ['HTML', 'EPUB'], scope: 'skip' });
+      expect(currentStep()).toBe('work-skins');
+      button('Continue')!.click();
+      await fixture.whenStable();
+      expect(currentStep()).toBe('credentials');
     });
 
     it('goes Back from its first page to the repair window, never closing', async () => {
@@ -3343,13 +3408,27 @@ describe('DownloadDialog', () => {
       expect(note.compareDocumentPosition(element.querySelector('.import-summary')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
-    it('asks to be left open on the overwrite page too, after a background page', async () => {
+    it('asks to be left open on its options page, and again on the background page', async () => {
       TestBed.inject(HelperConnection).settings.set({ ...DEFAULT_PAGE_CONFIG, helperUrl: 'https://ao3-helper.example.com' });
       await openImport({ ...IMPORT, files: 18 });
+      expect(currentStep()).toBe('work-skins');
+      expect(element.querySelector('.long-run-note')?.textContent).toContain('~21 requests to work through');
+      button('Continue')!.click();
+      await fixture.whenStable();
       expect(currentStep()).toBe('background');
       expect(element.querySelector('.long-run-note')).not.toBeNull();
-      await advanceTo('work-skins');
-      expect(element.querySelector('.long-run-note')?.textContent).toContain('~21 requests to work through');
+    });
+
+    it('counts the formats ticked in its request estimate', async () => {
+      // 2 lookups, 1 work updated: ~2 before a format is ticked, ~3 after
+      await openImport({ ...IMPORT, filetypes: ['JSON'], offered: ['HTML', 'EPUB'] });
+      const count = () => (fixture.componentInstance as unknown as { importRequestCount(): number }).importRequestCount();
+      const before = count();
+      button('Continue')!.click();
+      await fixture.whenStable();
+      element.querySelector<HTMLInputElement>('input[name="format-EPUB"]')!.click();
+      await fixture.whenStable();
+      expect(count()).toBe(before + 1);
     });
 
     it('offers to skip the login below the username and password', async () => {

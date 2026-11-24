@@ -89,8 +89,10 @@ type Step =
   | 'retry-how'
   /** whether to run it in the background, and its answers up front - a hosted copy only */
   | 'background'
-  /** Resolve issues: whether to save each work's skin as it is read */
+  /** Resolve issues: whether to save each work's skin as it is read, and whether to overwrite */
   | 'work-skins'
+  /** Resolve issues: the formats to fetch for the works updated that have none - after its options */
+  | 'import-formats'
   | 'acknowledge'
   | 'credentials'
   | 'running'
@@ -220,8 +222,26 @@ export class DownloadDialog implements OnDestroy {
   /** roughly how many requests an import makes - over `LONG_IMPORT_REQUESTS` it says to leave the window open */
   protected readonly importRequestCount = computed(() => {
     const importing = this.importing();
-    return importing ? importRequests({ ...importing, overwrite: this.importOverwrite() }) : 0;
+    return importing
+      ? importRequests({ ...importing, filetypes: this.chosenFiletypes(), overwrite: this.importOverwrite() })
+      : 0;
   });
+  /**
+   * Resolve issues' formats page (`import-formats`), after its options as every run's file types
+   * are: only for a repair that updates works. None ticked to begin with - a ticked format is
+   * fetched for a work with no copy in it; copies already held are checked for a newer version
+   * whatever is ticked.
+   */
+  protected readonly picksImportFormats = computed(() =>
+    this.action() === 'import' && !this.resuming() && this.importUpdated() > 0 &&
+    (this.importing()?.offered?.length ?? 0) > 0);
+  protected readonly importPicked = signal<string[]>([]);
+  protected readonly importOffered = computed(() => this.importing()?.offered ?? []);
+  protected readonly importHeld = computed(() => new Set(this.importing()?.held ?? []));
+  protected toggleImportFormat(format: string, on: boolean): void {
+    const offered = this.importOffered();
+    this.importPicked.update((picked) => offered.filter((f) => (f === format ? on : picked.includes(f))));
+  }
   /** how many works an import searches for updates - those not only looked up */
   protected readonly importUpdated = computed(() => {
     const importing = this.importing();
@@ -270,6 +290,8 @@ export class DownloadDialog implements OnDestroy {
   readonly resolveIssues = output<void>();
   /** Back from a Resolve issues run's first page: to the repair window, as it was left */
   readonly backToImport = output<void>();
+  /** the helper took the run: a Resolve issues run's repair window is not coming back */
+  readonly started = output<void>();
 
   protected readonly step = signal<Step>('preparing');
   protected readonly config = this.jobs.config;
@@ -1125,6 +1147,11 @@ export class DownloadDialog implements OnDestroy {
   );
 
   protected readonly firstStep = computed<Step>(() => {
+    // Resolve issues: its options, then its formats, then the background page and the login
+    if (this.action() === 'import' && this.importing() && !this.resuming()) {
+      if (this.picksImportSkins()) return 'work-skins';
+      return this.picksImportFormats() ? 'import-formats' : this.loginStep();
+    }
     if (this.needsLink()) return 'link';
     if (this.hasOptions()) return 'options';
     return this.picksFiletypes() ? 'filetypes' : this.loginStep();
@@ -1839,7 +1866,10 @@ export class DownloadDialog implements OnDestroy {
     // fetching work skins saves no format, the index included
     if (this.skinsOnly()) return [];
     const importing = this.importing();
-    if (this.action() === 'import' && importing) return importing.filetypes;
+    if (this.action() === 'import' && importing) {
+      if (!this.picksImportFormats()) return importing.filetypes;
+      return [...importing.filetypes, ...this.importPicked().filter((f) => !importing.filetypes.includes(f))];
+    }
     // collections on their own are only ever indexed
     if (!this.picksFiletypes()) return [METADATA];
     if (!this.picksReindex()) return this.selected();
@@ -2019,9 +2049,11 @@ export class DownloadDialog implements OnDestroy {
     if (this.picksFloorRun()) earlier.push('floor');
     if (this.resuming()) earlier.push('resume', 'retry-how');
     if (this.picksFiletypes()) earlier.push('filetypes');
+    // Resolve issues' options and formats, before the background page as every run's are
+    if (this.picksImportSkins()) earlier.push('work-skins');
+    if (this.picksImportFormats()) earlier.push('import-formats');
     if (this.needsAcknowledgement()) earlier.push('acknowledge');
     if (this.offersBackground()) earlier.push('background');
-    if (this.picksImportSkins()) earlier.push('work-skins');
     earlier.push('credentials');
 
     const at = earlier.indexOf(step);
@@ -2060,9 +2092,19 @@ export class DownloadDialog implements OnDestroy {
     return this.offersBackground() ? 'background' : this.afterBackground();
   }
 
-  /** after the background page: Resolve issues' work skins page where it is offered, then the login */
+  /** after the background page: the login */
   protected afterBackground(): Step {
-    return this.picksImportSkins() ? 'work-skins' : 'credentials';
+    return 'credentials';
+  }
+
+  /** after Resolve issues' options page: its formats, where it has them, then the background page or login */
+  protected afterImportSkins(): Step {
+    return this.picksImportFormats() ? 'import-formats' : this.loginStep();
+  }
+
+  /** after Resolve issues' formats page: the background page, or the login */
+  protected afterImportFormats(): Step {
+    return this.loginStep();
   }
 
   protected toCredentials(): void {
@@ -2298,6 +2340,7 @@ export class DownloadDialog implements OnDestroy {
 
     this.jobId = jobId;
     this.runId.set(jobId);
+    this.started.emit();
     void this.jobs.refreshActiveRuns();
     // the run reads and writes through this library for as long as it lasts, even if the
     // page is switched to another one meanwhile - a run half in each would be no use

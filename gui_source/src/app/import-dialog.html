@@ -1060,49 +1060,11 @@
       @if (canGoBack() || toLookUp().length || toRepair().length) {
         <button type="button" class="button subtle" (click)="backFrom('formats')">Back</button>
       }
-      <!-- updating goes on to the file types; skipping has nothing more to ask -->
-      @if (scopeChosen() !== 'skip') {
-        <button type="button" class="button primary" (click)="step.set('filetypes')">Continue</button>
-      } @else {
-        <button type="button" class="button primary" [disabled]="runs() && busy()" (click)="finish()">
-          {{ runs() ? 'Continue' : 'Done' }}
-        </button>
-      }
-    </footer>
-  }
-
-  <!-- 6: the file types to fetch for the works updated; whether to overwrite is the run window's -->
-  @if (step() === 'filetypes') {
-    <section class="body">
-      <fieldset class="formats">
-        <legend>File types</legend>
-        <p class="hint filetypes-hint">
-          Ticking a format here will check if a work is missing a copy in these formats, and download it if so.
-        </p>
-        <p class="hint filetypes-hint">
-          Files you already have downloaded will still be checked for a newer version - regardless of whether you tick any boxes below.
-        </p>
-        @for (format of offered(); track format) {
-          <label class="check">
-            <input type="checkbox" [attr.name]="'format-' + format"
-                   [checked]="picked().includes(format)"
-                   (change)="toggleFormat(format, $any($event.target).checked)" />
-            <span>
-              {{ format }}
-              @if (held().has(format)) { <span class="dim">(some already have it)</span> }
-            </span>
-          </label>
-        }
-      </fieldset>
-      @if (busy()) {
-        <p class="warning busy-note" role="note">A run is in progress. It has to finish before an import can start.</p>
-      }
-    </section>
-    <footer>
-      <button type="button" class="button subtle" (click)="step.set('formats')">Back</button>
+      <!-- the file types are asked in the run window, after its overwrite page -->
       <button type="button" class="button primary" [disabled]="runs() && busy()" (click)="finish()">
         {{ runs() ? 'Continue' : 'Done' }}
       </button>
     </footer>
   }
+
 </div>

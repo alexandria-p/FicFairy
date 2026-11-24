@@ -37,7 +37,7 @@ import { VisitLog } from './visit-log';
 import { Chime } from './chime';
 import { inAo3Zone, writtenDate } from './preferences';
 
-type Step = 'overview' | 'leftovers' | 'rename' | 'renaming' | 'duplicates' | 'choose' | 'removing' | 'dates' | 'repair' | 'dating' | 'index' | 'formats' | 'filetypes';
+type Step = 'overview' | 'leftovers' | 'rename' | 'renaming' | 'duplicates' | 'choose' | 'removing' | 'dates' | 'repair' | 'dating' | 'index' | 'formats';
 
 /** what sifting by hand decided for one group: a file to keep, skipped, or its most recent */
 /** what *Sort any remaining in bulk* can do with the rest */
@@ -1134,9 +1134,10 @@ export class ImportDialog implements OnInit {
   protected fetchLatest(): void {
     this.updateScope.set(this.lastScope());
   }
-  /** the formats to fetch for works without them - none ticked to begin with */
-  protected readonly picked = signal<string[]>([]);
-  /** every downloadable format the helper offers, JSON aside (always written: it is the index) */
+  /**
+   * every downloadable format the helper offers, JSON aside (always written: it is the index) -
+   * handed to the run window, which asks which to fetch, as every other run does
+   */
   protected readonly offered = computed(() => this.formats().filter((x) => x !== 'JSON'));
   /** the formats the found files are already in, so the page can say so */
   protected readonly held = computed(() => {
@@ -1253,9 +1254,7 @@ export class ImportDialog implements OnInit {
   /** whether there is anything for a run to do: a lookup, or an update */
   protected readonly runs = computed(() => this.scope().length > 0);
 
-  protected toggleFormat(format: string, on: boolean): void {
-    this.picked.update((p) => (on ? [...new Set([...p, format])] : p.filter((x) => x !== format)));
-  }
+
 
   // endregion
 
@@ -1571,7 +1570,10 @@ export class ImportDialog implements OnInit {
       request: {
         links: importLinks(works),
         count: works.length,
-        filetypes: ['JSON', ...(updates ? this.picked() : [])],
+        // the formats to fetch are asked in the run window, after the overwrite page
+        filetypes: ['JSON'],
+        offered: updates ? this.offered() : [],
+        held: updates ? this.offered().filter((f) => this.held().has(f)) : [],
         replaceOutdated: updates,
         // asked in the run window now, beside Fetch work skins
         overwrite: false,

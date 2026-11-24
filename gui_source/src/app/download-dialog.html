@@ -1238,7 +1238,7 @@
     <!-- running in the background, and its answers up front: a hosted copy only -->
     @if (step() === 'background') {
       <section class="body">
-          <!-- an import has no other page to say what it will do -->
+          <!-- a repair's options page says what it will do; here it is only said whether to stay -->
           @if (action() === 'import') {
             @if (importRequestCount() > longImport && !background()) {
               <p class="long-run-note" role="note">
@@ -1246,9 +1246,11 @@
                 Please leave this window open until it finishes.
               </p>
             }
-            <ul class="import-summary">
-              @for (line of importPlan(); track line) { <li>{{ line }}</li> }
-            </ul>
+            @if (firstStep() === 'background') {
+              <ul class="import-summary">
+                @for (line of importPlan(); track line) { <li>{{ line }}</li> }
+              </ul>
+            }
           }
           <div class="background-choice" [class.blocked]="backgroundBlocked()">
             <label class="check">
@@ -1414,7 +1416,45 @@
         <button type="button" class="button subtle" (click)="backFrom('work-skins')">
           {{ hasStepBefore('work-skins') ? 'Back' : 'Cancel' }}
         </button>
-        <button type="button" class="button primary" (click)="step.set('credentials')">Continue</button>
+        <button type="button" class="button primary" (click)="step.set(afterImportSkins())">Continue</button>
+      </footer>
+    }
+
+    <!-- Resolve issues: the formats to fetch for works without them, after its options -->
+    @if (step() === 'import-formats') {
+      <section class="body">
+        @if (firstStep() === 'import-formats' && importRequestCount() > longImport && !background()) {
+          <p class="long-run-note" role="note">
+            This may take a long time, with ~{{ importRequestCount() | number }} requests to work through.
+            Please leave this window open until it finishes.
+          </p>
+        }
+        <fieldset class="import-formats">
+          <legend>File types</legend>
+          <p class="hint filetypes-hint">
+            Ticking a format here will check if a work is missing a copy in these formats, and download it if so.
+          </p>
+          <p class="hint filetypes-hint">
+            Files you already have downloaded will still be checked for a newer version - regardless of whether you tick any boxes below.
+          </p>
+          @for (format of importOffered(); track format) {
+            <label class="check">
+              <input type="checkbox" [attr.name]="'format-' + format"
+                     [checked]="importPicked().includes(format)"
+                     (change)="toggleImportFormat(format, $any($event.target).checked)" />
+              <span>
+                {{ format }}
+                @if (importHeld().has(format)) { <span class="dim">(some already have it)</span> }
+              </span>
+            </label>
+          }
+        </fieldset>
+      </section>
+      <footer>
+        <button type="button" class="button subtle" (click)="backFrom('import-formats')">
+          {{ hasStepBefore('import-formats') ? 'Back' : 'Cancel' }}
+        </button>
+        <button type="button" class="button primary" (click)="step.set(afterImportFormats())">Continue</button>
       </footer>
     }
 

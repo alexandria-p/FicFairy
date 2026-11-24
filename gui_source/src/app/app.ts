@@ -326,7 +326,7 @@ export class App {
   }
 
   /** the repair window is not coming back: let it go, and take in the files it dated */
-  private releaseHeldImport(): void {
+  protected releaseHeldImport(): void {
     if (!this.importHeld()) return;
     this.importHeld.set(false);
     this.importLookUp.set(null);
