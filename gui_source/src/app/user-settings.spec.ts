@@ -856,6 +856,19 @@ describe('UserSettings', () => {
     expect(always.querySelector('[data-always="ao3-older"] .when-unanswered')).not.toBeNull();
   });
 
+  it('splits the six cases into From AO3 and From FicHub, each case\'s own words without the prefix', async () => {
+    await open();
+    const always = element.querySelector('details.always-answers')!;
+    expect([...always.querySelectorAll('h4.scenario-source')].map((h) => h.textContent?.trim())).toEqual(['From AO3', 'From FicHub']);
+    const names = [...always.querySelectorAll('.row-group > .row .name')].map((n) => n.textContent?.trim());
+    expect(names).toHaveLength(6);
+    expect(names.some((n) => n?.startsWith('From '))).toBe(false);
+    expect(names[2]).toBe("No date can be read from your file's name");
+    // the full words stay with the dropdown, for a screen reader
+    expect(always.querySelector('[data-always="fichub-unknown"] > .row select')?.getAttribute('aria-label'))
+      .toBe("From FicHub: no date can be read from your file's name");
+  });
+
   it('on this computer, puts each case\'s settings.ini answer under its always-answer, not in the settings.ini list', async () => {
     iniAnswer = { editable: true, file: 'settings.ini', settings: [
       ...INI,

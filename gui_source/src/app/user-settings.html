@@ -383,66 +383,70 @@
       gave taken instead. Change one here, or choose <em>Ask every time</em> to be asked again -
       and then choose what happens if you don't answer in time.
     </p>
-    <ul class="rows">
-      @for (scenario of scenarios; track scenario.name) {
-        <li class="row-group" [attr.data-always]="scenario.name">
-          <div class="row">
-            <div class="about">
-              <span class="name">{{ scenario.label }}</span>
+    <!-- one part per place a copy comes from, so each case need not say it -->
+    @for (source of scenarioSources; track source.title) {
+      <h4 class="scenario-source">{{ source.title }}</h4>
+      <ul class="rows">
+        @for (scenario of source.scenarios; track scenario.name) {
+          <li class="row-group" [attr.data-always]="scenario.name">
+            <div class="row">
+              <div class="about">
+                <span class="name">{{ shortLabel(scenario.label) }}</span>
+              </div>
+              <select
+                [attr.aria-label]="scenario.label"
+                (change)="setAlways(scenario.name, scenario.label, $any($event.target).value)"
+              >
+                <option value="" [selected]="!alwaysAnswers()[scenario.name]">Ask every time (default)</option>
+                <option value="yes" [selected]="alwaysAnswers()[scenario.name] === 'yes'">Always: {{ scenario.yes }}</option>
+                <option value="no" [selected]="alwaysAnswers()[scenario.name] === 'no'">Always: {{ scenario.no }}</option>
+                @if (scenario.both) {
+                  <option value="both" [selected]="alwaysAnswers()[scenario.name] === 'both'">Always: {{ scenario.both }}</option>
+                }
+              </select>
             </div>
-            <select
-              [attr.aria-label]="scenario.label"
-              (change)="setAlways(scenario.name, scenario.label, $any($event.target).value)"
-            >
-              <option value="" [selected]="!alwaysAnswers()[scenario.name]">Ask every time (default)</option>
-              <option value="yes" [selected]="alwaysAnswers()[scenario.name] === 'yes'">Always: {{ scenario.yes }}</option>
-              <option value="no" [selected]="alwaysAnswers()[scenario.name] === 'no'">Always: {{ scenario.no }}</option>
-              @if (scenario.both) {
-                <option value="both" [selected]="alwaysAnswers()[scenario.name] === 'both'">Always: {{ scenario.both }}</option>
+            <!-- asked every time: what a question nobody answers in time takes -->
+            @if (!alwaysAnswers()[scenario.name]) {
+              @if (!local) {
+                @let question = scenarioQuestion(scenario.name);
+                <div class="row when-unanswered" [attr.data-question-setting]="question.name">
+                  <div class="about">
+                    <span class="name">If you don't answer in time</span>
+                  </div>
+                  <select
+                    [attr.aria-label]="scenario.label + ' - if you don\'t answer in time'"
+                    (change)="setAnswer(question, $any($event.target).value)"
+                  >
+                    @for (choice of question.choices; track choice.value) {
+                      <option [value]="choice.value" [selected]="answer(question.name) === choice.value">
+                        {{ choice.label }}{{ choice.value === helperAnswer(question.name) ? ' (default)' : '' }}
+                      </option>
+                    }
+                  </select>
+                </div>
+              } @else if (scenarioIni(scenario.name); as setting) {
+                <!-- on this computer the same default is settings.ini's -->
+                <div class="row when-unanswered" [attr.data-setting]="setting.key">
+                  <div class="about">
+                    <span class="name">If you don't answer in time</span>
+                    <span class="description">Saved to <code>settings.ini</code> as <code>{{ setting.key }}</code>.</span>
+                  </div>
+                  <select
+                    [attr.aria-label]="setting.key"
+                    [value]="setting.value"
+                    (change)="editIni(setting, $any($event.target).value, $any($event.target))"
+                  >
+                    @for (choice of setting.choices ?? []; track choice) {
+                      <option [value]="choice" [selected]="setting.value === choice">{{ iniWords(setting.key, choice) }}{{ choice === setting.default ? ' (default)' : '' }}</option>
+                    }
+                  </select>
+                </div>
               }
-            </select>
-          </div>
-          <!-- asked every time: what a question nobody answers in time takes -->
-          @if (!alwaysAnswers()[scenario.name]) {
-            @if (!local) {
-              @let question = scenarioQuestion(scenario.name);
-              <div class="row when-unanswered" [attr.data-question-setting]="question.name">
-                <div class="about">
-                  <span class="name">If you don't answer in time</span>
-                </div>
-                <select
-                  [attr.aria-label]="scenario.label + ' - if you don\'t answer in time'"
-                  (change)="setAnswer(question, $any($event.target).value)"
-                >
-                  @for (choice of question.choices; track choice.value) {
-                    <option [value]="choice.value" [selected]="answer(question.name) === choice.value">
-                      {{ choice.label }}{{ choice.value === helperAnswer(question.name) ? ' (default)' : '' }}
-                    </option>
-                  }
-                </select>
-              </div>
-            } @else if (scenarioIni(scenario.name); as setting) {
-              <!-- on this computer the same default is settings.ini's -->
-              <div class="row when-unanswered" [attr.data-setting]="setting.key">
-                <div class="about">
-                  <span class="name">If you don't answer in time</span>
-                  <span class="description">Saved to <code>settings.ini</code> as <code>{{ setting.key }}</code>.</span>
-                </div>
-                <select
-                  [attr.aria-label]="setting.key"
-                  [value]="setting.value"
-                  (change)="editIni(setting, $any($event.target).value, $any($event.target))"
-                >
-                  @for (choice of setting.choices ?? []; track choice) {
-                    <option [value]="choice" [selected]="setting.value === choice">{{ iniWords(setting.key, choice) }}{{ choice === setting.default ? ' (default)' : '' }}</option>
-                  }
-                </select>
-              </div>
             }
-          }
-        </li>
-      }
-    </ul>
+          </li>
+        }
+      </ul>
+    }
   </details>
 
   <!-- collapsible: a long list, seldom changed -->

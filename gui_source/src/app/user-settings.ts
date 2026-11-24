@@ -575,6 +575,16 @@ export class UserSettings implements OnDestroy {
   /** the answers kept for a file with no date of ours; the retry's own is in Advanced (`retryAlways`) */
   protected readonly scenarios = ALWAYS_LABELS.filter((a) => a.name !== 'retry-reread');
   protected readonly retryAlways = ALWAYS_LABELS.find((a) => a.name === 'retry-reread')!;
+  /** the six cases, in two parts: where the incoming copy comes from */
+  protected readonly scenarioSources = [
+    { title: 'From AO3', scenarios: this.scenarios.filter((a) => a.name.startsWith('ao3-')) },
+    { title: 'From FicHub', scenarios: this.scenarios.filter((a) => a.name.startsWith('fichub-')) },
+  ];
+  /** a case's label without the 'From AO3: ' its part's heading already says */
+  protected shortLabel(label: string): string {
+    const rest = label.replace(/^From (AO3|FicHub): /, '');
+    return rest.charAt(0).toUpperCase() + rest.slice(1);
+  }
   /** settings.ini's default for it, on a helper on this computer - shown in Advanced, not the list */
   protected readonly retryIni = computed(() => this.ini()?.settings.find((x) => x.key === RETRY_REREAD_SETTING));
   protected readonly alwaysAnswers = signal(savedAlwaysAnswers());
