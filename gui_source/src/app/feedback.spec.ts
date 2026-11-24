@@ -685,6 +685,9 @@ describe('Feedback', () => {
         await settle();
         sent.add((element.querySelector(pre)?.textContent ?? '').length);
         counts.add(String((fixture.componentInstance as unknown as { sendChars(): number }).sendChars()));
+        // the count beside the box is what goes, and follows the choice
+        const size = element.querySelector(name === 'logAmount' ? '.log-size' : '.visit-size')?.textContent?.trim();
+        expect(size, name).toBe(`${(element.querySelector(pre)?.textContent ?? '').length.toLocaleString()} characters`);
       }
       // every choice offered sends a different amount, and the count follows it
       expect(sent.size, name).toBe(values.length);
@@ -709,10 +712,15 @@ describe('Feedback', () => {
     visit.dispatchEvent(new Event('change'));
     await settle();
     expect(sendButton().disabled).toBe(true);
+    const sizeOf = (which: string) => Number(element.querySelector(which)?.textContent?.replace(/\D/g, ''));
+    const visitBefore = sizeOf('.visit-size');
 
     (element.querySelector('button.trim-to-fit') as HTMLButtonElement).click();
     await settle();
 
+    // the count beside the visit log's box shows what the trim took off
+    expect(sizeOf('.visit-size')).toBeLessThan(visitBefore);
+    expect(sizeOf('.visit-size')).toBe((element.querySelector('details.log.visit pre')?.textContent ?? '').length);
     expect(element.querySelector('.too-long')).toBeNull();
     expect(sendButton().disabled).toBe(false);
     expect(element.querySelector('.visit-cut')?.textContent).toContain('trimmed to fit');

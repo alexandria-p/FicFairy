@@ -106,6 +106,9 @@
                 <input type="checkbox" name="attachLog" [checked]="attachLog()" [disabled]="!canAttach()"
                   (change)="toggleLog($any($event.target).checked)" />
                 <span>Attach a run's log <em>(optional)</em></span>
+                @if (attachLog() && logPreview()) {
+                  <span class="attach-size log-size">{{ logPreview().length.toLocaleString() }} characters</span>
+                }
               </label>
               @if (!canAttach()) {
                 <p class="hint">Open your library first (either your local filesystem, or Dropbox) - this is where run logs are kept.</p>
@@ -177,6 +180,9 @@
                 <input type="checkbox" name="attachVisit" [checked]="attachVisit()"
                   (change)="toggleVisit($any($event.target).checked)" />
                 <span>Attach what I did on this visit <em>(optional)</em></span>
+                @if (attachVisit() && visitPreview()) {
+                  <span class="attach-size visit-size">{{ visitPreview().length.toLocaleString() }} characters</span>
+                }
               </label>
               @if (attachVisit()) {
                 <!-- said once ticked, at the owner's request -->
