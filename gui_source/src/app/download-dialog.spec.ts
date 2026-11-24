@@ -3343,6 +3343,15 @@ describe('DownloadDialog', () => {
       expect(note.compareDocumentPosition(element.querySelector('.import-summary')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
+    it('asks to be left open on the overwrite page too, after a background page', async () => {
+      TestBed.inject(HelperConnection).settings.set({ ...DEFAULT_PAGE_CONFIG, helperUrl: 'https://ao3-helper.example.com' });
+      await openImport({ ...IMPORT, files: 18 });
+      expect(currentStep()).toBe('background');
+      expect(element.querySelector('.long-run-note')).not.toBeNull();
+      await advanceTo('work-skins');
+      expect(element.querySelector('.long-run-note')?.textContent).toContain('~21 requests to work through');
+    });
+
     it('offers to skip the login below the username and password', async () => {
       await openImport();
       await advanceTo('credentials');
