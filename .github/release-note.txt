@@ -1,1 +1,1 @@
-no-post
+Resolve issues now asks its questions in the same order as other runs, and you can go back from the run window. Overwrite only affects works being updated. Work skins can be fetched for files dated from your index.
