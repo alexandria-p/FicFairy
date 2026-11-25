@@ -53,6 +53,7 @@ export const GUEST_STEP_LABELS = {
   STEP_IMAGES: 'Save embedded images separately',
   STEP_SKINS_ONLY: 'Fetch work skins',
   STEP_SKINS_FOR_HTML: 'Fetch work skins for the HTML downloaded',
+  STEP_SKINS_INDEX_DATED: 'Fetch work skins for works dated from your FicFairy index',
   STEP_REPORT: 'Report any failures',
   STEP_SERIES: 'Index works in series marked for walkthrough',
   STEP_NON_BOOKMARKS: 'Check remaining non-bookmarks for updates',
@@ -147,7 +148,7 @@ export function guestPlan(action: JobAction, filetypes: string[], options: Optio
       window.push(
         step('check', L.STEP_CHECK_FILES),
         step('update', L.STEP_UPDATE_WINDOW),
-        ...skinsStep(filetypes, options),
+        ...skinsStep(action, filetypes, options),
         step('fichub', L.STEP_FICHUB),
         step('cleanup', L.STEP_CLEANUP),
         step('report', L.STEP_REPORT),
@@ -170,14 +171,19 @@ export function guestPlan(action: JobAction, filetypes: string[], options: Optio
     if (downloads.length) plan.push(step('check', L.STEP_CHECK_FILES), step('download', L.STEP_DOWNLOAD));
     if (options['images'] && action === 'custom') plan.push(step('images', L.STEP_IMAGES));
   }
-  plan.push(...skinsStep(filetypes, options));
+  plan.push(...skinsStep(action, filetypes, options));
   plan.push(step('fichub', L.STEP_FICHUB), step('cleanup', L.STEP_CLEANUP), step('report', L.STEP_REPORT));
   return plan;
 }
 
 /** The step that reads the work skins the html downloads had not to hand (`fetch_pending_skins`). */
-function skinsStep(filetypes: string[], options: Options): GuestStep[] {
-  return options['skins'] && filetypes.map((x) => x.toUpperCase()).includes('HTML')
+function skinsStep(action: JobAction, filetypes: string[], options: Options): GuestStep[] {
+  if (!options['skins']) return [];
+  // Resolve issues' works dated from their FicFairy index, read in this step (`index_dated_skins`)
+  if (action === 'import' && options['indexDatedSkins']) {
+    return [{ id: 'skins', label: L.STEP_SKINS_INDEX_DATED }];
+  }
+  return filetypes.map((x) => x.toUpperCase()).includes('HTML')
     ? [{ id: 'skins', label: L.STEP_SKINS_FOR_HTML }] : [];
 }
 

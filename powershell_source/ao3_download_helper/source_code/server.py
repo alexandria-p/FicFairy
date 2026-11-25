@@ -559,6 +559,10 @@ def resolve_options(requested) -> dict:
         # with html in the library
         'skinWorks': [str(x) for x in given.get('skinWorks') if str(x).isdigit()]
         if isinstance(given.get('skinWorks'), list) else [],
+        # Resolve issues: works whose files the page dated from their FicFairy index and that the
+        # run does not otherwise read - their skins fetched too, one request each, when asked
+        'indexDatedSkins': [str(x) for x in given.get('indexDatedSkins') if str(x).isdigit()]
+        if isinstance(given.get('indexDatedSkins'), list) else [],
         # any run may go without logging in - see USERNAME_ACTIONS for what it still needs
         'skipLogin': bool(given.get('skipLogin')),
         # a typed range: the page sends each end as the UTC moment it begins (from) or ends
@@ -772,6 +776,10 @@ class Job:
         # same loop boundaries a stop is read at, and cleared by whichever pass consumes it,
         # so one press skips one step rather than every step after it.
         self.skip = threading.Event()
+        # the debug panel's Make AO3 fail for this step: the step it was pressed on, or None.
+        # AO3 fails only while that step is the one in progress (`ao3_made_to_fail`)
+        self.fail_ao3_step: str | None = None
+        self.fail_ao3_said = False
         # the checklist this run is working through. starts as one with nothing in it and
         # nowhere to report to, so every run function can mark its steps without first
         # checking whether anyone is listening - `run_job` swaps in the real one.
@@ -977,6 +985,10 @@ class Job:
         # a retry fetching skins goes back for the ones its earlier attempt did not get, whether
         # or not their html is downloaded again - read in the skins step with the rest
         if real and value.skins is True:
+            # Resolve issues: the works dated from their FicFairy index, which nothing else reads
+            if self.action == ACTION_IMPORT:
+                for work in (getattr(self, 'options', None) or {}).get('indexDatedSkins') or []:
+                    if work not in value.skins_pending: value.skins_pending.append(str(work))
             for work in (getattr(self, 'resume', None) or {}).get('missedSkins') or []:
                 if work not in value.skins_pending: value.skins_pending.append(str(work))
             if value.skins_pending: value.skins_pending_changed()
@@ -1004,6 +1016,18 @@ class Job:
         end of a run all make at once."""
         if self.record: self.record.data['skinsPending'] = list(works)
 
+
+    def ao3_made_to_fail(self) -> bool:
+        """Whether every request to AO3 should fail now - the debug panel asked for it on the
+        step still in progress. The step ending ends it, so the next step asks AO3 as usual.
+        Said once in the run, in the run's own thread, the first time a request is failed."""
+
+        step = self.fail_ao3_step
+        if not step or self.steps.current != step: return False
+        if not self.fail_ao3_said:
+            self.fail_ao3_said = True
+            print(strings.AO3_INFO_MADE_TO_FAIL.format(self.steps.label_of(step)))
+        return True
 
     def skipping(self) -> bool:
         """Whether the step in progress should be abandoned, consuming the request.
@@ -1210,7 +1234,21 @@ def fetches_skins(job: Job) -> bool:
     that reads the ones not to hand (`fetch_pending_skins`)."""
     # only with HTML ticked, on every run (`do_POST` clears the option without it)
     return bool((job.options or {}).get('skins')) and \
-        'HTML' in [str(x).upper() for x in job.filetypes]
+        ('HTML' in [str(x).upper() for x in job.filetypes] or bool(index_dated_skins(job)))
+
+
+def index_dated_skins(job: Job) -> list[str]:
+    """Resolve issues' works dated from their FicFairy index whose skins are fetched too - the
+    import's alone, and only with *Fetch work skins* ticked."""
+    options = job.options or {}
+    if job.action != ACTION_IMPORT or not options.get('skins'): return []
+    return list(options.get('indexDatedSkins') or [])
+
+
+def skins_step_label(job: Job) -> str:
+    """The skins step's words: an import reading its index-dated works' skins says so - every
+    other work it reads has its skin saved as its page is read, so there is no html left over."""
+    return strings.STEP_SKINS_INDEX_DATED if index_dated_skins(job) else strings.STEP_SKINS_FOR_HTML
 
 
 def step_plan(job: Job) -> list[tuple[str, str]]:
@@ -1307,7 +1345,7 @@ def step_plan(job: Job) -> list[tuple[str, str]]:
                 window.append(('nonbookmarks', strings.STEP_NON_BOOKMARKS))
             window.extend([('check', strings.STEP_CHECK_FILES),
                            ('update', strings.STEP_UPDATE_WINDOW)])
-            if fetches_skins(job): window.append(('skins', strings.STEP_SKINS_FOR_HTML))
+            if fetches_skins(job): window.append(('skins', skins_step_label(job)))
             window.extend([('fichub', strings.STEP_FICHUB),
                            ('cleanup', strings.STEP_CLEANUP),
                            ('report', strings.STEP_REPORT)])
@@ -1341,7 +1379,7 @@ def step_plan(job: Job) -> list[tuple[str, str]]:
     # end. every run can end with files to tidy away, and every run reports - in that order,
     # so a work FicHub gave us is linked to its collections, and anything the cleanup could
     # not remove is in the report
-    if fetches_skins(job): plan.append(('skins', strings.STEP_SKINS_FOR_HTML))
+    if fetches_skins(job): plan.append(('skins', skins_step_label(job)))
     plan.append(('fichub', strings.STEP_FICHUB))
     plan.append(('cleanup', strings.STEP_CLEANUP))
     plan.append(('report', strings.STEP_REPORT))
@@ -1428,6 +1466,8 @@ def run_job(job: Job, password: str) -> None:
                 if isinstance(fileops.storage, PageStorage): fileops.storage.gate = repo.hold_if_asked
                 # the zone a run's own lines say a time in - the person's AO3 zone
                 repo.zone = job.ao3_zone
+                # the debug panel's Make AO3 fail for this step reaches every request through this
+                repo.fail_check = job.ao3_made_to_fail
                 job.emit({'type': progress.STARTED, 'action': job.action,
                           'filetypes': job.filetypes, 'options': job.options})
                 # which zone the floors and ceilings are turned into dates in, said up front -
@@ -2887,7 +2927,8 @@ def download_planned(job: Job, fileops: FileOps, ao3: Ao3, records: list[dict],
                      downloadtypes: list[str], report,
                      overwrite: list[str] | None = None, keep_existing: bool = False,
                      repair: dict[str, dict[str, str]] | None = None,
-                     repair_only: set[str] | None = None) -> None:
+                     repair_only: set[str] | None = None,
+                     repaired: dict[str, dict[str, str]] | None = None) -> None:
     """Settle anything undated among these works, then download them.
 
     The same rule a full run downloads by, applied to whichever slice of the index the
@@ -2915,6 +2956,8 @@ def download_planned(job: Job, fileops: FileOps, ao3: Ao3, records: list[dict],
                       fileops.get_ini_value_integer(strings.INI_NAME_LENGTH,
                                                     strings.INI_DEFAULT_NAME_LENGTH),
                       ao3.repair_clashes)
+    # files the import already repaired by renaming them are the repair page's alone
+    if repaired: keep_repaired(records, plan, repaired, downloadtypes)
     # an out-of-date copy is not 'already downloaded', so it must not be skipped
     visited = shared.already_downloaded(plan['existing'], downloadtypes, records, plan['stale'])
     if ao3.held_only:
@@ -3335,6 +3378,11 @@ def repair_copies(records: list[dict], plan: dict, filetypes: list[str],
             if others:
                 keep.setdefault(link, set()).update(others)
                 plan.setdefault('keptSaid', set()).add(link)
+                # nor are they replaced: *Overwrite existing downloads* is for the works updated
+                replacing = plan['superseded'].get(link) or {}
+                for filetype in [x for x in replacing if x.upper() in others]:
+                    replacing.pop(filetype)
+                if link in plan['superseded'] and not replacing: plan['superseded'].pop(link)
         for filetype in filetypes:
             if filetype.upper() not in repair[work]: continue
             copy = undated_copy((existing.get(work) or {}).get(filetype.upper()))
@@ -3602,7 +3650,12 @@ def run_fic_list(job: Job, fileops: FileOps, repo: Repository, report, importing
             # nothing is downloaded for them; one AO3 did not give goes to FicHub at the end
             print(strings.AO3_INFO_IMPORT_RENAMING.format(sum(len(x) for x in repair.values())))
             rename_from_ao3(fileops, records, repair, ao3.repair_clashes)
+            # and then left alone: the repair page decided what happens to them, so an update's
+            # *Overwrite existing downloads* never downloads them again (`keep_repaired`)
+            renamed = repair
             repair = {}
+        else:
+            renamed = {}
         # a work with a file to repair is downloaded for it - only for it, if it was otherwise
         # only looked up (`repair_copies`)
         repair_only = set(job.options.get('indexOnly') or []) & set(repair)
@@ -3630,7 +3683,8 @@ def run_fic_list(job: Job, fileops: FileOps, repo: Repository, report, importing
                 downloadtypes = downloadtypes + extra
                 ao3.filetypes = downloadtypes
         download_planned(job, fileops, ao3, updating, downloadtypes, report,
-                         keep_existing=not replace, repair=repair, repair_only=repair_only)
+                         keep_existing=not replace, repair=repair, repair_only=repair_only,
+                         repaired=renamed)
     else:
         records = merge_by_work(records, index_marked_series(job, ao3, report))
         download_planned(job, fileops, ao3, records, downloadtypes, report, overwrite=asked)
@@ -6122,6 +6176,33 @@ def keep_undated_copies(records: list[dict], plan: dict, existing: dict, filetyp
     if kept: print(strings.AO3_INFO_IMPORT_OVERWRITE_UNDATED_KEPT.format(kept))
 
 
+def keep_repaired(records: list[dict], plan: dict, repaired: dict[str, dict[str, str]],
+                  filetypes: list[str]) -> None:
+    """Keep the files an import's repair page already settled - each named with AO3's date by
+    *Only rename the file* - whatever an update of the same work would do to them. An import told
+    to *Overwrite existing downloads* puts every copy in `superseded`; these leave it for
+    `plan['keep']`, so the repair page's choice stands, and the overwrite applies to every other
+    file of the works it updates. A work with nothing left to replace or fetch leaves `stale`."""
+
+    keep: dict[str, set[str]] = plan.setdefault('keep', {})
+    existing = plan.get('existing') or {}
+    for record in records:
+        work = str(record.get('id') or '')
+        link = record.get('link') or ''
+        if not link or work not in repaired: continue
+        formats = {x.upper() for x in repaired[work]}
+        replacing = plan['superseded'].get(link) or {}
+        for filetype in list(replacing):
+            if filetype.upper() in formats: replacing.pop(filetype, None)
+        keep.setdefault(link, set()).update(formats)
+        if replacing: continue
+        plan['superseded'].pop(link, None)
+        have = existing.get(work) or {}
+        wanted = [x for x in filetypes if x.upper() not in formats]
+        if link in plan['stale'] and all(have.get(x.upper()) for x in wanted):
+            plan['stale'].remove(link)
+
+
 def keep_existing_copies(records: list[dict], plan: dict, filetypes: list[str]) -> None:
     """Keep every copy already in the folder, current or not - an import told not to replace
     outdated copies.
@@ -6708,6 +6789,10 @@ class Handler(BaseHTTPRequestHandler):
             self.skip_step(self.path.split('/')[3])
             return
 
+        if self.path.startswith('/api/jobs/') and self.path.endswith('/fail-ao3'):
+            self.fail_ao3(self.path.split('/')[3])
+            return
+
         if self.path != '/api/jobs':
             self.send_json(404, {'error': 'not found'})
             return
@@ -6812,6 +6897,8 @@ class Handler(BaseHTTPRequestHandler):
         else:
             options['skinScope'] = 'unchecked'
             options['skinWorks'] = []
+            # Resolve issues' index-dated works: the import's alone, and only fetching skins
+            if action != ACTION_IMPORT or not options['skins']: options['indexDatedSkins'] = []
             # work skins go with html, on every run - the ones that read each work's page anyway
             # included, at the owner's request: no HTML ticked, no skin saved. But for an import
             # (Resolve issues), which reads every work's page to index it, so its skin is free:
@@ -7002,6 +7089,28 @@ class Handler(BaseHTTPRequestHandler):
 
         job.skip.set()
         self.send_json(202, {'skipping': True})
+
+    def fail_ao3(self, job_id: str) -> None:
+        """Make every request to AO3 fail until the step a run is on ends - the debug panel's
+        way to send a run's works to FicHub without waiting for AO3 to go down.
+
+        The step carries on: what it was fetching fails as it would with AO3 down (a walk breaks
+        off and is recorded, each work becomes a failure), then the next step asks AO3 as usual,
+        and the FicHub step at the end is offered what failed. 409 when no step is in progress.
+        """
+
+        with Handler.jobs_lock:
+            job = Handler.jobs.get(job_id)
+        if not job:
+            self.send_json(404, {'error': 'no such job'})
+            return
+        step = job.steps.current
+        if not step:
+            self.send_json(409, {'error': 'no step in progress'})
+            return
+        job.fail_ao3_step = step
+        job.fail_ao3_said = False
+        self.send_json(202, {'failing': step})
 
     def hold_job(self, job_id: str, hold: bool) -> None:
         """Pause or resume a run.

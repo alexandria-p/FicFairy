@@ -258,7 +258,7 @@ describe('Running in the background', () => {
     expect(button('Start in the background')).toBeTruthy();
   });
 
-  it('is offered on an import too, before its login, asking nothing about undated files', async () => {
+  it('is offered on an import too, after its options and before its login, asking nothing about undated files', async () => {
     inDropbox();
     fixture = TestBed.createComponent(DownloadDialog);
     fixture.componentRef.setInput('action', 'import');
@@ -269,6 +269,10 @@ describe('Running in the background', () => {
     await fixture.whenStable();
     element = fixture.nativeElement as HTMLElement;
 
+    // its options page comes first, as every run's options do, then the background page
+    expect(currentStep()).toBe('work-skins');
+    [...element.querySelectorAll<HTMLButtonElement>('footer button')].find((b) => b.textContent?.trim() === 'Continue')!.click();
+    await fixture.whenStable();
     expect(currentStep()).toBe('background');
     await tickBackground();
     // the import window offered to date them; the run leaves undated files alone

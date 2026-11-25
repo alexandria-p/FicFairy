@@ -395,12 +395,13 @@
 
 @if (dialogAction(); as action) {
   <app-download-dialog [action]="action" [resumeFrom]="resumeFrom()" [attachTo]="attachTo()" [prefill]="prefillLink()" [skinWorks]="skinWorks()"
-                       [importing]="importing()" (closed)="dialogClosed()"
+                       [importing]="importing()" (closed)="dialogClosed()" (backToImport)="backToImport()" (started)="releaseHeldImport()"
                        (resolveIssues)="resolveIssuesAfterRun()" />
 }
 
-@if (importOpen()) {
-  <app-import-dialog [works]="imports.found()" [undatedElsewhere]="imports.undatedIndexed()" [duplicates]="imports.duplicates()"
+<!-- held, hidden, while its run window is open: Back there shows it again as it was left -->
+@if (importOpen() || importHeld()) {
+  <app-import-dialog [style.display]="importHeld() ? 'none' : null" [works]="imports.found()" [undatedElsewhere]="imports.undatedIndexed()" [duplicates]="imports.duplicates()"
                      [misnamed]="imports.misnamed()" [renameFrom]="renameFrom()" [lookUpWorks]="importLookUp()" [leftovers]="imports.leftovers()" [ignored]="imports.ignoredIndex()"
                      [store]="library.store()"
                      [formats]="importFormats()" [busy]="!!activeRun()"

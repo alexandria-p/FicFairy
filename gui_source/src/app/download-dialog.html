@@ -1238,7 +1238,7 @@
     <!-- running in the background, and its answers up front: a hosted copy only -->
     @if (step() === 'background') {
       <section class="body">
-          <!-- an import has no other page to say what it will do -->
+          <!-- a repair's options page says what it will do; here it is only said whether to stay -->
           @if (action() === 'import') {
             @if (importRequestCount() > longImport && !background()) {
               <p class="long-run-note" role="note">
@@ -1246,9 +1246,11 @@
                 Please leave this window open until it finishes.
               </p>
             }
-            <ul class="import-summary">
-              @for (line of importPlan(); track line) { <li>{{ line }}</li> }
-            </ul>
+            @if (firstStep() === 'background') {
+              <ul class="import-summary">
+                @for (line of importPlan(); track line) { <li>{{ line }}</li> }
+              </ul>
+            }
           }
           <div class="background-choice" [class.blocked]="backgroundBlocked()">
             <label class="check">
@@ -1374,17 +1376,17 @@
     <!-- Resolve issues: whether to save each work's skin as its page is read -->
     @if (step() === 'work-skins') {
       <section class="body">
-        @if (firstStep() === 'work-skins') {
-          @if (importRequestCount() > longImport && !background()) {
-            <p class="long-run-note" role="note">
-              This may take a long time, with ~{{ importRequestCount() | number }} requests to work through.
-              Please leave this window open until it finishes.
-            </p>
-          }
-          <ul class="import-summary">
-            @for (line of importPlan(); track line) { <li>{{ line }}</li> }
-          </ul>
+        <!-- here as on the first page, after a background page too -->
+        @if (importRequestCount() > longImport && !background()) {
+          <p class="long-run-note" role="note">
+            This may take a long time, with ~{{ importRequestCount() | number }} requests to work through.
+            Please leave this window open until it finishes.
+          </p>
         }
+        <!-- always here, after a background page too: its choices below change what it says -->
+        <ul class="import-summary">
+          @for (line of importPlan(); track line) { <li>{{ line }}</li> }
+        </ul>
         <!-- the update's own choice, here beside the skins at the owner's request -->
         @if (importUpdated() > 0) {
           <label class="check import-overwrite">
@@ -1392,9 +1394,11 @@
                    (change)="importOverwrite.set($any($event.target).checked)" />
             <span>Overwrite existing downloads</span>
           </label>
+          <!-- Resolve issues' own wording: the scans' overwrite box keeps its own hint -->
           <p class="hint import-overwrite-hint">
-            Check this if you are concerned about file integrity issues and would like to re-download
-            each file again.
+            Allows you to overwrite existing files for any works being searched for updates. Check
+            this if you are concerned about file integrity and would like to re-download each file
+            again. Files with no date in the name are never overwritten.
           </p>
         }
         <label class="check skins-option">
@@ -1406,13 +1410,59 @@
           <p class="hint skins-hint">
             Work skins are only fetched for AO3.
           </p>
+          <!-- works dated from the FicFairy index that the run does not otherwise read -->
+          @if (importIndexDated().length) {
+            <label class="check nested-option index-dated-skins">
+              <input type="checkbox" name="indexDatedSkins" [checked]="importIndexSkins()"
+                     (change)="importIndexSkins.set($any($event.target).checked)" />
+              <span>Fetch skins for works that were dated using an existing FicFairy index? (This will be an extra call to AO3 per fic)</span>
+            </label>
+          }
         }
       </section>
       <footer>
         <button type="button" class="button subtle" (click)="backFrom('work-skins')">
           {{ hasStepBefore('work-skins') ? 'Back' : 'Cancel' }}
         </button>
-        <button type="button" class="button primary" (click)="step.set('credentials')">Continue</button>
+        <button type="button" class="button primary" (click)="step.set(afterImportSkins())">Continue</button>
+      </footer>
+    }
+
+    <!-- Resolve issues: the formats to fetch for works without them, after its options -->
+    @if (step() === 'import-formats') {
+      <section class="body">
+        @if (firstStep() === 'import-formats' && importRequestCount() > longImport && !background()) {
+          <p class="long-run-note" role="note">
+            This may take a long time, with ~{{ importRequestCount() | number }} requests to work through.
+            Please leave this window open until it finishes.
+          </p>
+        }
+        <fieldset class="import-formats">
+          <legend>File types</legend>
+          <p class="hint filetypes-hint">
+            Ticking a format here will check if a work is missing a copy in these formats, and download it if so.
+          </p>
+          <p class="hint filetypes-hint">
+            Files you already have downloaded will still be checked for a newer version - regardless of whether you tick any boxes below.
+          </p>
+          @for (format of importOffered(); track format) {
+            <label class="check">
+              <input type="checkbox" [attr.name]="'format-' + format"
+                     [checked]="importPicked().includes(format)"
+                     (change)="toggleImportFormat(format, $any($event.target).checked)" />
+              <span>
+                {{ format }}
+                @if (importHeld().has(format)) { <span class="dim">(some already have it)</span> }
+              </span>
+            </label>
+          }
+        </fieldset>
+      </section>
+      <footer>
+        <button type="button" class="button subtle" (click)="backFrom('import-formats')">
+          {{ hasStepBefore('import-formats') ? 'Back' : 'Cancel' }}
+        </button>
+        <button type="button" class="button primary" (click)="step.set(afterImportFormats())">Continue</button>
       </footer>
     }
 
@@ -2213,6 +2263,10 @@
                       (click)="skipCurrentStep()">
                 Skip this step
               </button>
+              <button type="button" class="button fail-ao3" [disabled]="failingAo3()"
+                      (click)="failAo3ForStep()">
+                Make AO3 fail for this step
+              </button>
               <button type="button" class="button" (click)="mockReport()">
                 Show a made-up report
               </button>
@@ -2220,6 +2274,9 @@
             <p class="hint">
               <strong>Skip this step</strong> really skips it - whatever it would have done
               does not happen, and the checklist marks it skipped rather than done.
+              <strong>Make AO3 fail for this step</strong> fails every request to AO3 until the
+              step ends, as if AO3 were down - what it was fetching fails, and is offered to
+              FicHub at the end. The next step asks AO3 as usual.
               <strong>Show a made-up report</strong> jumps to the end of the run and fills
               both lists with invented entries, so their layout can be checked without
               waiting for something to go wrong. Nothing in it happened.

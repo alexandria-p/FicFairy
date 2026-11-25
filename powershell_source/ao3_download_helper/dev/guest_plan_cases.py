@@ -24,9 +24,10 @@ FILETYPES = (['JSON', 'HTML'], ['JSON'], ['HTML'])
 # (repairing is put before replacing, so the case kept for an import's download step - the same
 # plan either way - stays the replacing one)
 CHOICES = ('collectionWorks', 'series', 'repair', 'replaceOutdated', 'reindex', 'dates', 'images',
-           'nonBookmarks', 'skipIndex', 'recheck', 'orderBookmarked', 'skinsOnly', 'skins')
+           'nonBookmarks', 'skipIndex', 'recheck', 'orderBookmarked', 'skinsOnly', 'skins',
+           'indexDatedSkins')
 # a choice sent as a list rather than a flag: on is this, and the case records it as true
-LISTS = {'repair': ['1 Fic.html']}
+LISTS = {'repair': ['1 Fic.html'], 'indexDatedSkins': ['7']}
 # a choice whose 'on' sends a false option: a custom run told to skip its indexing
 SENT_FALSE = {'skipIndex': 'reindex'}
 # a choice whose 'on' sends a value: a custom run's range read by date bookmarked

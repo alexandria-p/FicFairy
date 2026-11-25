@@ -149,6 +149,14 @@ export class App {
   );
   /** whether the import window is up */
   protected readonly importOpen = signal(false);
+  /**
+   * The repair window, kept - hidden - while the run window it opened asks the rest, so the run
+   * window's Back can show it again with every choice as it was. Let go once the run starts or
+   * the run window is closed; the files it dated are taken in then (`heldDated`), not before, so
+   * nothing changes under it while it may come back.
+   */
+  protected readonly importHeld = signal(false);
+  private heldDated: DatingResult | null = null;
   /** the work Resolve issues was opened to look up, from the Works tab - none when opened otherwise */
   protected readonly importLookUp = signal<string[] | null>(null);
   /** the formats an old naming pattern left, ticked on the rename step once it was just changed */
@@ -296,11 +304,36 @@ export class App {
   /** the import window's choices made: on to the run window, which asks the rest */
   protected importStart(chosen: { request: ImportRequest; dated: DatingResult | null }): void {
     this.importOpen.set(false);
-    this.importLookUp.set(null);
-    this.renameFrom.set([]);
-    void this.takeInDating(chosen.dated);
+    this.importHeld.set(true);
+    this.heldDated = chosen.dated;
     this.importing.set(chosen.request);
     this.openRun('import');
+  }
+
+  /** the run window's Back from its first page: the repair window again, as it was left */
+  protected backToImport(): void {
+    // let go already - a run started elsewhere meanwhile: nothing to go back to, and the repair
+    // window is never opened while a run is going
+    if (!this.importHeld()) {
+      this.dialogClosed();
+      return;
+    }
+    this.dialogAction.set(null);
+    this.importing.set(null);
+    this.importHeld.set(false);
+    this.heldDated = null;
+    this.importOpen.set(true);
+  }
+
+  /** the repair window is not coming back: let it go, and take in the files it dated */
+  protected releaseHeldImport(): void {
+    if (!this.importHeld()) return;
+    this.importHeld.set(false);
+    this.importLookUp.set(null);
+    this.renameFrom.set([]);
+    const dated = this.heldDated;
+    this.heldDated = null;
+    void this.takeInDating(dated);
   }
 
   protected setImportOffered(offered: boolean): void {
@@ -318,6 +351,7 @@ export class App {
 
   /** the run window closed - whatever it was, what is running may have changed */
   protected dialogClosed(): void {
+    this.releaseHeldImport();
     this.dialogAction.set(null);
     this.importing.set(null);
     this.resumeFrom.set('');
@@ -456,6 +490,10 @@ export class App {
       watching.observe(footer);
       note();
       this.destroyRef.onDestroy(() => watching.disconnect());
+    });
+    // a Resolve issues run that has started will not go back to its repair window
+    effect(() => {
+      if (this.activeRun() && this.importHeld()) untracked(() => this.releaseHeldImport());
     });
     // runs left 'running' by a page that closed or a helper that stopped are marked
     // interrupted whenever a library is opened or refreshed - in the background, since nothing

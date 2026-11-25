@@ -57,6 +57,9 @@ class Repository:
     # how long apart. maintenance is usually minutes or hours, not seconds, so the full
     # MaxRetries would only spend a quarter of an hour per request learning nothing new
     maintenance_retries = 2
+    # the debug panel's AO3 failure, here too so a Repository built bare (as tests do) has them
+    fail_check: Callable[[], bool] | None = None
+    asking_ao3 = False
     # the status of the last page `get_soup` fetched
     last_status: int | None = None
     # the zone a run's lines say a time in (the person's AO3 zone); None is UTC
@@ -78,6 +81,13 @@ class Repository:
         # (`Ao3.skippable`): asked wherever a stop is, so a request in flight, a retry's wait and
         # AO3's break all end at once. Consumes the press as it reads it. None the rest of the time
         self.skip_check: Callable[[], bool] | None = None
+        # the debug panel's Make AO3 fail for this step (`Job.ao3_made_to_fail`): while it says
+        # so, every request to AO3 fails as if AO3 were down - at the request, and mid-request or
+        # mid-wait through `check_cancelled`. Unlike `ao3_down` it is not kept: the step ending
+        # ends it. None the rest of the time
+        self.fail_check: Callable[[], bool] | None = None
+        # whether the request in hand is to AO3, so `check_cancelled` fails only those
+        self.asking_ao3 = False
         self.session = requests.Session()
         self.debug = fileops.get_ini_value_boolean(strings.INI_DEBUG_LOGGING, False)
         self.extra_wait = fileops.get_ini_value_integer(strings.INI_WAIT_TIME, 0)
@@ -118,6 +128,12 @@ class Repository:
         if self.skip_check is not None and self.skip_check():
             print(strings.AO3_INFO_STEP_SKIPPED)
             raise exceptions.StepSkippedException()
+        if self.asking_ao3 and self.made_to_fail():
+            raise exceptions.Ao3DownException(strings.ERROR_AO3_MADE_TO_FAIL)
+
+    def made_to_fail(self) -> bool:
+        """Whether the debug panel has AO3 failing for the step in progress."""
+        return self.fail_check is not None and bool(self.fail_check())
 
 
     def wait(self, seconds: float) -> None:
@@ -348,6 +364,18 @@ class Repository:
     def my_request(self, method: str, url: str, data: dict[str, str] | None = None) -> requests.Response:
         """Get response from a url."""
 
+        # noted for `check_cancelled`, which the debug panel's AO3 failure reaches through: a
+        # request to AO3 in flight, or waiting out a retry or AO3's break, ends at once
+        before = self.asking_ao3
+        self.asking_ao3 = goes_to_ao3(url)
+        try:
+            return self.requested(method, url, data)
+        finally:
+            self.asking_ao3 = before
+
+    def requested(self, method: str, url: str, data: dict[str, str] | None = None) -> requests.Response:
+        """`my_request`'s own work, with `asking_ao3` set."""
+
         # normalize http -> https for ao3 links. older downloaded works may contain http
         # links in their embedded metadata, and the resulting redirect trips cloudflare.
         to_ao3 = goes_to_ao3(url)
@@ -364,6 +392,10 @@ class Repository:
             # ao3 already said it is down on this run: nothing to gain by asking again
             if to_ao3 and self.ao3_down:
                 raise exceptions.Ao3DownException(strings.ERROR_AO3_DOWN)
+            # or the debug panel has it failing for this step - as if it were down, but only
+            # until the step ends
+            if to_ao3 and self.made_to_fail():
+                raise exceptions.Ao3DownException(strings.ERROR_AO3_MADE_TO_FAIL)
             # and a pause holds here, before the request, rather than anywhere it could
             # catch a transfer in progress
             self.hold_if_asked()
@@ -384,8 +416,9 @@ class Repository:
                 # not count as an attempt: the user pausing is not the server failing
                 self.hold_if_asked()
                 continue
-            except exceptions.StepSkippedException:
-                # never retried: the press was consumed as it was read, and the step is over
+            except (exceptions.StepSkippedException, exceptions.Ao3DownException):
+                # never retried: the press was consumed as it was read, and the step is over -
+                # and AO3 made to fail from the debug panel fails until the step ends
                 raise
             except Exception as e:
                 # a page that times out repeatedly is unlikely to recover, so give up after (consecutive) 

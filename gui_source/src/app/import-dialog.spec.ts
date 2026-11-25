@@ -1127,14 +1127,14 @@ describe('ImportDialog', () => {
     await fixture.whenStable();
   }
 
-  it("warns of FicHub's cache, leaves the file as it is to begin with, and shows each choice's questions only under it", async () => {
+  it("warns of FicHub's cache only for overwriting, leaves the file as it is to begin with, and shows each choice's questions only under it", async () => {
     await open();
     await click('Continue');
     await click('Repair remaining from AO3');
     await click('Continue');
 
-    expect(element.querySelector('.repair-warning')?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
-      'FicHub keeps cached copies, which may be older than the newest version on AO3.');
+    // FicHub's cache is warned of only where its copy would overwrite the file
+    expect(element.querySelector('.repair-warning')).toBeNull();
     expect(fallback('keep').checked).toBe(true);
     expect(fallback('rename').closest('label')!.textContent).toContain('Only rename the file');
     expect(fallback('replace').closest('label')!.textContent).toContain('Overwrite and rename the file');
@@ -1150,8 +1150,12 @@ describe('ImportDialog', () => {
     expect([answer('renameOlder')!.value, answer('renameUndated')!.value]).toEqual(['yes', 'yes']);
     expect(answer('replaceOlder')).toBeNull();
 
+    // renaming keeps what the file holds, so no warning there
+    expect(element.querySelector('.repair-warning')).toBeNull();
     fallback('replace').click();
     await fixture.whenStable();
+    expect(element.querySelector('.repair-warning')?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+      'FicHub keeps cached copies, which may be older than the newest version on AO3.');
     expect(answer('renameOlder')).toBeNull();
     expect(answer('replaceOlder')!.closest('label')!.textContent).toContain(
       "Overwrite files that seem to have an older date than FicHub's?");
@@ -1268,6 +1272,22 @@ describe('ImportDialog', () => {
     expect(step()).toBe('repair');
   });
 
+  it('never offers files for dating again once they are renamed, however the window is gone back through', async () => {
+    await open();
+    await click('Continue');
+    await type(dateBox('works/2 C - D.html'), '2024-05-06');
+    await click('Skip remaining');
+    await click('Continue');
+    expect(step()).toBe('dating');
+    await click('Continue');
+    // back as far as the window goes, then on again
+    for (let i = 0; i < 6 && button('Back'); i++) await click('Back');
+    const at = step();
+    if (at === 'overview') await click('Continue');
+    expect(step()).not.toBe('dates');
+    expect(store.renamed).toEqual([['works/2 C - D.html', 'works/2 C - D 2024-05-06.html']]);
+  });
+
   describe('repairing from the FicFairy index first', () => {
     const indexed = () => TestBed.inject(Library).worksById.set(new Map([
       ['7', { id: '7', title: 'The Fic', authors: ['Writer'], date_updated: '14 Dec 2024' } as Bookmark]]));
@@ -1313,6 +1333,42 @@ describe('ImportDialog', () => {
       await click('Done');
       expect(started).toEqual([]);
       expect(closed.length).toBe(1);
+    });
+
+    async function toIndexRound(update: 'skip' | 'fetch') {
+      indexed();
+      await open(ALL_DATED, false, INDEXED_UNDATED);
+      await click('Continue');
+      await click('Repair remaining from AO3');
+      await click('Continue');
+      indexFirst().click();
+      await fixture.whenStable();
+      await click('Continue');
+      if (step() === 'index') await click('Continue');
+      expect(step()).toBe('formats');
+      if (update === 'skip') {
+        element.querySelector<HTMLInputElement>('input[name="updateFetch"][value="skip"]')!.click();
+        await fixture.whenStable();
+      }
+      primary().click();
+      await settle();
+      expect(step()).toBe('dating');
+      primary().click();
+      await settle();
+    }
+
+    it('hands the run window the works it dated from the index that the run does not read', async () => {
+      // work 7 is dated from its index and nothing else takes it in; work 1 is looked up
+      await toIndexRound('skip');
+      expect(started.length).toBe(1);
+      expect(started[0].request.indexDated).toEqual(['7']);
+    });
+
+    it('leaves out a work dated from the index that the run takes in anyway', async () => {
+      // updating the works with date issues takes work 7 in: its skin comes with its page
+      await toIndexRound('fetch');
+      expect(started[0].request.links).toContain('/works/7');
+      expect(started[0].request.indexDated).toEqual([]);
     });
 
     it('never renames over another file, and lists the clash', async () => {
@@ -1941,7 +1997,7 @@ describe('ImportDialog', () => {
 
   // endregion
 
-  it('asks about the index on a page of its own, then the formats on the next', async () => {
+  it('asks about the index on a page of its own, then which works to update - the file types are the run window\'s', async () => {
     await open(ALL_DATED);
     await click('Continue');
     expect(element.textContent).toContain('Fetch their index entries from AO3 now?');
@@ -1954,18 +2010,11 @@ describe('ImportDialog', () => {
     expect(element.querySelector('.fetch-hint')!.textContent!.trim()).toBe('This only updates files that have a date in their name. A file with no date in its name is kept as-is.');
     expect(element.querySelector('.index-only-hint')!.textContent!.replace(/\s+/g, ' ').trim()).toBe(
       'Only works with an index entry can be updated. If you are concerned that some works are missing indexes, go back to the previous step and tick Yes so they can be caught.');
-    // the file types, and overwriting, are a page of their own after it
-    await click('Continue');
-    expect(step()).toBe('filetypes');
-    expect(element.textContent).toContain('File types');
-    expect(Array.from(element.querySelectorAll('.filetypes-hint')).map((p) => p.textContent!.replace(/\s+/g, ' ').trim())).toEqual([
-      'Ticking a format here will check if a work is missing a copy in these formats, and download it if so.',
-      'Files you already have downloaded will still be checked for a newer version - regardless of whether you tick any boxes below.',
-    ]);
-    // overwriting is asked in the run window now, beside Fetch work skins
+    // the file types and overwriting are asked in the run window, after its options
+    expect(element.querySelector('input[name="format-EPUB"]')).toBeNull();
     expect(element.querySelector('input[name="overwrite"]')).toBeNull();
-    await click('Back');
-    expect(step()).toBe('formats');
+    await click('Continue');
+    expect(started.length).toBe(1);
   });
 
   function radio(name: string, value: string): HTMLInputElement | null {
@@ -1982,19 +2031,19 @@ describe('ImportDialog', () => {
     await fixture.whenStable();
   }
 
-  it('starts an import of every work found, with the formats ticked, replacing outdated copies', async () => {
+  it('starts an import of every work found, replacing outdated copies, handing the run window the formats to offer', async () => {
     await open(ALL_DATED);
     await click('Continue');
     await click('Continue');
     expect(radio('updateScope', 'all')!.checked).toBe(true);
     await click('Continue');
-    await tick('format-EPUB');
-    await click('Continue');
 
     expect(started[0].request).toEqual({
       links: 'https://archiveofourown.org/works/1',
       count: 1,
-      filetypes: ['JSON', 'EPUB'],
+      filetypes: ['JSON'],
+      offered: ['HTML', 'EPUB', 'PDF', 'MOBI', 'AZW3'],
+      held: ['HTML'],
       replaceOutdated: true,
       overwrite: false,
       indexOnly: [],
@@ -2008,6 +2057,7 @@ describe('ImportDialog', () => {
       repairFicHubRename: false,
       repairFicHubCheck: true,
       repairRenameOnly: false,
+      indexDated: [],
     });
   });
 
@@ -2108,19 +2158,18 @@ describe('ImportDialog', () => {
     await click('Continue');
     await choose('updateScope', 'dates');
     await click('Continue');
-    await tick('format-EPUB');
-    await click('Continue');
 
     const request = started[0].request;
     expect(request.links.split('\n').map((l) => l.split('/').pop())).toEqual(['1', '2', '3']);
     expect(request.indexOnly).toEqual(['1']);
     expect(request.scope).toBe('dates');
-    expect(request.filetypes).toEqual(['JSON', 'EPUB']);
+    expect(request.filetypes).toEqual(['JSON']);
+    // the formats the found files are in, said beside them in the run window
+    expect(request.held).toEqual(['HTML', 'EPUB', 'PDF']);
   });
 
   it('leaves overwriting to the run window, asking nothing about it here', async () => {
     await open(ALL_DATED);
-    await click('Continue');
     await click('Continue');
     await click('Continue');
     expect(element.querySelector('input[name="overwrite"]')).toBeNull();
@@ -2132,16 +2181,13 @@ describe('ImportDialog', () => {
     await open(ALL_DATED);
     await click('Continue');
     await click('Continue');
-    await click('Continue');
-    await tick('format-EPUB');
-    await click('Back');
     await choose('updateFetch', 'skip');
     expect(radio('updateScope', 'all')).toBeNull();
-    expect(element.querySelector('input[name="format-EPUB"]')).toBeNull();
     await click('Continue');
 
     expect(started[0].request).toMatchObject({
       filetypes: ['JSON'],
+      offered: [],
       replaceOutdated: false,
       indexOnly: ['1'],
       lookups: 1,

@@ -177,6 +177,8 @@ export interface JobOptions {
   skinScope?: SkinScope;
   /** fetching skins only: the works picked, by number; none is every work with html */
   skinWorks?: string[];
+  /** Resolve issues: works dated from their FicFairy index whose skins are fetched too, by number */
+  indexDatedSkins?: string[];
   /**
    * Whether to cover a date window instead of a slice of the listing.
    *
@@ -1079,6 +1081,16 @@ export class Jobs {
   async skipStep(jobId: string): Promise<void> {
     const response = await this.helper.call(`/api/jobs/${jobId}/skip`, { method: 'POST' });
     if (!response.ok) throw new Error('could not skip the current step');
+  }
+
+  /**
+   * A debug tool: every request to AO3 fails, as if AO3 were down, until the step the run is on
+   * ends - so what it was fetching fails, and is offered to FicHub at the end. Throws when the
+   * helper refuses (409: no step in progress), so the page never claims it happened.
+   */
+  async failAo3ForStep(jobId: string): Promise<void> {
+    const response = await this.helper.call(`/api/jobs/${jobId}/fail-ao3`, { method: 'POST' });
+    if (!response.ok) throw new Error('could not make AO3 fail for this step');
   }
 
   async start(request: StartRequest): Promise<string> {

@@ -4432,6 +4432,51 @@ export const GUEST_PLAN_CASES: { action: string; filetypes: string[]; options: R
  {
   "action": "import",
   "filetypes": [
+   "JSON",
+   "HTML"
+  ],
+  "options": {
+   "skins": true,
+   "indexDatedSkins": true
+  },
+  "plan": [
+   [
+    "login",
+    "Log in to AO3"
+   ],
+   [
+    "index",
+    "Index the works found in your library"
+   ],
+   [
+    "check",
+    "Read your existing downloaded files"
+   ],
+   [
+    "download",
+    "Download the formats asked for"
+   ],
+   [
+    "skins",
+    "Fetch work skins for works dated from your FicFairy index"
+   ],
+   [
+    "fichub",
+    "Try FicHub for works AO3 would not give us"
+   ],
+   [
+    "cleanup",
+    "Cleanup"
+   ],
+   [
+    "report",
+    "Report any failures"
+   ]
+  ]
+ },
+ {
+  "action": "import",
+  "filetypes": [
    "JSON"
   ],
   "options": {},
@@ -4443,6 +4488,42 @@ export const GUEST_PLAN_CASES: { action: string; filetypes: string[]; options: R
    [
     "index",
     "Index the works found in your library"
+   ],
+   [
+    "fichub",
+    "Try FicHub for works AO3 would not give us"
+   ],
+   [
+    "cleanup",
+    "Cleanup"
+   ],
+   [
+    "report",
+    "Report any failures"
+   ]
+  ]
+ },
+ {
+  "action": "import",
+  "filetypes": [
+   "JSON"
+  ],
+  "options": {
+   "skins": true,
+   "indexDatedSkins": true
+  },
+  "plan": [
+   [
+    "login",
+    "Log in to AO3"
+   ],
+   [
+    "index",
+    "Index the works found in your library"
+   ],
+   [
+    "skins",
+    "Fetch work skins for works dated from your FicFairy index"
    ],
    [
     "fichub",
@@ -4482,6 +4563,51 @@ export const GUEST_PLAN_CASES: { action: string; filetypes: string[]; options: R
    [
     "download",
     "Download the formats asked for"
+   ],
+   [
+    "fichub",
+    "Try FicHub for works AO3 would not give us"
+   ],
+   [
+    "cleanup",
+    "Cleanup"
+   ],
+   [
+    "report",
+    "Report any failures"
+   ]
+  ]
+ },
+ {
+  "action": "import",
+  "filetypes": [
+   "JSON"
+  ],
+  "options": {
+   "replaceOutdated": true,
+   "skins": true,
+   "indexDatedSkins": true
+  },
+  "plan": [
+   [
+    "login",
+    "Log in to AO3"
+   ],
+   [
+    "index",
+    "Index the works found in your library"
+   ],
+   [
+    "check",
+    "Read your existing downloaded files"
+   ],
+   [
+    "download",
+    "Download the formats asked for"
+   ],
+   [
+    "skins",
+    "Fetch work skins for works dated from your FicFairy index"
    ],
    [
     "fichub",
@@ -4562,6 +4688,50 @@ export const GUEST_PLAN_CASES: { action: string; filetypes: string[]; options: R
    [
     "skins",
     "Fetch work skins for the HTML downloaded"
+   ],
+   [
+    "fichub",
+    "Try FicHub for works AO3 would not give us"
+   ],
+   [
+    "cleanup",
+    "Cleanup"
+   ],
+   [
+    "report",
+    "Report any failures"
+   ]
+  ]
+ },
+ {
+  "action": "import",
+  "filetypes": [
+   "HTML"
+  ],
+  "options": {
+   "skins": true,
+   "indexDatedSkins": true
+  },
+  "plan": [
+   [
+    "login",
+    "Log in to AO3"
+   ],
+   [
+    "index",
+    "Index the works found in your library"
+   ],
+   [
+    "check",
+    "Read your existing downloaded files"
+   ],
+   [
+    "download",
+    "Download the formats asked for"
+   ],
+   [
+    "skins",
+    "Fetch work skins for works dated from your FicFairy index"
    ],
    [
     "fichub",

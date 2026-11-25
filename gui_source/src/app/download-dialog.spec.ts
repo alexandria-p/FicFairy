@@ -107,6 +107,8 @@ class FakeJobs extends Jobs {
   pauseFails: string | null = null;
   /** job ids a debug skip was asked for */
   skipped: string[] = [];
+  failedAo3: string[] = [];
+  failAo3Fails = false;
   /** set by a test that needs a skip to be refused */
   skipFails = false;
   push: ((event: JobEvent) => void) | null = null;
@@ -159,6 +161,11 @@ class FakeJobs extends Jobs {
   override async skipStep(jobId: string): Promise<void> {
     if (this.skipFails) throw new Error('could not skip the current step');
     this.skipped.push(jobId);
+  }
+
+  override async failAo3ForStep(jobId: string): Promise<void> {
+    if (this.failAo3Fails) throw new Error('could not make AO3 fail for this step');
+    this.failedAo3.push(jobId);
   }
 
   override stream(_id: string, onEvent: (e: JobEvent) => void): () => void {
@@ -223,7 +230,7 @@ function currentStep(): string {
  * the file types and everything else asks them after, and several runs put an
  * acknowledgement in between. Counting clicks made every test quietly depend on which.
  */
-async function advanceTo(target: 'options' | 'more-options' | 'filetypes' | 'credentials' | 'running') {
+async function advanceTo(target: 'options' | 'more-options' | 'work-skins' | 'filetypes' | 'credentials' | 'running') {
   for (let guard = 0; guard < 8; guard++) {
     const at = currentStep();
     if (at === target || at === 'running') return;
@@ -3272,20 +3279,158 @@ describe('DownloadDialog', () => {
       expect(element.querySelector('input[name="username"]')).toBeNull();
     });
 
+    it('says what it will do on its options page, the repairs first, ahead of the background page', async () => {
+      TestBed.inject(HelperConnection).settings.set({ ...DEFAULT_PAGE_CONFIG, helperUrl: 'https://ao3-helper.example.com' });
+      await openImport({ ...IMPORT, repair: ['1 A.html'] });
+      expect(currentStep()).toBe('work-skins');
+      const lines = [...element.querySelectorAll('.import-summary li')].map((li) => li.textContent?.trim());
+      expect(lines[0]).toBe('Repair 1 file with no date from AO3, replacing it with the latest version');
+      expect(lines).toContain('Search 1 work for updates');
+      button('Continue')!.click();
+      await fixture.whenStable();
+      expect(currentStep()).toBe('background');
+      // said once, on the options page
+      expect(element.querySelector('.import-summary')).toBeNull();
+    });
+
+    it('asks its options, then its formats, then the background page, then the login - as every run does', async () => {
+      TestBed.inject(HelperConnection).settings.set({ ...DEFAULT_PAGE_CONFIG, helperUrl: 'https://ao3-helper.example.com' });
+      await openImport({ ...IMPORT, filetypes: ['JSON'], offered: ['HTML', 'EPUB', 'PDF'], held: ['HTML'] });
+      const next = async () => { button('Continue')!.click(); await fixture.whenStable(); };
+      expect(currentStep()).toBe('work-skins');
+      await next();
+      expect(currentStep()).toBe('import-formats');
+      const box = (format: string) => element.querySelector<HTMLInputElement>(`input[name="format-${format}"]`)!;
+      expect([...element.querySelectorAll('.import-formats input')].map((x) => x.getAttribute('name')))
+        .toEqual(['format-HTML', 'format-EPUB', 'format-PDF']);
+      // none ticked to begin with, and the formats some files are in already said so
+      expect(box('HTML').checked).toBe(false);
+      expect(box('HTML').closest('label')!.textContent).toContain('(some already have it)');
+      expect(box('EPUB').closest('label')!.textContent).not.toContain('(some already have it)');
+      box('EPUB').click();
+      await fixture.whenStable();
+      await next();
+      expect(currentStep()).toBe('background');
+      // back keeps what was ticked
+      button('Back')!.click();
+      await fixture.whenStable();
+      expect(currentStep()).toBe('import-formats');
+      expect(box('EPUB').checked).toBe(true);
+      button('Back')!.click();
+      await fixture.whenStable();
+      expect(currentStep()).toBe('work-skins');
+      await next();
+      await next();
+      await next();
+      expect(currentStep()).toBe('credentials');
+      checkbox('Skip AO3 login?')!.click();
+      await fixture.whenStable();
+      button('Start repair')!.click();
+      await fixture.whenStable();
+      expect(jobs.started[0].filetypes).toEqual(['JSON', 'EPUB']);
+    });
+
+    it('goes from its formats straight to the login on a copy with no background runs', async () => {
+      await openImport({ ...IMPORT, filetypes: ['JSON'], offered: ['HTML', 'EPUB'] });
+      button('Continue')!.click();
+      await fixture.whenStable();
+      expect(currentStep()).toBe('import-formats');
+      button('Continue')!.click();
+      await fixture.whenStable();
+      expect(currentStep()).toBe('credentials');
+      checkbox('Skip AO3 login?')!.click();
+      await fixture.whenStable();
+      button('Start repair')!.click();
+      await fixture.whenStable();
+      // nothing ticked: only the index, and copies held checked for a newer version
+      expect(jobs.started[0].filetypes).toEqual(['JSON']);
+    });
+
+    it('offers, under Fetch work skins, the skins of works dated from the FicFairy index, and sends them', async () => {
+      await openImport({ ...IMPORT, indexDated: ['7', '8'] });
+      const nested = () => element.querySelector<HTMLInputElement>('input[name="indexDatedSkins"]');
+      // only once Fetch work skins is ticked
+      expect(nested()).toBeNull();
+      element.querySelector<HTMLInputElement>('input[name="skins"]')!.click();
+      await fixture.whenStable();
+      expect(nested()!.checked).toBe(false);
+      expect(nested()!.closest('label')!.textContent!.replace(/\s+/g, ' ').trim()).toBe(
+        'Fetch skins for works that were dated using an existing FicFairy index? (This will be an extra call to AO3 per fic)');
+      nested()!.click();
+      await fixture.whenStable();
+      const lines = [...element.querySelectorAll('.import-summary li')].map((li) => li.textContent?.trim());
+      expect(lines).toContain('Fetch work skins for 2 works dated using an existing FicFairy index (an extra call to AO3 each)');
+      await advanceTo('credentials');
+      checkbox('Skip AO3 login?')!.click();
+      await fixture.whenStable();
+      button('Start repair')!.click();
+      await fixture.whenStable();
+      expect(jobs.started[0].options.skins).toBe(true);
+      expect(jobs.started[0].options.indexDatedSkins).toEqual(['7', '8']);
+    });
+
+    it('sends no index-dated skins when Fetch work skins is unticked, whatever was ticked under it', async () => {
+      await openImport({ ...IMPORT, indexDated: ['7'] });
+      const skins = element.querySelector<HTMLInputElement>('input[name="skins"]')!;
+      skins.click();
+      await fixture.whenStable();
+      element.querySelector<HTMLInputElement>('input[name="indexDatedSkins"]')!.click();
+      await fixture.whenStable();
+      skins.click();
+      await fixture.whenStable();
+      await advanceTo('credentials');
+      checkbox('Skip AO3 login?')!.click();
+      await fixture.whenStable();
+      button('Start repair')!.click();
+      await fixture.whenStable();
+      expect(jobs.started[0].options.indexDatedSkins).toEqual([]);
+    });
+
+    it('offers nothing about index-dated skins when there are none', async () => {
+      await openImport({ ...IMPORT, indexDated: [] });
+      element.querySelector<HTMLInputElement>('input[name="skins"]')!.click();
+      await fixture.whenStable();
+      expect(element.querySelector('input[name="indexDatedSkins"]')).toBeNull();
+    });
+
+    it('asks no formats when it only looks works up', async () => {
+      await openImport({ ...IMPORT, filetypes: ['JSON'], offered: ['HTML', 'EPUB'], scope: 'skip' });
+      expect(currentStep()).toBe('work-skins');
+      button('Continue')!.click();
+      await fixture.whenStable();
+      expect(currentStep()).toBe('credentials');
+    });
+
+    it('goes Back from its first page to the repair window, never closing', async () => {
+      await openImport();
+      let back = 0;
+      let closed = 0;
+      fixture.componentInstance.backToImport.subscribe(() => back++);
+      fixture.componentInstance.closed.subscribe(() => closed++);
+      expect(currentStep()).toBe('work-skins');
+      expect(button('Cancel')).toBeFalsy();
+      button('Back')!.click();
+      await fixture.whenStable();
+      expect(back).toBe(1);
+      expect(closed).toBe(0);
+    });
+
     it('asks whether to overwrite on the work skins page, only when the import updates works', async () => {
       await openImport();
       const box = () => element.querySelector<HTMLInputElement>('input[name="overwrite"]');
       expect(box()!.checked).toBe(false);
       expect(box()!.closest('label')!.textContent?.trim()).toBe('Overwrite existing downloads');
       expect(element.querySelector('.import-overwrite-hint')?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
-        'Check this if you are concerned about file integrity issues and would like to re-download each file again.');
+        'Allows you to overwrite existing files for any works being searched for updates. ' +
+        'Check this if you are concerned about file integrity and would like to re-download each file again. ' +
+        'Files with no date in the name are never overwritten.');
       // on the same page as Fetch work skins, above it
       const skins = element.querySelector('input[name="skins"]')!;
       expect(box()!.compareDocumentPosition(skins) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       box()!.click();
       await fixture.whenStable();
       const lines = [...element.querySelectorAll('.import-summary li')].map((li) => li.textContent?.trim());
-      expect(lines).toContain('Will re-download and overwrite existing files to repair them');
+      expect(lines).toContain('Will re-download and overwrite the existing files of the works being updated');
       await advanceTo('credentials');
       checkbox('Skip AO3 login?')!.click();
       await fixture.whenStable();
@@ -3308,6 +3453,29 @@ describe('DownloadDialog', () => {
       expect(note.textContent).toContain('This may take a long time, with ~21 requests to work through');
       expect(note.textContent).toContain('leave this window open');
       expect(note.compareDocumentPosition(element.querySelector('.import-summary')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('asks to be left open on its options page, and again on the background page', async () => {
+      TestBed.inject(HelperConnection).settings.set({ ...DEFAULT_PAGE_CONFIG, helperUrl: 'https://ao3-helper.example.com' });
+      await openImport({ ...IMPORT, files: 18 });
+      expect(currentStep()).toBe('work-skins');
+      expect(element.querySelector('.long-run-note')?.textContent).toContain('~21 requests to work through');
+      button('Continue')!.click();
+      await fixture.whenStable();
+      expect(currentStep()).toBe('background');
+      expect(element.querySelector('.long-run-note')).not.toBeNull();
+    });
+
+    it('counts the formats ticked in its request estimate', async () => {
+      // 2 lookups, 1 work updated: ~2 before a format is ticked, ~3 after
+      await openImport({ ...IMPORT, filetypes: ['JSON'], offered: ['HTML', 'EPUB'] });
+      const count = () => (fixture.componentInstance as unknown as { importRequestCount(): number }).importRequestCount();
+      const before = count();
+      button('Continue')!.click();
+      await fixture.whenStable();
+      element.querySelector<HTMLInputElement>('input[name="format-EPUB"]')!.click();
+      await fixture.whenStable();
+      expect(count()).toBe(before + 1);
     });
 
     it('offers to skip the login below the username and password', async () => {
@@ -3368,13 +3536,23 @@ describe('DownloadDialog', () => {
       expect(sent.options.overwrite).toBe(false);
     });
 
+    it("keeps Resolve issues' overwrite hint to Resolve issues - a full scan's box has its own", async () => {
+      await openImport({ ...IMPORT, repair: ['1 Fic 1 - Someone.html'] });
+      expect(element.querySelector('.import-overwrite-hint')).not.toBeNull();
+      await open('bookmarks');
+      await advanceTo('options');
+      expect(element.querySelector('input[name="overwrite"]')).not.toBeNull();
+      expect(element.querySelector('.import-overwrite-hint')).toBeNull();
+      expect(element.textContent).not.toContain('searched for updates');
+    });
+
     it('says it will re-download and overwrite existing files when told to overwrite', async () => {
       await openImport({ ...IMPORT, overwrite: true });
       const lines = [...element.querySelectorAll('.import-summary li')].map((li) => li.textContent?.trim());
       expect(lines).toEqual([
         'Look-up 2 works with missing index',
         'Search 1 work for updates',
-        'Will re-download and overwrite existing files to repair them',
+        'Will re-download and overwrite the existing files of the works being updated',
       ]);
     });
 
@@ -3398,7 +3576,8 @@ describe('DownloadDialog', () => {
       expect(box.checked).toBe(false);
       expect(box.disabled).toBe(false);
       expect(element.querySelector('.skins-hint')).toBeNull();
-      expect(button('Cancel')).toBeTruthy();
+      // the first page goes Back to the repair window, not Cancel
+      expect(button('Back')).toBeTruthy();
 
       box.click();
       await fixture.whenStable();
@@ -3460,10 +3639,11 @@ describe('DownloadDialog', () => {
       await openImport({ ...IMPORT, filetypes: ['JSON'], replaceOutdated: false, scope: 'skip',
                          repair: ['1 A.html', '2 B.pdf'], repairFicHub: true, repairFicHubUndated: false });
       const lines = [...element.querySelectorAll('.import-summary li')].map((li) => li.textContent?.trim());
+      // the repairs first
       expect(lines).toEqual([
-        'Look-up 2 works with missing index',
         'Repair 2 files with no date from AO3, replacing each with the latest version',
         "Where AO3 can't, overwrite with FicHub's copy - only when the date guessed from the file's name is the same or older",
+        'Look-up 2 works with missing index',
       ]);
       await advanceTo('running');
       expect(jobs.started[0].options.repair).toEqual(['1 A.html', '2 B.pdf']);
@@ -3861,6 +4041,7 @@ describe('DownloadDialog', () => {
     const panel = element.querySelector('.settings.debug');
     expect(panel).toBeTruthy();
     expect(button('Skip this step')).toBeTruthy();
+    expect(button('Make AO3 fail for this step')).toBeTruthy();
     expect(button('Show a made-up report')).toBeTruthy();
   });
 
@@ -3882,6 +4063,26 @@ describe('DownloadDialog', () => {
     await fixture.whenStable();
 
     expect(element.querySelector('.log')?.textContent).toContain('could not skip');
+  });
+
+  it('asks the helper to make AO3 fail for the step in progress, and says so', async () => {
+    await runningWithDebug(true);
+
+    button('Make AO3 fail for this step')!.click();
+    await fixture.whenStable();
+
+    expect(jobs.failedAo3).toEqual(['job-1']);
+    expect(element.querySelector('.log')?.textContent).toContain('AO3 made to fail until this step ends');
+  });
+
+  it('says so when AO3 cannot be made to fail, rather than pretending it was', async () => {
+    jobs.failAo3Fails = true;
+    await runningWithDebug(true);
+
+    button('Make AO3 fail for this step')!.click();
+    await fixture.whenStable();
+
+    expect(element.querySelector('.log')?.textContent).toContain('could not make AO3 fail');
   });
 
   it('fills both report lists with one of every kind, and says they are made up', async () => {

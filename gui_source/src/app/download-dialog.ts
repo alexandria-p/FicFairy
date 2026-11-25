@@ -89,8 +89,10 @@ type Step =
   | 'retry-how'
   /** whether to run it in the background, and its answers up front - a hosted copy only */
   | 'background'
-  /** Resolve issues: whether to save each work's skin as it is read */
+  /** Resolve issues: whether to save each work's skin as it is read, and whether to overwrite */
   | 'work-skins'
+  /** Resolve issues: the formats to fetch for the works updated that have none - after its options */
+  | 'import-formats'
   | 'acknowledge'
   | 'credentials'
   | 'running'
@@ -220,8 +222,27 @@ export class DownloadDialog implements OnDestroy {
   /** roughly how many requests an import makes - over `LONG_IMPORT_REQUESTS` it says to leave the window open */
   protected readonly importRequestCount = computed(() => {
     const importing = this.importing();
-    return importing ? importRequests({ ...importing, overwrite: this.importOverwrite() }) : 0;
+    return importing
+      ? importRequests({ ...importing, filetypes: this.chosenFiletypes(), overwrite: this.importOverwrite() }) +
+        this.indexDatedSkins().length
+      : 0;
   });
+  /**
+   * Resolve issues' formats page (`import-formats`), after its options as every run's file types
+   * are: only for a repair that updates works. None ticked to begin with - a ticked format is
+   * fetched for a work with no copy in it; copies already held are checked for a newer version
+   * whatever is ticked.
+   */
+  protected readonly picksImportFormats = computed(() =>
+    this.action() === 'import' && !this.resuming() && this.importUpdated() > 0 &&
+    (this.importing()?.offered?.length ?? 0) > 0);
+  protected readonly importPicked = signal<string[]>([]);
+  protected readonly importOffered = computed(() => this.importing()?.offered ?? []);
+  protected readonly importHeld = computed(() => new Set(this.importing()?.held ?? []));
+  protected toggleImportFormat(format: string, on: boolean): void {
+    const offered = this.importOffered();
+    this.importPicked.update((picked) => offered.filter((f) => (f === format ? on : picked.includes(f))));
+  }
   /** how many works an import searches for updates - those not only looked up */
   protected readonly importUpdated = computed(() => {
     const importing = this.importing();
@@ -268,6 +289,10 @@ export class DownloadDialog implements OnDestroy {
    * issues on what it finds.
    */
   readonly resolveIssues = output<void>();
+  /** Back from a Resolve issues run's first page: to the repair window, as it was left */
+  readonly backToImport = output<void>();
+  /** the helper took the run: a Resolve issues run's repair window is not coming back */
+  readonly started = output<void>();
 
   protected readonly step = signal<Step>('preparing');
   protected readonly config = this.jobs.config;
@@ -831,18 +856,7 @@ export class DownloadDialog implements OnDestroy {
     const importing = this.importing();
     if (!importing) return [];
     const lines: string[] = [];
-    const lookups = importing.lookups ?? 0;
-    if (lookups) lines.push(`Look-up ${lookups.toLocaleString()} ${lookups === 1 ? 'work' : 'works'} with missing index`);
-    // the works updated are those not only looked up; the formats are not said, at the owner's request
-    const updated = this.importUpdated();
-    if (updated) lines.push(`Search ${updated.toLocaleString()} ${updated === 1 ? 'work' : 'works'} for updates`);
-    if (updated && this.importOverwrite()) {
-      lines.push('Will re-download and overwrite existing files to repair them');
-    }
-    // every work the import reads gives its skin for nothing - saved as css, never into the html
-    if (this.picksImportSkins() && this.importSkins()) {
-      lines.push('Fetch and save work skins from AO3, where possible');
-    }
+    // the repairs first, at the owner's request - they are what the reader came here for
     const repairs = importing.repair?.length ?? 0;
     if (repairs) {
       const files = `${repairs.toLocaleString()} ${repairs === 1 ? 'file' : 'files'} with no date`;
@@ -859,6 +873,24 @@ export class DownloadDialog implements OnDestroy {
         lines.push(importing.repairFicHub
           ? `Where AO3 can't, overwrite with FicHub's copy - ${which}`
           : `Where AO3 can't, name the file with FicHub's date - ${which}`);
+      }
+    }
+    const lookups = importing.lookups ?? 0;
+    if (lookups) lines.push(`Look-up ${lookups.toLocaleString()} ${lookups === 1 ? 'work' : 'works'} with missing index`);
+    // the works updated are those not only looked up; the formats are not said, at the owner's request
+    const updated = this.importUpdated();
+    if (updated) lines.push(`Search ${updated.toLocaleString()} ${updated === 1 ? 'work' : 'works'} for updates`);
+    if (updated && this.importOverwrite()) {
+      // only the works updated - the files chosen to repair go by the repair page, said above
+      lines.push('Will re-download and overwrite the existing files of the works being updated');
+    }
+    // every work the import reads gives its skin for nothing - saved as css, never into the html
+    if (this.picksImportSkins() && this.importSkins()) {
+      lines.push('Fetch and save work skins from AO3, where possible');
+      const dated = this.indexDatedSkins().length;
+      if (dated) {
+        lines.push(`Fetch work skins for ${dated.toLocaleString()} ${dated === 1 ? 'work' : 'works'} dated using an ` +
+          'existing FicFairy index (an extra call to AO3 each)');
       }
     }
     return lines;
@@ -970,6 +1002,16 @@ export class DownloadDialog implements OnDestroy {
   protected readonly picksImportSkins = computed(() =>
     this.action() === 'import' && !this.resuming() && (this.importing()?.count ?? 0) > 0);
   protected readonly importSkins = signal(false);
+  /**
+   * Nested under *Fetch work skins*: the works the repair window dated from their FicFairy index
+   * that the run does not otherwise read (`ImportRequest.indexDated`) - their skins fetched too,
+   * one request to AO3 each, in the run's skins step. Unticked to begin with.
+   */
+  protected readonly importIndexDated = computed(() => this.importing()?.indexDated ?? []);
+  protected readonly importIndexSkins = signal(false);
+  /** the index-dated works whose skins the run fetches - none unless both boxes are ticked */
+  protected readonly indexDatedSkins = computed(() =>
+    this.picksImportSkins() && this.importSkins() && this.importIndexSkins() ? this.importIndexDated() : []);
 
   /**
    * Which runs may fetch a work again that nothing says is out of date.
@@ -1121,6 +1163,11 @@ export class DownloadDialog implements OnDestroy {
   );
 
   protected readonly firstStep = computed<Step>(() => {
+    // Resolve issues: its options, then its formats, then the background page and the login
+    if (this.action() === 'import' && this.importing() && !this.resuming()) {
+      if (this.picksImportSkins()) return 'work-skins';
+      return this.picksImportFormats() ? 'import-formats' : this.loginStep();
+    }
     if (this.needsLink()) return 'link';
     if (this.hasOptions()) return 'options';
     return this.picksFiletypes() ? 'filetypes' : this.loginStep();
@@ -1352,6 +1399,8 @@ export class DownloadDialog implements OnDestroy {
   protected readonly debugTools = computed(() => this.debugMode.on());
   /** set once a skip has been asked for, so it cannot be sent twice by accident */
   protected readonly skipping = signal(false);
+  /** a Make AO3 fail for this step asked for and not yet answered */
+  protected readonly failingAo3 = signal(false);
 
   // region running in the background
 
@@ -1833,7 +1882,10 @@ export class DownloadDialog implements OnDestroy {
     // fetching work skins saves no format, the index included
     if (this.skinsOnly()) return [];
     const importing = this.importing();
-    if (this.action() === 'import' && importing) return importing.filetypes;
+    if (this.action() === 'import' && importing) {
+      if (!this.picksImportFormats()) return importing.filetypes;
+      return [...importing.filetypes, ...this.importPicked().filter((f) => !importing.filetypes.includes(f))];
+    }
     // collections on their own are only ever indexed
     if (!this.picksFiletypes()) return [METADATA];
     if (!this.picksReindex()) return this.selected();
@@ -2013,9 +2065,11 @@ export class DownloadDialog implements OnDestroy {
     if (this.picksFloorRun()) earlier.push('floor');
     if (this.resuming()) earlier.push('resume', 'retry-how');
     if (this.picksFiletypes()) earlier.push('filetypes');
+    // Resolve issues' options and formats, before the background page as every run's are
+    if (this.picksImportSkins()) earlier.push('work-skins');
+    if (this.picksImportFormats()) earlier.push('import-formats');
     if (this.needsAcknowledgement()) earlier.push('acknowledge');
     if (this.offersBackground()) earlier.push('background');
-    if (this.picksImportSkins()) earlier.push('work-skins');
     earlier.push('credentials');
 
     const at = earlier.indexOf(step);
@@ -2033,12 +2087,17 @@ export class DownloadDialog implements OnDestroy {
       this.step.set(previous);
       return;
     }
+    // a Resolve issues run's first page goes back to the repair window, its choices kept
+    if (this.action() === 'import' && this.importing()) {
+      this.backToImport.emit();
+      return;
+    }
     this.close();
   }
 
   /** whether stepping back from here goes anywhere other than out of the dialog */
   protected hasStepBefore(step: Step): boolean {
-    return this.stepBefore(step) !== null;
+    return this.stepBefore(step) !== null || (this.action() === 'import' && !!this.importing());
   }
 
   /**
@@ -2049,9 +2108,19 @@ export class DownloadDialog implements OnDestroy {
     return this.offersBackground() ? 'background' : this.afterBackground();
   }
 
-  /** after the background page: Resolve issues' work skins page where it is offered, then the login */
+  /** after the background page: the login */
   protected afterBackground(): Step {
-    return this.picksImportSkins() ? 'work-skins' : 'credentials';
+    return 'credentials';
+  }
+
+  /** after Resolve issues' options page: its formats, where it has them, then the background page or login */
+  protected afterImportSkins(): Step {
+    return this.picksImportFormats() ? 'import-formats' : this.loginStep();
+  }
+
+  /** after Resolve issues' formats page: the background page, or the login */
+  protected afterImportFormats(): Step {
+    return this.loginStep();
   }
 
   protected toCredentials(): void {
@@ -2287,6 +2356,7 @@ export class DownloadDialog implements OnDestroy {
 
     this.jobId = jobId;
     this.runId.set(jobId);
+    this.started.emit();
     void this.jobs.refreshActiveRuns();
     // the run reads and writes through this library for as long as it lasts, even if the
     // page is switched to another one meanwhile - a run half in each would be no use
@@ -2360,6 +2430,8 @@ export class DownloadDialog implements OnDestroy {
         // an import's from its own page (`work-skins`), with no HTML needed
         skins: this.action() === 'import' ? this.picksImportSkins() && this.importSkins()
           : this.picksSkins() && this.skins() && !this.skinsHeld(),
+        // Resolve issues' works dated from their FicFairy index, their skins fetched too
+        ...(this.action() === 'import' ? { indexDatedSkins: this.indexDatedSkins() } : {}),
         workdates: this.workdates(),
         // only offered on the runs that can be pointed at a known set of works
         // an import's from the work-skins page's *Overwrite existing downloads*, when it updates works
@@ -2656,6 +2728,23 @@ export class DownloadDialog implements OnDestroy {
       this.append('debug: could not skip the current step');
     }
     this.skipping.set(false);
+  }
+
+  /**
+   * Debug only: make every request to AO3 fail until the step the run is on ends, as if AO3
+   * were down - so what it was fetching fails and is offered to FicHub at the end. The next
+   * step asks AO3 as usual.
+   */
+  protected async failAo3ForStep(): Promise<void> {
+    if (!this.jobId || this.failingAo3()) return;
+    this.failingAo3.set(true);
+    try {
+      await this.jobs.failAo3ForStep(this.jobId);
+      this.append('debug: AO3 made to fail until this step ends');
+    } catch {
+      this.append('debug: could not make AO3 fail - no step is in progress');
+    }
+    this.failingAo3.set(false);
   }
 
   /**

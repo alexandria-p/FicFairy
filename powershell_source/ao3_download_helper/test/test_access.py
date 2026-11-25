@@ -281,7 +281,7 @@ EVERY_PATH = [
     '/api/jobs/x/record', '/api/jobs/x/blobs/y', '/api/runs', '/api/runs/floors',
     '/api/runs/retryable', '/api/update', '/api/file-names', '/api/jobs/x/answer',
     '/api/jobs/x/cancel', '/api/jobs/x/force-stop', '/api/jobs/x/pause', '/api/jobs/x/resume',
-    '/api/jobs/x/skip', '/', '/no/such/path',
+    '/api/jobs/x/skip', '/api/jobs/x/fail-ao3', '/', '/no/such/path',
 ]
 
 
