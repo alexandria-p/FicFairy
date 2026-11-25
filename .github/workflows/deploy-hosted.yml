@@ -311,8 +311,8 @@ jobs:
     # request) and "Get it here", linked to the latest release - posted once every app zip is on
     # the release, so the link has something to download. a note too long was refused by the
     # tests long before this; a note the last release already posted gives way to a generic one.
-    # skipped, with a notice, until the bluesky secrets are set, and for a release whose note is
-    # only no-post (announce.SKIP_NOTE). X is never posted to from here:
+    # skipped, with a notice, until the bluesky secrets are set, and for a release whose note
+    # starts with a no-post line (announce.SKIP_NOTE). X is never posted to from here:
     # its owner posts by hand, from the link shown when the merge was approved. nothing waits on
     # this, so a post that fails holds up nothing. re-running this job posts again
     needs: [version, windows, mac, linux]

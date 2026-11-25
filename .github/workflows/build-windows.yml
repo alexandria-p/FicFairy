@@ -254,7 +254,7 @@ jobs:
         run: |
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             # how to install it on each system, then this release's note as Bluesky gets it
-            # (none for a no-post release) - written by announce.py, the same from every build
+            # (no-post: only what follows that line) - written by announce.py, the same from every build
             (cd powershell_source/ao3_download_helper \
               && uv run --no-sync python announce.py release-notes --version "$VERSION" --out "$RUNNER_TEMP/release-notes.md")
             gh release create "$TAG" \

@@ -20,8 +20,10 @@ test runs it on the committed note, so one too long cannot be merged. A release 
 same as the release before it - a push straight to main that did not write one - says
 `FALLBACK_NOTE` instead on Bluesky, rather than announcing the last change twice.
 
-**A release can go out unannounced**: a pull request whose release note is `SKIP_NOTE`
-(`no-post`) and nothing else is not posted to Bluesky, and `preview` offers no X link for it.
+**A release can go out unannounced**: a pull request whose release note starts with a
+`SKIP_NOTE` (`no-post`) line is not posted to Bluesky, and `preview` offers no X link for it.
+Whatever follows that line is still the release page's "What's new" (`release_text`); `no-post`
+alone leaves the release page with no "What's new".
 
     python announce.py check                      # does the committed note fit?
     python announce.py preview [--version 1.2.3]  # both posts, and the link to post on X
@@ -31,7 +33,7 @@ same as the release before it - a push straight to main that did not write one -
 **The GitHub release's description** (`release_body`) opens with the note Bluesky was given,
 under a "What's new" heading and a line, then how to install the app on each system, under an
 "Installation instructions" heading of the same size. A release that is not announced
-(`SKIP_NOTE`) has no "What's new". The three app builds
+(`SKIP_NOTE`) shows only what follows its `no-post` line - none, no "What's new". The three app builds
 write it with `release-notes`, whichever of them makes the release first.
 """
 
@@ -49,7 +51,8 @@ ROOT = Path(__file__).resolve().parents[2]
 NOTE_FILE = ROOT / '.github' / 'release-note.txt'
 RELEASE_LINK = 'https://github.com/alexandria-p/FicFairy/releases/latest'
 FALLBACK_NOTE = 'Small fixes and improvements.'
-# a release note that is only this posts nothing: the release goes out unannounced
+# a release note whose first line is only this posts nothing: the release goes out unannounced,
+# and what follows the line is for the release page alone
 SKIP_NOTE = 'no-post'
 # what Bluesky shows, linked to RELEASE_LINK: there a link's text counts in full, so the words
 # stand in for the address
@@ -95,19 +98,34 @@ def read_note(path: Path = NOTE_FILE) -> str:
 
 
 def skipped(note: str) -> bool:
-    """Whether this release is not to be announced at all (its note is `SKIP_NOTE`)."""
+    """Whether this release is not to be announced at all (its note's first line is `SKIP_NOTE`)."""
 
-    return note.strip().lower() == SKIP_NOTE
+    lines = note.strip().splitlines()
+    return bool(lines) and lines[0].strip().lower() == SKIP_NOTE
 
 
-def note_for(note: str, previous: str) -> str:
-    """The note to post: the committed one, unless it is the last release's again (or empty).
-    `SKIP_NOTE` is kept whatever the last release said, so it is never posted as the fallback."""
+def release_text(note: str) -> str:
+    """What the release page's "What's new" says: the note, less a `SKIP_NOTE` first line -
+    so a release not announced can still say what changed there, and never says `no-post`."""
 
     note = note.strip()
     if skipped(note):
+        return note.split('\n', 1)[1].strip() if '\n' in note else ''
+    return note
+
+
+def note_for(note: str, previous: str) -> str:
+    """The note to use: the committed one, unless it says what the last release's did (or is
+    empty). A `SKIP_NOTE` first line is kept whatever the last release said, so the release is
+    never posted as the fallback; only what follows it gives way to `FALLBACK_NOTE`."""
+
+    note = note.strip()
+    text, before = release_text(note), release_text(previous)
+    if skipped(note):
+        if text and text == before:
+            return f'{SKIP_NOTE}\n{FALLBACK_NOTE}'
         return note
-    return note if note and note != previous.strip() else FALLBACK_NOTE
+    return note if note and text != before else FALLBACK_NOTE
 
 
 def _x_weight(char: str) -> int:
@@ -195,13 +213,15 @@ If you are stuck, a README inside each zip has more details.'''
 def release_body(note: str) -> str:
     """The GitHub release's description: the note Bluesky is given (as `note_for` chose it)
     under a "What's new" heading, a line under it, then `INSTALL_NOTES` under an "Installation
-    instructions" heading of the same size - or only the instructions for a release not
-    announced."""
+    instructions" heading of the same size. A release not announced shows what follows its
+    `SKIP_NOTE` line (`release_text`) - never the line itself - or, with nothing after it, only
+    the instructions."""
 
     install = f"{INSTALL_HEADING}\n\n{INSTALL_NOTES}\n"
-    if skipped(note) or not note.strip():
+    text = release_text(note)
+    if not text:
         return install
-    return f"{NEW_HEADING}\n\n{note.strip()}\n\n---\n\n{install}"
+    return f"{NEW_HEADING}\n\n{text}\n\n---\n\n{install}"
 
 
 def previous_note(version: str, root: Path = ROOT) -> str:
@@ -269,7 +289,7 @@ def announce(version: str, note: str, environ, session) -> bool:
     """Post to Bluesky, when its secrets are set. True when nothing that was tried failed."""
 
     if skipped(note):
-        print(f'::notice::not posted to Bluesky - the release note is "{SKIP_NOTE}"')
+        print(f'::notice::not posted to Bluesky - the release note starts with "{SKIP_NOTE}"')
         return True
     found = problems(version, note)
     if found:
@@ -315,8 +335,11 @@ def preview_text(version: str, note: str) -> str:
     posts X's - shown before a merge."""
 
     if skipped(note):
-        return (f'No posts for this release: the release note is "{SKIP_NOTE}".\n'
-                'Bluesky will not be posted to, and there is no link to post on X.')
+        text = release_text(note)
+        page = (f"The release page's \"What's new\" will say:\n{text}" if text
+                else "The release page will have no \"What's new\".")
+        return (f'No posts for this release: the release note starts with "{SKIP_NOTE}".\n'
+                'Bluesky will not be posted to, and there is no link to post on X.\n' + page)
     on_x, on_bluesky = compose_x(version, note), compose_bluesky(version, note)
     lines = [f'X ({x_length(on_x)} of {X_LIMIT}) - posted by you, from the link below:', on_x, '',
              f'Bluesky ({bluesky_length(on_bluesky)} of {BLUESKY_LIMIT}, "{LINK_LABEL}" links to {RELEASE_LINK})'

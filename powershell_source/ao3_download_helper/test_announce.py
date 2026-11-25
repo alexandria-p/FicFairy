@@ -161,6 +161,35 @@ def test_no_post_passes_the_check_and_the_preview_offers_no_x_link():
     assert announce.X_INTENT_URL not in shown
 
 
+def test_a_note_starting_with_a_no_post_line_is_not_posted_anywhere(capsys):
+    note = 'no-post\nImprovements to the Resolve issues window.\n'
+    sites = Sites()
+    assert announce.announce('1.2.3', announce.note_for(note, ''), BLUESKY_SECRETS, sites)
+    assert sites.calls == []
+    assert announce.problems(announce.LONGEST_VERSION, note) == []
+    shown = announce.preview_text('1.2.3', note)
+    assert 'No posts for this release' in shown
+    assert announce.X_INTENT_URL not in shown
+    assert 'Improvements to the Resolve issues window.' in shown
+
+
+def test_what_follows_a_no_post_line_is_the_release_pages_whats_new_without_the_line():
+    for note in ('no-post\nImprovements to the Resolve issues window.', 'No-Post\n\nImprovements to the Resolve issues window.\n'):
+        body = announce.release_body(announce.note_for(note, ''))
+        assert body.startswith("## What's new\n\nImprovements to the Resolve issues window.\n")
+        assert 'no-post' not in body.lower()
+
+
+def test_a_no_post_note_the_last_release_already_had_gives_way_to_the_fallback_unposted():
+    note = 'no-post\nImprovements to the Resolve issues window.'
+    chosen = announce.note_for(note, note)
+    assert announce.skipped(chosen)
+    assert announce.release_text(chosen) == announce.FALLBACK_NOTE
+    sites = Sites()
+    assert announce.announce('1.2.3', chosen, BLUESKY_SECRETS, sites)
+    assert sites.calls == []
+
+
 def test_a_note_that_only_mentions_no_post_is_still_posted():
     sites = Sites()
     assert announce.announce('1.2.3', 'Releases can now be marked no-post.', BLUESKY_SECRETS, sites)
