@@ -177,6 +177,8 @@ export interface JobOptions {
   skinScope?: SkinScope;
   /** fetching skins only: the works picked, by number; none is every work with html */
   skinWorks?: string[];
+  /** Resolve issues: works dated from their FicFairy index whose skins are fetched too, by number */
+  indexDatedSkins?: string[];
   /**
    * Whether to cover a date window instead of a slice of the listing.
    *

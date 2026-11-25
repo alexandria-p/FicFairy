@@ -1335,6 +1335,42 @@ describe('ImportDialog', () => {
       expect(closed.length).toBe(1);
     });
 
+    async function toIndexRound(update: 'skip' | 'fetch') {
+      indexed();
+      await open(ALL_DATED, false, INDEXED_UNDATED);
+      await click('Continue');
+      await click('Repair remaining from AO3');
+      await click('Continue');
+      indexFirst().click();
+      await fixture.whenStable();
+      await click('Continue');
+      if (step() === 'index') await click('Continue');
+      expect(step()).toBe('formats');
+      if (update === 'skip') {
+        element.querySelector<HTMLInputElement>('input[name="updateFetch"][value="skip"]')!.click();
+        await fixture.whenStable();
+      }
+      primary().click();
+      await settle();
+      expect(step()).toBe('dating');
+      primary().click();
+      await settle();
+    }
+
+    it('hands the run window the works it dated from the index that the run does not read', async () => {
+      // work 7 is dated from its index and nothing else takes it in; work 1 is looked up
+      await toIndexRound('skip');
+      expect(started.length).toBe(1);
+      expect(started[0].request.indexDated).toEqual(['7']);
+    });
+
+    it('leaves out a work dated from the index that the run takes in anyway', async () => {
+      // updating the works with date issues takes work 7 in: its skin comes with its page
+      await toIndexRound('fetch');
+      expect(started[0].request.links).toContain('/works/7');
+      expect(started[0].request.indexDated).toEqual([]);
+    });
+
     it('never renames over another file, and lists the clash', async () => {
       indexed();
       await open([], false, INDEXED_UNDATED);
@@ -2021,6 +2057,7 @@ describe('ImportDialog', () => {
       repairFicHubRename: false,
       repairFicHubCheck: true,
       repairRenameOnly: false,
+      indexDated: [],
     });
   });
 

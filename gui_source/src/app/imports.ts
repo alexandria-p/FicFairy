@@ -654,6 +654,9 @@ export interface ImportRequest {
   repairFicHubCheck?: boolean;
   /** where AO3 has the work, the file is only named with AO3's date - nothing downloaded */
   repairRenameOnly?: boolean;
+  /** works whose files were dated from their FicFairy index and that the run does not otherwise
+   *  read - the run window offers to fetch their skins too, a request each */
+  indexDated?: string[];
 }
 
 /**

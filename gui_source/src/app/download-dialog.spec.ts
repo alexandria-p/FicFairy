@@ -3346,6 +3346,53 @@ describe('DownloadDialog', () => {
       expect(jobs.started[0].filetypes).toEqual(['JSON']);
     });
 
+    it('offers, under Fetch work skins, the skins of works dated from the FicFairy index, and sends them', async () => {
+      await openImport({ ...IMPORT, indexDated: ['7', '8'] });
+      const nested = () => element.querySelector<HTMLInputElement>('input[name="indexDatedSkins"]');
+      // only once Fetch work skins is ticked
+      expect(nested()).toBeNull();
+      element.querySelector<HTMLInputElement>('input[name="skins"]')!.click();
+      await fixture.whenStable();
+      expect(nested()!.checked).toBe(false);
+      expect(nested()!.closest('label')!.textContent!.replace(/\s+/g, ' ').trim()).toBe(
+        'Fetch skins for works that were dated using an existing FicFairy index? (This will be an extra call to AO3 per fic)');
+      nested()!.click();
+      await fixture.whenStable();
+      const lines = [...element.querySelectorAll('.import-summary li')].map((li) => li.textContent?.trim());
+      expect(lines).toContain('Fetch work skins for 2 works dated using an existing FicFairy index (an extra call to AO3 each)');
+      await advanceTo('credentials');
+      checkbox('Skip AO3 login?')!.click();
+      await fixture.whenStable();
+      button('Start repair')!.click();
+      await fixture.whenStable();
+      expect(jobs.started[0].options.skins).toBe(true);
+      expect(jobs.started[0].options.indexDatedSkins).toEqual(['7', '8']);
+    });
+
+    it('sends no index-dated skins when Fetch work skins is unticked, whatever was ticked under it', async () => {
+      await openImport({ ...IMPORT, indexDated: ['7'] });
+      const skins = element.querySelector<HTMLInputElement>('input[name="skins"]')!;
+      skins.click();
+      await fixture.whenStable();
+      element.querySelector<HTMLInputElement>('input[name="indexDatedSkins"]')!.click();
+      await fixture.whenStable();
+      skins.click();
+      await fixture.whenStable();
+      await advanceTo('credentials');
+      checkbox('Skip AO3 login?')!.click();
+      await fixture.whenStable();
+      button('Start repair')!.click();
+      await fixture.whenStable();
+      expect(jobs.started[0].options.indexDatedSkins).toEqual([]);
+    });
+
+    it('offers nothing about index-dated skins when there are none', async () => {
+      await openImport({ ...IMPORT, indexDated: [] });
+      element.querySelector<HTMLInputElement>('input[name="skins"]')!.click();
+      await fixture.whenStable();
+      expect(element.querySelector('input[name="indexDatedSkins"]')).toBeNull();
+    });
+
     it('asks no formats when it only looks works up', async () => {
       await openImport({ ...IMPORT, filetypes: ['JSON'], offered: ['HTML', 'EPUB'], scope: 'skip' });
       expect(currentStep()).toBe('work-skins');

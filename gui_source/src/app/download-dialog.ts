@@ -223,7 +223,8 @@ export class DownloadDialog implements OnDestroy {
   protected readonly importRequestCount = computed(() => {
     const importing = this.importing();
     return importing
-      ? importRequests({ ...importing, filetypes: this.chosenFiletypes(), overwrite: this.importOverwrite() })
+      ? importRequests({ ...importing, filetypes: this.chosenFiletypes(), overwrite: this.importOverwrite() }) +
+        this.indexDatedSkins().length
       : 0;
   });
   /**
@@ -886,6 +887,11 @@ export class DownloadDialog implements OnDestroy {
     // every work the import reads gives its skin for nothing - saved as css, never into the html
     if (this.picksImportSkins() && this.importSkins()) {
       lines.push('Fetch and save work skins from AO3, where possible');
+      const dated = this.indexDatedSkins().length;
+      if (dated) {
+        lines.push(`Fetch work skins for ${dated.toLocaleString()} ${dated === 1 ? 'work' : 'works'} dated using an ` +
+          'existing FicFairy index (an extra call to AO3 each)');
+      }
     }
     return lines;
   });
@@ -996,6 +1002,16 @@ export class DownloadDialog implements OnDestroy {
   protected readonly picksImportSkins = computed(() =>
     this.action() === 'import' && !this.resuming() && (this.importing()?.count ?? 0) > 0);
   protected readonly importSkins = signal(false);
+  /**
+   * Nested under *Fetch work skins*: the works the repair window dated from their FicFairy index
+   * that the run does not otherwise read (`ImportRequest.indexDated`) - their skins fetched too,
+   * one request to AO3 each, in the run's skins step. Unticked to begin with.
+   */
+  protected readonly importIndexDated = computed(() => this.importing()?.indexDated ?? []);
+  protected readonly importIndexSkins = signal(false);
+  /** the index-dated works whose skins the run fetches - none unless both boxes are ticked */
+  protected readonly indexDatedSkins = computed(() =>
+    this.picksImportSkins() && this.importSkins() && this.importIndexSkins() ? this.importIndexDated() : []);
 
   /**
    * Which runs may fetch a work again that nothing says is out of date.
@@ -2414,6 +2430,8 @@ export class DownloadDialog implements OnDestroy {
         // an import's from its own page (`work-skins`), with no HTML needed
         skins: this.action() === 'import' ? this.picksImportSkins() && this.importSkins()
           : this.picksSkins() && this.skins() && !this.skinsHeld(),
+        // Resolve issues' works dated from their FicFairy index, their skins fetched too
+        ...(this.action() === 'import' ? { indexDatedSkins: this.indexDatedSkins() } : {}),
         workdates: this.workdates(),
         // only offered on the runs that can be pointed at a known set of works
         // an import's from the work-skins page's *Overwrite existing downloads*, when it updates works

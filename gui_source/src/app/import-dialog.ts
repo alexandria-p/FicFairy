@@ -1433,6 +1433,8 @@ export class ImportDialog implements OnInit {
   protected readonly round = signal<DatingResult | null>(null);
   /** the repairs from the FicFairy index have been renamed (or tried), so `finish` goes on */
   private readonly indexRepaired = signal(false);
+  /** the works whose files the index round renamed with a date - offered their skins in the run window */
+  private readonly indexDatedIds = signal<string[]>([]);
 
   /** rename these files with their dates, on the dating page; the cross stops it after the one in hand */
   private async renameWithDates(chosen: FoundFile[], which: 'dates' | 'index'): Promise<void> {
@@ -1466,6 +1468,10 @@ export class ImportDialog implements OnInit {
       () => this.stopDating,
       result,
     );
+    if (which === 'index') {
+      const renamed = new Set(result.renamed.map((r) => r.from));
+      this.indexDatedIds.set([...new Set(chosen.filter((f) => renamed.has(f.path)).map((f) => f.id))]);
+    }
     // a renamed file keeps its place on the exclusion lists - on the index list above all, where
     // a name no longer recorded would ask about its work again - written at once, not on close
     if (result.renamed.length) {
@@ -1593,6 +1599,8 @@ export class ImportDialog implements OnInit {
         // FicHub keeps to the date guessed from each name: a name that looks newer is left alone
         repairFicHubCheck: true,
         repairRenameOnly: this.runRepairs().length > 0 && this.repairAo3() === 'rename',
+        // dated from the FicFairy index and not otherwise in the run: their skins can be asked for
+        indexDated: this.indexDatedIds().filter((id) => !taken.has(id)),
       },
       dated: this.dated(),
     });

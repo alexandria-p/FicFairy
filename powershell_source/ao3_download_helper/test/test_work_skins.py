@@ -798,6 +798,44 @@ def test_every_work_an_import_looks_up_has_its_skin_saved_for_free(tmp_path):
     assert ao3.skins_pending == []
 
 
+def test_an_import_fetches_the_skins_of_works_dated_from_the_index_in_its_skins_step():
+    # Resolve issues dated these works' files from their FicFairy index, so the run never reads
+    # them: asked to, it reads each one's page in the skins step - one request a work
+    job = server.Job(server.ACTION_IMPORT, ['JSON'], '',
+                     server.resolve_options({'skins': True, 'indexDatedSkins': ['7', '8', 'x']}))
+    assert job.options['indexDatedSkins'] == ['7', '8']
+    assert ('skins', strings.STEP_SKINS_INDEX_DATED) in server.step_plan(job)
+    ao3 = server.Ao3(MagicMock(), MagicMock(), [], None, False, False)
+    job.ao3 = ao3
+    assert ao3.skins_pending == ['7', '8']
+
+
+def test_works_dated_from_the_index_are_fetched_only_by_an_import_fetching_skins():
+    assert started_options(server.ACTION_IMPORT, {'skins': True, 'indexDatedSkins': ['7']}, '1',
+                           filetypes=['JSON'])['indexDatedSkins'] == ['7']
+    assert started_options(server.ACTION_IMPORT, {'indexDatedSkins': ['7']}, '1',
+                           filetypes=['JSON'])['indexDatedSkins'] == []
+    assert started_options(server.ACTION_WORKS, {'skins': True, 'indexDatedSkins': ['7']}, '1',
+                           filetypes=['JSON', 'HTML'])['indexDatedSkins'] == []
+    # an import with none lists no skins step of its own
+    job = server.Job(server.ACTION_IMPORT, ['JSON'], '', server.resolve_options({'skins': True}))
+    assert 'skins' not in [x for x, _ in server.step_plan(job)]
+
+
+def test_the_skins_step_reads_each_index_dated_work_once_and_saves_its_skin(tmp_path):
+    ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWork')})
+    job = server.Job(server.ACTION_IMPORT, ['JSON'], '',
+                     server.resolve_options({'skins': True, 'indexDatedSkins': ['41822007']}))
+    job.ao3 = ao3
+    job.steps = MagicMock()
+    job.steps.plan = [('skins', strings.STEP_SKINS_INDEX_DATED)]
+
+    server.fetch_pending_skins(job, MagicMock(), ao3, MagicMock())
+
+    assert os.listdir(tmp_path / strings.SKINS_FOLDER_NAME) == ['41822007.css']
+    assert ao3.skins_pending == []
+
+
 def test_an_import_not_fetching_skins_saves_none_while_looking_works_up(tmp_path):
     ao3 = skinning(tmp_path, {WORK_PAGE: page('unlockedWork')})
     ao3.skins = False

@@ -559,6 +559,10 @@ def resolve_options(requested) -> dict:
         # with html in the library
         'skinWorks': [str(x) for x in given.get('skinWorks') if str(x).isdigit()]
         if isinstance(given.get('skinWorks'), list) else [],
+        # Resolve issues: works whose files the page dated from their FicFairy index and that the
+        # run does not otherwise read - their skins fetched too, one request each, when asked
+        'indexDatedSkins': [str(x) for x in given.get('indexDatedSkins') if str(x).isdigit()]
+        if isinstance(given.get('indexDatedSkins'), list) else [],
         # any run may go without logging in - see USERNAME_ACTIONS for what it still needs
         'skipLogin': bool(given.get('skipLogin')),
         # a typed range: the page sends each end as the UTC moment it begins (from) or ends
@@ -981,6 +985,10 @@ class Job:
         # a retry fetching skins goes back for the ones its earlier attempt did not get, whether
         # or not their html is downloaded again - read in the skins step with the rest
         if real and value.skins is True:
+            # Resolve issues: the works dated from their FicFairy index, which nothing else reads
+            if self.action == ACTION_IMPORT:
+                for work in (getattr(self, 'options', None) or {}).get('indexDatedSkins') or []:
+                    if work not in value.skins_pending: value.skins_pending.append(str(work))
             for work in (getattr(self, 'resume', None) or {}).get('missedSkins') or []:
                 if work not in value.skins_pending: value.skins_pending.append(str(work))
             if value.skins_pending: value.skins_pending_changed()
@@ -1226,7 +1234,21 @@ def fetches_skins(job: Job) -> bool:
     that reads the ones not to hand (`fetch_pending_skins`)."""
     # only with HTML ticked, on every run (`do_POST` clears the option without it)
     return bool((job.options or {}).get('skins')) and \
-        'HTML' in [str(x).upper() for x in job.filetypes]
+        ('HTML' in [str(x).upper() for x in job.filetypes] or bool(index_dated_skins(job)))
+
+
+def index_dated_skins(job: Job) -> list[str]:
+    """Resolve issues' works dated from their FicFairy index whose skins are fetched too - the
+    import's alone, and only with *Fetch work skins* ticked."""
+    options = job.options or {}
+    if job.action != ACTION_IMPORT or not options.get('skins'): return []
+    return list(options.get('indexDatedSkins') or [])
+
+
+def skins_step_label(job: Job) -> str:
+    """The skins step's words: an import reading its index-dated works' skins says so - every
+    other work it reads has its skin saved as its page is read, so there is no html left over."""
+    return strings.STEP_SKINS_INDEX_DATED if index_dated_skins(job) else strings.STEP_SKINS_FOR_HTML
 
 
 def step_plan(job: Job) -> list[tuple[str, str]]:
@@ -1323,7 +1345,7 @@ def step_plan(job: Job) -> list[tuple[str, str]]:
                 window.append(('nonbookmarks', strings.STEP_NON_BOOKMARKS))
             window.extend([('check', strings.STEP_CHECK_FILES),
                            ('update', strings.STEP_UPDATE_WINDOW)])
-            if fetches_skins(job): window.append(('skins', strings.STEP_SKINS_FOR_HTML))
+            if fetches_skins(job): window.append(('skins', skins_step_label(job)))
             window.extend([('fichub', strings.STEP_FICHUB),
                            ('cleanup', strings.STEP_CLEANUP),
                            ('report', strings.STEP_REPORT)])
@@ -1357,7 +1379,7 @@ def step_plan(job: Job) -> list[tuple[str, str]]:
     # end. every run can end with files to tidy away, and every run reports - in that order,
     # so a work FicHub gave us is linked to its collections, and anything the cleanup could
     # not remove is in the report
-    if fetches_skins(job): plan.append(('skins', strings.STEP_SKINS_FOR_HTML))
+    if fetches_skins(job): plan.append(('skins', skins_step_label(job)))
     plan.append(('fichub', strings.STEP_FICHUB))
     plan.append(('cleanup', strings.STEP_CLEANUP))
     plan.append(('report', strings.STEP_REPORT))
@@ -6875,6 +6897,8 @@ class Handler(BaseHTTPRequestHandler):
         else:
             options['skinScope'] = 'unchecked'
             options['skinWorks'] = []
+            # Resolve issues' index-dated works: the import's alone, and only fetching skins
+            if action != ACTION_IMPORT or not options['skins']: options['indexDatedSkins'] = []
             # work skins go with html, on every run - the ones that read each work's page anyway
             # included, at the owner's request: no HTML ticked, no skin saved. But for an import
             # (Resolve issues), which reads every work's page to index it, so its skin is free:

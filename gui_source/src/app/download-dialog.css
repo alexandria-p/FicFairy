@@ -1084,3 +1084,8 @@ textarea.ghost-typing {
 .existing-options .skip-index-hint {
   margin-bottom: 8px;
 }
+
+/* Resolve issues: a choice that belongs to the box above it, set in under it */
+.check.nested-option {
+  margin-left: 1.6rem;
+}

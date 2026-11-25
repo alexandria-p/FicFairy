@@ -106,7 +106,7 @@ def test_html_is_offered_by_default_but_can_be_turned_off():
 def test_resolve_options_defaults_match_the_console_defaults():
     assert server.resolve_options(None) == {
         'start': 1, 'pages': 0, 'series': False, 'images': False, 'skins': False, 'workdates': False,
-        'reindex': True, 'dates': False, 'order': '', 'recheck': False, 'skinsOnly': False, 'skinScope': 'unchecked', 'skinWorks': [], 'skipLogin': False, 'dateFrom': '', 'dateTo': '',
+        'reindex': True, 'dates': False, 'order': '', 'recheck': False, 'skinsOnly': False, 'skinScope': 'unchecked', 'skinWorks': [], 'indexDatedSkins': [], 'skipLogin': False, 'dateFrom': '', 'dateTo': '',
         'overwrite': False, 'floorRun': '', 'nonBookmarks': False, 'resume': '', 'retryMode': '',
         'collectionWorks': False, 'subcollections': False, 'parentCollections': False,
         'replaceOutdated': False, 'indexOnly': [],
@@ -124,7 +124,7 @@ def test_resolve_options_reads_what_was_asked_for():
 
     assert result == {'start': 5, 'pages': 8, 'series': True, 'images': True, 'skins': False,
                       'workdates': True, 'reindex': False, 'dates': True, 'order': 'bookmarked',
-                      'recheck': False, 'skinsOnly': False, 'skinScope': 'unchecked', 'skinWorks': [], 'skipLogin': False,
+                      'recheck': False, 'skinsOnly': False, 'skinScope': 'unchecked', 'skinWorks': [], 'indexDatedSkins': [], 'skipLogin': False,
                       'dateFrom': '2026-01-01', 'dateTo': '2026-06-30',
                       'overwrite': True, 'floorRun': '', 'nonBookmarks': True,
                       'resume': '', 'retryMode': '', 'collectionWorks': True, 'subcollections': True,

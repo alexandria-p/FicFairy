@@ -1410,6 +1410,14 @@
           <p class="hint skins-hint">
             Work skins are only fetched for AO3.
           </p>
+          <!-- works dated from the FicFairy index that the run does not otherwise read -->
+          @if (importIndexDated().length) {
+            <label class="check nested-option index-dated-skins">
+              <input type="checkbox" name="indexDatedSkins" [checked]="importIndexSkins()"
+                     (change)="importIndexSkins.set($any($event.target).checked)" />
+              <span>Fetch skins for works that were dated using an existing FicFairy index? (This will be an extra call to AO3 per fic)</span>
+            </label>
+          }
         }
       </section>
       <footer>
