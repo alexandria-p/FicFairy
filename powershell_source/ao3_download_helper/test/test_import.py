@@ -727,6 +727,25 @@ def test_overwriting_is_for_the_works_updated_alone_never_a_work_only_looked_up_
     assert '1 Fic 1 - Someone 2026-05-01.epub' in works_files(library)
 
 
+@pytest.mark.parametrize('kind', ['looked up', 'updated', 'repaired'])
+def test_every_work_an_import_takes_in_has_its_page_read_so_its_skin_comes_free(library, monkeypatch, kind):
+    # *Fetch work skins* on Resolve issues: a work only looked up, one searched for updates and
+    # one with a file to repair are all read on AO3 (`index_one_work`), and reading the page is
+    # what saves its skin (`note_skin`) - so each of them gets its skin, at no extra request
+    a_copy(library, '1 Fic 1 - Someone.html')
+    a_copy(library, '2 Fic 2 - Someone 2026-05-01.epub')
+    options = {
+        'looked up': {'index_only': ['1', '2']},
+        'updated': {'index_only': []},
+        'repaired': {'index_only': ['1', '2'], 'repair': ['1 Fic 1 - Someone.html']},
+    }[kind]
+
+    job, _ = importing(library, monkeypatch, ['JSON', 'EPUB'], replace=True, skins=True, **options)
+
+    assert job.options['skins'] is True
+    assert {'1', '2'} <= job.ao3.reindexed
+
+
 def test_only_renaming_is_a_repairs_alone():
     _, [job], _ = start_request(server.ACTION_IMPORT, '1', repairRenameOnly=True)
     assert job.options['repairRenameOnly'] is False
