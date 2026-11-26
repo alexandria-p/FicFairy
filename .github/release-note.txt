@@ -1,2 +1,2 @@
 no-post
-Improvements to the 'Resolve issues' window when repairing your imported files.
+When FicHub cannot find a fic, the run now says so plainly instead of reporting an odd reply.

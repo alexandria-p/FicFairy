@@ -37,12 +37,15 @@ def lookup(repo, link: str) -> dict:
     except ValueError as e:
         raise exceptions.FicHubException(strings.ERROR_FICHUB_NOT_JSON,
                                          reply=odd_reply(response, url)) from e
+    # an error it reports comes with no `meta` (`{"err": -1, "msg": "unable to find fic", ...}`),
+    # so it is read before the shape is checked: it is FicHub's ordinary "not found", not an
+    # odd reply to keep for troubleshooting
+    if isinstance(answer, dict) and answer.get('err'):
+        raise exceptions.FicHubException(strings.ERROR_FICHUB_LOOKUP.format(
+            answer.get('msg') or answer.get('err')))
     if not isinstance(answer, dict) or not isinstance(answer.get('meta'), dict):
         raise exceptions.FicHubException(strings.ERROR_FICHUB_NOT_JSON,
                                          reply=odd_reply(response, url))
-    if answer.get('err'):
-        raise exceptions.FicHubException(strings.ERROR_FICHUB_LOOKUP.format(
-            answer.get('msg') or answer.get('err')))
 
     asked = parse_text.get_work_number(link)
     source = parse_text.get_work_number(str(answer['meta'].get('source') or ''))

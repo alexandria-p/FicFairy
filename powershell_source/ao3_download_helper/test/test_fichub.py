@@ -124,6 +124,17 @@ def test_an_odd_reply_is_kept_on_the_failure_to_look_at_afterwards():
     assert reply['url'].startswith('https://fichub.net/api/v0/epub?q=')
 
 
+def test_fichub_saying_it_cannot_find_the_fic_is_a_plain_failure_not_an_odd_reply():
+    # its real answer for a work it could not get: an error, and no meta
+    repo = answering(body={'arg': 'https:/archiveofourown.org/works/13392882', 'err': -1, 'fixits': [],
+                           'msg': 'unable to find fic', 'q': 'https://archiveofourown.org/works/13392882',
+                           'res': 'unable to extract fic content', 'ret': 8, 'upstream': True})
+    with pytest.raises(exceptions.FicHubException) as raised:
+        fichub.lookup(repo, 'https://archiveofourown.org/works/13392882')
+    assert str(raised.value) == strings.ERROR_FICHUB_LOOKUP.format('unable to find fic')
+    assert raised.value.reply is None
+
+
 def test_an_odd_reply_keeps_only_the_start_of_a_long_body():
     repo = answering(body={'no': 'meta'})
     repo.my_request.return_value.text = 'x' * (fichub.ODD_REPLY_KEPT_CHARS + 10)
