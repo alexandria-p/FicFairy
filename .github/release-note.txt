@@ -1,1 +1,2 @@
+no-post
 When FicHub cannot find a fic, the run now says so plainly instead of reporting an odd reply.
